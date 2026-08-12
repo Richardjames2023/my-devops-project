@@ -1,0 +1,42 @@
+name: Multi-Stage Deployment pipeline
+
+# TRIGGER CONTROL: run this pipeline whenever anyone pushes code to dev or main
+on:
+  push:
+    branches: [ dev, main ]
+
+jobs:
+  # PHASE-ONE: VERIFICATIOIN & TESTING (Runs automaticaally on github runners)
+  test-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code from GitHub
+         uses: actions/checkout@v4
+
+      - name: Setup Node runtime with caching 
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Project Dependencies
+        run: npm ci
+
+      - name: Run Unit Test Pyramid Layer 
+        run: npm test  
+
+  # PHASE-TWO: AUTOMATED DEPLOYMENTS (triggers only if test passed successfully)
+  deploy-to-aws:
+    needs: test-and-validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+
+      # We will stimulate a secure simulation layout,  where we will connect our server variable next 
+      - name: Deploy Feature Container to a live AWS Server
+        run: |
+          echo "Initializing secure deployment rollout"
+          echo "target branch: ${{github.ref_name}}"
+          echo "git commit SHA: ${{github.sha}}"
