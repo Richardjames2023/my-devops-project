@@ -20,7 +20,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Project Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run Unit Test Pyramid Layer 
         run: npm test  
