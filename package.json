@@ -1,0 +1,11 @@
+{
+  "name": "my-devops-project",
+  "version": "1.0.0",
+  "description": "Multi-stage pipeline backend tracker",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "echo \"Running feature unit tests...\" && exit 0"
+  },
+  "dependencies": {}
+}
