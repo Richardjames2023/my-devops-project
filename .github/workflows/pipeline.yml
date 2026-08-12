@@ -41,17 +41,17 @@ jobs:
           host: ${{secrets.AWS_SERVER_IP}}
           username: ${{secrets.AWS_USERNAME}}
           key: ${{secrets.AWS_SSH_KEY}}
-          script: |
-            echo "-- Standing Inside Live AWS Server --"
-
-            # WE will need to create a clean project workspace directory on the server if doesn't exist
-            mkdir -p ~/app
+          sscript: |
+            echo "--- Standing inside Live AWS Server ---"
+            
+            # 1. Ensure our workspaces exist cleanly
+            mkdir -p ~/app/src
             cd ~/app
 
-            # We will clear out all our old version of our code file
+            # 2. Clear out old files safely
             rm -f package.json Dockerfile src/app.js
 
-            # we will downnload the fresh code file directly into the server workspaceb
+            # 3. Re-inject our architectural layers cleanly
             cat << 'EOF' > package.json
             {
               "name": "my-devops-project",
@@ -100,15 +100,16 @@ jobs:
             });
             EOF
 
-             echo "--- Building Multi-Stage Docker Container ---"
-            # 4. Stop and remove old running container instances
+            echo "--- Executing Automated Docker Swaps ---"
+            # 4. Cycle out the old running container
             docker stop my-feature-app || true
             docker rm my-feature-app || true
 
-            # 5. Build our highly optimized multi-stage image locally on the server
+            # 5. Build our highly optimized container image from scratch
             docker build -t devops-app:latest .
 
-            # 6. Spin up our container live, mapping internal port 3000 to public web port 80!
+            # 6. Push the new build live to web port 80
             docker run -d --name my-feature-app -p 80:3000 -e NODE_ENV="Development Feature Phase" devops-app:latest
             
-            echo "--- Deployment Complete! Container is Live! ---"
+            echo "--- Automation Run Completed Successfully! ---"
+
