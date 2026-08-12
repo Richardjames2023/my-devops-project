@@ -49,24 +49,59 @@ jobs:
             cd ~/app
 
             # We will clear out all our old version of our code file
-            rm -rf *
+            rm -f package.json Dockerfile src/app.js
 
             # we will downnload the fresh code file directly into the server workspaceb
             cat << 'EOF' > package.json
-            ${{ sed '' package.json }}
+            {
+              "name": "my-devops-project",
+              "version": "1.0.0",
+              "description": "Multi-stage pipeline backend tracker",
+              "main": "src/app.js",
+              "scripts": {
+                "start": "node src/app.js",
+                "test": "echo \"Running feature unit tests...\" && exit 0"
+              },
+              "dependencies": {}
+            }
             EOF
 
             cat << 'EOF' > Dockerfile
-            ${{sed '' Dockerfile }}
+            FROM node:20-alpine AS builder
+            WORKDIR /usr/src/app
+            COPY package*.json ./
+            RUN npm install
+            COPY src/ ./src
+
+            FROM node:20-alpine AS runtime
+            ENV NODE_ENV=production
+            WORKDIR /app
+            COPY --from=builder /usr/src/app/src ./src
+            EXPOSE 3000
+            CMD ["node", "src/app.js"]
             EOF
 
-            mkdir -p src
             cat << 'EOF' > src/app.js
-            ${{ sed '' src/app.js }}
+            const http = require('http');
+            const PORT = process.env.PORT || 3000;
+            const ENV_NAME = process.env.NODE_ENV || 'Development Sandbox';
+
+            const server = http.createServer((req, res) => {
+              if (req.url === '/health') {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ status: 'UP', environment: ENV_NAME }));
+              }
+              res.writeHead(200, { 'Content-Type': 'text/plain' });
+              res.end(`Welcome to the ${ENV_NAME} Environment!\nDeployment is 100% SUCCESSFUL!\n`);
+            });
+
+            server.listen(PORT, () => {
+              console.log(`Server running securely on port ${PORT}`);
+            });
             EOF
 
-            echo "-- Building Multi-Stage Docker Container --"
-            # Stop and remove  the old running container so we don't hit a port conflict
+             echo "--- Building Multi-Stage Docker Container ---"
+            # 4. Stop and remove old running container instances
             docker stop my-feature-app || true
             docker rm my-feature-app || true
 
