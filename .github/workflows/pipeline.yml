@@ -34,9 +34,46 @@ jobs:
         uses: actions/checkout@v4
 
 
-      # We will stimulate a secure simulation layout,  where we will connect our server variable next 
-      - name: Deploy Feature Container to a live AWS Server
-        run: |
-          echo "Initializing secure deployment rollout"
-          echo "target branch: ${{github.ref_name}}"
-          echo "git commit SHA: ${{github.sha}}"
+      # Securely log into AWS, package the app and launch it live!
+      - name: Execute Remote SSH Deployment Via Docker
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{secrets.AWS_SERVER_IP}}
+          username: ${{secrets.AWS_USERNAME}}
+          key: ${{secrets.AWS_SSH_KEY}}
+          script: |
+            echo "-- Standing Inside Live AWS Server --"
+
+            # WE will need to create a clean project workspace directory on the server if doesn't exist
+            mkdir -p ~/app
+            cd ~/app
+
+            # We will clear out all our old version of our code file
+            rm -rf *
+
+            # we will downnload the fresh code file directly into the server workspaceb
+            cat << 'EOF' > package.json
+            ${{ sed '' package.json }}
+            EOF
+
+            cat << 'EOF' > Dockerfile
+            ${{sed '' Dockerfile }}
+            EOF
+
+            mkdir -p src
+            cat << 'EOF' > src/app.js
+            ${{ sed '' src/app.js }}
+            EOF
+
+            echo "-- Building Multi-Stage Docker Container --"
+            # Stop and remove  the old running container so we don't hit a port conflict
+            docker stop my-feature-app || true
+            docker rm my-feature-app || true
+
+            # 5. Build our highly optimized multi-stage image locally on the server
+            docker build -t devops-app:latest .
+
+            # 6. Spin up our container live, mapping internal port 3000 to public web port 80!
+            docker run -d --name my-feature-app -p 80:3000 -e NODE_ENV="Development Feature Phase" devops-app:latest
+            
+            echo "--- Deployment Complete! Container is Live! ---"
