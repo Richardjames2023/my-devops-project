@@ -41,7 +41,7 @@ jobs:
           host: ${{secrets.AWS_SERVER_IP}}
           username: ${{secrets.AWS_USERNAME}}
           key: ${{secrets.AWS_SSH_KEY}}
-          sscript: |
+          script: |
             echo "--- Standing inside Live AWS Server ---"
             
             # 1. Ensure our workspaces exist cleanly
