@@ -3,7 +3,7 @@ name: Multi-Stage Deployment pipeline
 # TRIGGER CONTROL: run this pipeline whenever anyone pushes code to dev or main
 on:
   push:
-    branches: [ dev, main ]
+    branches: [ dev, staging, main ]
 
 jobs:
   # PHASE-ONE: VERIFICATIOIN & TESTING (Runs automaticaally on github runners)
