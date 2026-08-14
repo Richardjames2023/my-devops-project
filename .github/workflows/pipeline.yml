@@ -84,7 +84,7 @@ jobs:
             cat << 'EOF' > src/app.js
             const http = require('http');
             const PORT = process.env.PORT || 3000;
-            const ENV_NAME = process.env.NODE_ENV || 'Development Sandbox';
+            const ENV_NAME = process.env.NODE_ENV || 'Live Environment';
 
             const server = http.createServer((req, res) => {
               if (req.url === '/health') {
@@ -108,8 +108,8 @@ jobs:
             # 5. Build our highly optimized container image from scratch
             docker build -t devops-app:latest .
 
-            # 6. Push the new build live to web port 80
-            docker run -d --name my-feature-app -p 80:3000 -e NODE_ENV="Development Feature Phase" devops-app:latest
-            
+            # 6. Push the new build live to web port 80 using your active branch name as the label
+            docker run -d --name my-feature-app -p 80:3000 -e NODE_ENV="${{ github.ref_name }} Environment" devops-app:latest
+
             echo "--- Automation Run Completed Successfully! ---"
 
