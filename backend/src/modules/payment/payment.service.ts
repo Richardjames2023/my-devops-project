@@ -207,15 +207,25 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
     // Paystack may have initialized the transaction even though
     // our server did not receive a reliable response.
     if (error instanceof PaystackInitializationUncertainError) {
-      const payment = await prisma.payment.update({
+      await prisma.payment.updateMany({
         where: {
           id: paymentContext.payment.id,
+          status: "PENDING",
         },
         data: {
           status: "INITIALIZATION_UNKNOWN",
         },
       });
 
+      const payment = await prisma.payment.findUnique({
+        where: {
+          id: paymentContext.payment.id,
+        },
+      });
+
+      if (!payment) {
+        throw new AppError("Payment not found during reconciliation", 404);
+      }
       console.error(
         "[PAYMENT] Paystack initialization outcome is uncertain. Inventory reservations have been preserved.",
         {
