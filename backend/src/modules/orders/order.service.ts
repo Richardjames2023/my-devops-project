@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type { CreateOrderInput } from "./order.validation";
@@ -14,86 +15,105 @@ export async function createOrder(
   input: CreateOrderInput,
 ) {
   return prisma.$transaction(async (tx) => {
-    const variantIds = input.items.map(
-      (item) => item.productVariantId,
-    );
-
-    const variants = await tx.productVariant.findMany({
-      where: {
-        id: {
-          in: variantIds,
-        },
-        isActive: true,
-      },
+    // 1. Retrieve the customer's cart from PostgreSQL.
+    const cart = await tx.cart.findUnique({
+      where: { userId },
       include: {
-        product: true,
+        items: {
+          include: {
+            productVariant: {
+              include: {
+                product: true,
+                inventory: true,
+              },
+            },
+          },
+        },
       },
     });
 
-    if (variants.length !== new Set(variantIds).size) {
-      throw new AppError(
-        "One or more product variants were not found or are inactive",
-        400,
-      );
+    if (!cart || cart.items.length === 0) {
+      throw new AppError("Your cart is empty", 400);
     }
 
-    const variantMap = new Map(
-      variants.map((variant) => [variant.id, variant]),
-    );
+    // Validate products, variants and available inventory.
+    let subtotal = new Prisma.Decimal(0);
 
-    let subtotal = 0;
+    const orderItems = cart.items.map((item) => {
+      const variant = item.productVariant;
+      const product = variant.product;
+      const inventory = variant.inventory;
 
-    const orderItems = input.items.map((item) => {
-      const variant = variantMap.get(item.productVariantId);
-
-      if (!variant) {
-        throw new AppError("Product variant not found", 404);
+      if (!variant.isActive || !product.isActive) {
+        throw new AppError(
+          `${product.name} - ${variant.name} is no longer available`,
+          409,
+        );
       }
 
-      const unitPrice = Number(variant.price);
-      const totalPrice = unitPrice * item.quantity;
+      if (!inventory) {
+        throw new AppError(
+          `Inventory not found for ${product.name} - ${variant.name}`,
+          409,
+        );
+      }
 
-      subtotal += totalPrice;
+      const availableStock = Math.max(
+        0,
+        inventory.quantity -
+          inventory.reservedQuantity -
+          inventory.quarantineQuantity,
+      );
+
+      if (item.quantity > availableStock) {
+        throw new AppError(
+          `Insufficient stock for ${product.name} - ${variant.name}. Available quantity: ${availableStock}`,
+          409,
+        );
+      }
+
+      // Calculate prices using current database prices.
+      const unitPrice = variant.price;
+      const totalPrice = unitPrice.mul(item.quantity);
+
+      subtotal = subtotal.plus(totalPrice);
 
       return {
         productVariantId: variant.id,
-        productName: variant.product.name,
+        productName: product.name,
         variantName: variant.name,
         sku: variant.sku,
         quantity: item.quantity,
-        unitPrice: variant.price,
-        discountAmount: 0,
+        unitPrice,
+        discountAmount: new Prisma.Decimal(0),
         totalPrice,
       };
     });
 
-    const discountAmount = 0;
-    const deliveryFee = 0;
-    const totalAmount =
-      subtotal - discountAmount + deliveryFee;
+    // Calculate the order total.
+    const discountAmount = new Prisma.Decimal(0);
+    const deliveryFee = new Prisma.Decimal(0);
 
+    const totalAmount = subtotal
+      .minus(discountAmount)
+      .plus(deliveryFee);
+
+    // Create the order and its items in the same transaction.
     const order = await tx.order.create({
       data: {
         userId,
-
         orderNumber: generateOrderNumber(),
-
         status: "PENDING",
-
         subtotal,
         discountAmount,
         deliveryFee,
         totalAmount,
-
         currency: "NGN",
-
         shippingAddress: input.shippingAddress,
-
         items: {
           create: orderItems,
         },
       },
-
       include: {
         items: true,
       },

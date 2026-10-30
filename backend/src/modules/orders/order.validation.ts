@@ -1,3 +1,4 @@
+
 import { z } from "zod";
 
 const shippingAddressSchema = z.object({
@@ -38,19 +39,6 @@ const shippingAddressSchema = z.object({
 });
 
 export const createOrderSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        productVariantId: z.uuid("Invalid product variant ID"),
-
-        quantity: z
-          .number()
-          .int("Quantity must be a whole number")
-          .positive("Quantity must be greater than zero"),
-      }),
-    )
-    .min(1, "Order must contain at least one item"),
-
   shippingAddress: shippingAddressSchema,
 });
 

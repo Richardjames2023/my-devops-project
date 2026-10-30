@@ -24,15 +24,14 @@ export async function createInventoryReservation(
       throw new AppError("Inventory not found", 404);
     }
 
-    const existingReservation =
-      await tx.inventoryReservation.findUnique({
-        where: {
-          orderId_inventoryId: {
-            orderId: input.orderId,
-            inventoryId: input.inventoryId,
-          },
+    const existingReservation = await tx.inventoryReservation.findUnique({
+      where: {
+        orderId_inventoryId: {
+          orderId: input.orderId,
+          inventoryId: input.inventoryId,
         },
-      });
+      },
+    });
 
     if (existingReservation) {
       throw new AppError(
@@ -45,7 +44,7 @@ export async function createInventoryReservation(
       UPDATE inventory
       SET "reservedQuantity" = "reservedQuantity" + ${input.quantity}
       WHERE id = ${input.inventoryId}::uuid
-        AND quantity - "reservedQuantity" >= ${input.quantity}
+        AND quantity - "reservedQuantity" - "quarantineQuantity" >= ${input.quantity}
       RETURNING id
     `;
 
@@ -81,9 +80,7 @@ export async function createInventoryReservation(
   });
 }
 
-export async function confirmInventoryReservation(
-  reservationId: string,
-) {
+export async function confirmInventoryReservation(reservationId: string) {
   return prisma.$transaction(async (tx) => {
     const reservation = await tx.inventoryReservation.findUnique({
       where: { id: reservationId },
@@ -93,44 +90,41 @@ export async function confirmInventoryReservation(
       throw new AppError("Reservation not found", 404);
     }
 
-    if (reservation.status !== "PENDING") {
-      throw new AppError(
-        `Reservation cannot be confirmed because it is ${reservation.status}`,
-        400,
-      );
-    }
+    const now = new Date();
 
-    if (reservation.expiresAt <= new Date()) {
-      throw new AppError(
-        "Reservation has expired and cannot be confirmed",
-        400,
-      );
-    }
-
-    const inventory = await tx.inventory.findUnique({
-      where: { id: reservation.inventoryId },
+    // Atomically claim confirmation.
+    const confirmed = await tx.inventoryReservation.updateMany({
+      where: {
+        id: reservationId,
+        status: "PENDING",
+        expiresAt: {
+          gt: now,
+        },
+      },
+      data: {
+        status: "CONFIRMED",
+        confirmedAt: now,
+      },
     });
 
-    if (!inventory) {
-      throw new AppError("Inventory not found", 404);
-    }
-
-    if (inventory.reservedQuantity < reservation.quantity) {
+    if (confirmed.count !== 1) {
       throw new AppError(
-        "Reserved inventory is inconsistent",
+        "Reservation has expired or has already been processed",
         409,
       );
     }
 
-    if (inventory.quantity < reservation.quantity) {
-      throw new AppError(
-        "Inventory quantity is insufficient",
-        409,
-      );
-    }
-
-    const updatedInventory = await tx.inventory.update({
-      where: { id: inventory.id },
+    // Deduct stock and release its reservation.
+    const updatedInventory = await tx.inventory.updateMany({
+      where: {
+        id: reservation.inventoryId,
+        quantity: {
+          gte: reservation.quantity,
+        },
+        reservedQuantity: {
+          gte: reservation.quantity,
+        },
+      },
       data: {
         quantity: {
           decrement: reservation.quantity,
@@ -141,50 +135,8 @@ export async function confirmInventoryReservation(
       },
     });
 
-    const movement = await tx.stockMovement.create({
-      data: {
-        inventoryId: inventory.id,
-        type: "SOLD",
-        quantity: reservation.quantity,
-        reference: reservation.orderId,
-        reason: "Inventory confirmed after successful payment",
-      },
-    });
-
-    const confirmedReservation =
-      await tx.inventoryReservation.update({
-        where: { id: reservation.id },
-        data: {
-          status: "CONFIRMED",
-          confirmedAt: new Date(),
-        },
-      });
-
-    return {
-      reservation: confirmedReservation,
-      inventory: updatedInventory,
-      movement,
-    };
-  });
-}
-
-export async function releaseInventoryReservation(
-  reservationId: string,
-) {
-  return prisma.$transaction(async (tx) => {
-    const reservation = await tx.inventoryReservation.findUnique({
-      where: { id: reservationId },
-    });
-
-    if (!reservation) {
-      throw new AppError("Reservation not found", 404);
-    }
-
-    if (reservation.status !== "PENDING") {
-      throw new AppError(
-        `Reservation cannot be released because it is ${reservation.status}`,
-        400,
-      );
+    if (updatedInventory.count !== 1) {
+      throw new AppError("Reserved inventory is inconsistent", 409);
     }
 
     const inventory = await tx.inventory.findUnique({
@@ -195,15 +147,69 @@ export async function releaseInventoryReservation(
       throw new AppError("Inventory not found", 404);
     }
 
-    if (inventory.reservedQuantity < reservation.quantity) {
+    const movement = await tx.stockMovement.create({
+      data: {
+        inventoryId: reservation.inventoryId,
+        type: "SOLD",
+        quantity: reservation.quantity,
+        reference: reservation.orderId,
+        reason: "Inventory confirmed after successful payment",
+      },
+    });
+
+    const confirmedReservation = await tx.inventoryReservation.findUnique({
+      where: { id: reservationId },
+    });
+
+    if (!confirmedReservation) {
+      throw new AppError("Confirmed reservation could not be retrieved", 409);
+    }
+
+    return {
+      reservation: confirmedReservation,
+      inventory,
+      movement,
+    };
+  });
+}
+
+export async function releaseInventoryReservation(reservationId: string) {
+  return prisma.$transaction(async (tx) => {
+    const reservation = await tx.inventoryReservation.findUnique({
+      where: { id: reservationId },
+    });
+
+    if (!reservation) {
+      throw new AppError("Reservation not found", 404);
+    }
+
+    // Atomically claim the release.
+    // Only one concurrent request can change PENDING to RELEASED.
+    const released = await tx.inventoryReservation.updateMany({
+      where: {
+        id: reservationId,
+        status: "PENDING",
+      },
+      data: {
+        status: "RELEASED",
+        releasedAt: new Date(),
+      },
+    });
+
+    if (released.count !== 1) {
       throw new AppError(
-        "Reserved inventory is inconsistent",
+        "Reservation has already been processed or cannot be released",
         409,
       );
     }
 
-    const updatedInventory = await tx.inventory.update({
-      where: { id: inventory.id },
+    const updatedInventory = await tx.inventory.updateMany({
+      where: {
+        id: reservation.inventoryId,
+        reservedQuantity: {
+          gte: reservation.quantity,
+        },
+      },
       data: {
         reservedQuantity: {
           decrement: reservation.quantity,
@@ -211,18 +217,25 @@ export async function releaseInventoryReservation(
       },
     });
 
-    const releasedReservation =
-      await tx.inventoryReservation.update({
-        where: { id: reservation.id },
-        data: {
-          status: "RELEASED",
-          releasedAt: new Date(),
-        },
-      });
+    if (updatedInventory.count !== 1) {
+      throw new AppError("Reserved inventory is inconsistent", 409);
+    }
+
+    const releasedReservation = await tx.inventoryReservation.findUnique({
+      where: { id: reservationId },
+    });
+
+    if (!releasedReservation) {
+      throw new AppError("Released reservation could not be retrieved", 409);
+    }
+
+    const inventory = await tx.inventory.findUnique({
+      where: { id: reservation.inventoryId },
+    });
 
     return {
       reservation: releasedReservation,
-      inventory: updatedInventory,
+      inventory,
     };
   });
 }
@@ -230,18 +243,17 @@ export async function releaseInventoryReservation(
 export async function expireInventoryReservations() {
   const now = new Date();
 
-  const expiredReservations =
-    await prisma.inventoryReservation.findMany({
-      where: {
-        status: "PENDING",
-        expiresAt: {
-          lte: now,
-        },
+  const expiredReservations = await prisma.inventoryReservation.findMany({
+    where: {
+      status: "PENDING",
+      expiresAt: {
+        lte: now,
       },
-      select: {
-        id: true,
-      },
-    });
+    },
+    select: {
+      id: true,
+    },
+  });
 
   let expiredCount = 0;
 
@@ -251,38 +263,33 @@ export async function expireInventoryReservations() {
       //
       // Only a PENDING reservation that has actually expired
       // can be changed to EXPIRED.
-      const updatedReservation =
-        await tx.inventoryReservation.updateMany({
-          where: {
-            id: reservation.id,
-            status: "PENDING",
-            expiresAt: {
-              lte: now,
-            },
+      const updatedReservation = await tx.inventoryReservation.updateMany({
+        where: {
+          id: reservation.id,
+          status: "PENDING",
+          expiresAt: {
+            lte: now,
           },
-          data: {
-            status: "EXPIRED",
-            releasedAt: now,
-          },
-        });
+        },
+        data: {
+          status: "EXPIRED",
+          releasedAt: now,
+        },
+      });
 
       // Another cleanup process may have already handled it.
       if (updatedReservation.count === 0) {
         return false;
       }
 
-      const reservationRecord =
-        await tx.inventoryReservation.findUnique({
-          where: {
-            id: reservation.id,
-          },
-        });
+      const reservationRecord = await tx.inventoryReservation.findUnique({
+        where: {
+          id: reservation.id,
+        },
+      });
 
       if (!reservationRecord) {
-        throw new AppError(
-          "Reservation disappeared during expiration",
-          409,
-        );
+        throw new AppError("Reservation disappeared during expiration", 409);
       }
 
       const updatedInventory = await tx.inventory.updateMany({
@@ -300,10 +307,7 @@ export async function expireInventoryReservations() {
       });
 
       if (updatedInventory.count === 0) {
-        throw new AppError(
-          "Reserved inventory is inconsistent",
-          409,
-        );
+        throw new AppError("Reserved inventory is inconsistent", 409);
       }
 
       return true;

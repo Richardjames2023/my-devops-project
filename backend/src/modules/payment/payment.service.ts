@@ -93,7 +93,7 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
         UPDATE inventory
         SET "reservedQuantity" = "reservedQuantity" + ${item.quantity}
         WHERE "productVariantId" = ${item.productVariantId}::uuid
-          AND quantity - "reservedQuantity" >= ${item.quantity}
+          AND quantity - "reservedQuantity" - "quarantineQuantity" >= ${item.quantity}
         RETURNING id
       `;
 
@@ -375,7 +375,7 @@ export async function markPaymentSuccessful(paymentId: string, userId: string) {
                 UPDATE inventory
                 SET "reservedQuantity" = "reservedQuantity" + ${reservation.quantity}
                 WHERE id = ${reservation.inventoryId}::uuid
-                  AND quantity - "reservedQuantity" >= ${reservation.quantity}
+                  AND quantity - "reservedQuantity" - "quarantineQuantity" >= ${reservation.quantity}
               `;
 
               if (reacquired !== 1) {
