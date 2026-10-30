@@ -625,6 +625,7 @@ enum PaymentProvider {
 
 enum PaymentStatus {
   PENDING
+  INITIALIZATION_UNKNOWN
   PROCESSING
   SUCCESS
   FAILED

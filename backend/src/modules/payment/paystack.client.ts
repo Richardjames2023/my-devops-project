@@ -11,6 +11,23 @@ interface PaystackApiResponse<T> {
   meta?: Record<string, unknown>;
 }
 
+class PaystackTransportError extends AppError {
+  constructor(message: string) {
+    super(message, 502);
+    this.name = "PaystackTransportError";
+  }
+}
+
+export class PaystackInitializationUncertainError extends AppError {
+  constructor() {
+    super(
+      "Paystack initialization outcome is uncertain. Payment reconciliation is required.",
+      503,
+    );
+    this.name = "PaystackInitializationUncertainError";
+  }
+}
+
 export class PaystackApiError extends AppError {
   public readonly providerStatusCode: number;
   public readonly providerCode: string | undefined;
@@ -127,15 +144,18 @@ async function paystackRequest<T>(
       signal: AbortSignal.timeout(15_000),
     });
   } catch {
-    throw new AppError("Unable to contact Paystack. Please try again.", 502);
+    throw new PaystackTransportError(
+      "Unable to confirm the Paystack request outcome.",
+    );
   }
-
   let result: PaystackApiResponse<T>;
 
   try {
     result = (await response.json()) as PaystackApiResponse<T>;
   } catch {
-    throw new AppError("Paystack returned an invalid response", 502);
+    throw new PaystackTransportError(
+      "Paystack returned an unreadable response.",
+    );
   }
 
   if (!response.ok || !result.status) {
@@ -169,15 +189,26 @@ export async function initializePaystackTransaction(input: {
     body.callback_url = input.callbackUrl;
   }
 
-  const result = await paystackRequest<PaystackInitializeData>(
-    "/transaction/initialize",
-    {
-      method: "POST",
-      body,
-    },
-  );
+  try {
+    const result = await paystackRequest<PaystackInitializeData>(
+      "/transaction/initialize",
+      {
+        method: "POST",
+        body,
+      },
+    );
 
-  return result.data;
+    return result.data;
+  } catch (error) {
+    if (
+      error instanceof PaystackTransportError ||
+      (error instanceof PaystackApiError && error.providerStatusCode >= 500)
+    ) {
+      throw new PaystackInitializationUncertainError();
+    }
+
+    throw error;
+  }
 }
 
 export async function verifyPaystackTransaction(
@@ -277,7 +308,6 @@ export async function listPaystackRefunds(input: {
   return result.data;
 }
 
-
 export interface PaystackRefundRetryData {
   id: number;
   status: string;
@@ -309,23 +339,21 @@ export async function retryPaystackRefund(input: {
     throw new AppError("Invalid refund currency", 400);
   }
 
-  const result =
-    await paystackRequest<PaystackRefundRetryData>(
-      `/refund/retry_with_customer_details/${encodeURIComponent(
-        String(input.refundId),
-      )}`,
-      {
-        method: "POST",
-        body: {
-          refund_account_details: {
-            currency: input.currency,
-            account_number: input.accountNumber,
-            bank_id: input.bankId,
-          },
+  const result = await paystackRequest<PaystackRefundRetryData>(
+    `/refund/retry_with_customer_details/${encodeURIComponent(
+      String(input.refundId),
+    )}`,
+    {
+      method: "POST",
+      body: {
+        refund_account_details: {
+          currency: input.currency,
+          account_number: input.accountNumber,
+          bank_id: input.bankId,
         },
       },
-    );
+    },
+  );
 
   return result.data;
 }
-

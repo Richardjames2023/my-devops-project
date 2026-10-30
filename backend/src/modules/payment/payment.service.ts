@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   initializePaystackTransaction,
   verifyPaystackTransaction,
+  PaystackInitializationUncertainError,
 } from "./paystack.client";
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
@@ -77,7 +78,7 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
       where: {
         orderId: order.id,
         status: {
-          in: ["PENDING", "PROCESSING", "SUCCESS"],
+          in: ["PENDING", "INITIALIZATION_UNKNOWN", "PROCESSING", "SUCCESS"],
         },
       },
     });
@@ -89,32 +90,82 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     for (const item of order.items) {
-      const updatedInventory = await tx.$queryRaw<{ id: string }[]>`
-        UPDATE inventory
-        SET "reservedQuantity" = "reservedQuantity" + ${item.quantity}
-        WHERE "productVariantId" = ${item.productVariantId}::uuid
-          AND quantity - "reservedQuantity" - "quarantineQuantity" >= ${item.quantity}
-        RETURNING id
-      `;
-
-      const inventory = updatedInventory[0];
+      const inventory = await tx.inventory.findUnique({
+        where: {
+          productVariantId: item.productVariantId,
+        },
+        select: {
+          id: true,
+        },
+      });
 
       if (!inventory) {
+        throw new AppError(
+          `Inventory not found for ${item.productName} - ${item.variantName}`,
+          404,
+        );
+      }
+
+      const existingReservation = await tx.inventoryReservation.findUnique({
+        where: {
+          orderId_inventoryId: {
+            orderId: order.id,
+            inventoryId: inventory.id,
+          },
+        },
+      });
+
+      if (existingReservation && existingReservation.status !== "RELEASED") {
+        throw new AppError(
+          "An existing inventory reservation requires reconciliation",
+          409,
+        );
+      }
+
+      const updatedInventory = await tx.$queryRaw<{ id: string }[]>`
+    UPDATE inventory
+    SET "reservedQuantity" = "reservedQuantity" + ${item.quantity}
+    WHERE id = ${inventory.id}::uuid
+      AND quantity - "reservedQuantity" - "quarantineQuantity" >= ${item.quantity}
+    RETURNING id
+  `;
+
+      if (updatedInventory.length === 0) {
         throw new AppError(
           `Insufficient inventory for ${item.productName} - ${item.variantName}`,
           409,
         );
       }
 
-      await tx.inventoryReservation.create({
-        data: {
-          orderId: order.id,
-          inventoryId: inventory.id,
-          quantity: item.quantity,
-          status: "PENDING",
-          expiresAt,
-        },
-      });
+      if (existingReservation) {
+        const reopenedReservation = await tx.inventoryReservation.updateMany({
+          where: {
+            id: existingReservation.id,
+            status: "RELEASED",
+          },
+          data: {
+            status: "PENDING",
+            quantity: item.quantity,
+            expiresAt,
+            releasedAt: null,
+            confirmedAt: null,
+          },
+        });
+
+        if (reopenedReservation.count !== 1) {
+          throw new AppError("Unable to reopen the inventory reservation", 409);
+        }
+      } else {
+        await tx.inventoryReservation.create({
+          data: {
+            orderId: order.id,
+            inventoryId: inventory.id,
+            quantity: item.quantity,
+            status: "PENDING",
+            expiresAt,
+          },
+        });
+      }
     }
 
     const payment = await tx.payment.create({
@@ -137,10 +188,13 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
   // Phase 2: Contact Paystack outside the database transaction.
   // Paystack expects the amount in the smallest currency unit:
   // NGN 1,000.00 = 100000 kobo.
-  try {
-    const amountKobo = paymentContext.payment.amount.mul(100).toFixed(0);
 
-    const initialized = await initializePaystackTransaction({
+  const amountKobo = paymentContext.payment.amount.mul(100).toFixed(0);
+
+  let initialized;
+
+  try {
+    initialized = await initializePaystackTransaction({
       email: paymentContext.email,
       amountKobo,
       currency: paymentContext.payment.currency,
@@ -149,23 +203,35 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
         ? { callbackUrl: process.env.PAYSTACK_CALLBACK_URL }
         : {}),
     });
-
-    const payment = await prisma.payment.update({
-      where: { id: paymentContext.payment.id },
-      data: {
-        metadata: {
-          accessCode: initialized.access_code,
-        },
-      },
-    });
-
-    return {
-      payment,
-      authorizationUrl: initialized.authorization_url,
-    };
   } catch (error) {
-    // If initialization failed, release only reservations that
-    // are still pending. This avoids releasing the same stock twice.
+    // Paystack may have initialized the transaction even though
+    // our server did not receive a reliable response.
+    if (error instanceof PaystackInitializationUncertainError) {
+      const payment = await prisma.payment.update({
+        where: {
+          id: paymentContext.payment.id,
+        },
+        data: {
+          status: "INITIALIZATION_UNKNOWN",
+        },
+      });
+
+      console.error(
+        "[PAYMENT] Paystack initialization outcome is uncertain. Inventory reservations have been preserved.",
+        {
+          paymentId: payment.id,
+          reference: payment.reference,
+        },
+      );
+
+      return {
+        payment,
+        authorizationUrl: null,
+      };
+    }
+
+    // Definite initialization failure:
+    // Release pending reservations and mark payment as failed.
     await prisma.$transaction(async (tx) => {
       const reservations = await tx.inventoryReservation.findMany({
         where: {
@@ -212,6 +278,36 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
 
     throw error;
   }
+
+  // Phase 3: Save Paystack metadata separately.
+  // Do not release inventory if this database operation fails.
+
+  let payment = paymentContext.payment;
+
+  try {
+    payment = await prisma.payment.update({
+      where: { id: paymentContext.payment.id },
+      data: {
+        metadata: {
+          accessCode: initialized.access_code,
+        },
+      },
+    });
+  } catch (metadataError) {
+    console.error(
+      "[PAYMENT] Paystack initialized successfully, but metadata could not be saved.",
+      {
+        paymentId: paymentContext.payment.id,
+        reference: paymentContext.payment.reference,
+        error: metadataError,
+      },
+    );
+  }
+
+  return {
+    payment,
+    authorizationUrl: initialized.authorization_url,
+  };
 }
 
 export async function markPaymentSuccessful(paymentId: string, userId: string) {
@@ -327,8 +423,14 @@ export async function markPaymentSuccessful(paymentId: string, userId: string) {
             );
           }
 
-          if (currentPayment.order.status !== "PENDING") {
-            throw new AppError("Order is no longer awaiting payment", 409);
+          if (
+            currentPayment.status !== "PENDING" &&
+            currentPayment.status !== "INITIALIZATION_UNKNOWN"
+          ) {
+            throw new AppError(
+              "Payment is not pending or awaiting reconciliation",
+              409,
+            );
           }
 
           // Load every reservation, including expired ones.
@@ -510,6 +612,190 @@ export async function markPaymentSuccessful(paymentId: string, userId: string) {
   }
 
   throw new AppError("Payment could not be completed. Please try again.", 409);
+}
+
+export async function reconcileUnknownPayment(paymentId: string) {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+  });
+
+  if (!payment) {
+    throw new AppError("Payment not found", 404);
+  }
+
+  if (payment.status !== "INITIALIZATION_UNKNOWN") {
+    return {
+      reconciled: false,
+      status: payment.status,
+    };
+  }
+
+  if (payment.provider !== "PAYSTACK") {
+    throw new AppError("Payment provider mismatch", 400);
+  }
+
+  // Ask Paystack for the authoritative transaction status.
+  const verified = await verifyPaystackTransaction(payment.reference);
+
+  // Never reconcile a transaction using a different reference.
+  if (verified.reference !== payment.reference) {
+    throw new AppError("Paystack transaction reference mismatch", 409);
+  }
+
+  const expectedAmountKobo = payment.amount.mul(100).toFixed(0);
+
+  if (
+    !Number.isSafeInteger(verified.amount) ||
+    String(verified.amount) !== expectedAmountKobo ||
+    verified.currency !== payment.currency
+  ) {
+    throw new AppError(
+      "Paystack transaction details do not match the payment",
+      409,
+    );
+  }
+
+  // Successful payments must use the existing verification
+  // and inventory-finalization workflow.
+  if (verified.status === "success") {
+    const currentPayment = await prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: {
+        order: {
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!currentPayment?.order.userId) {
+      throw new AppError("Payment order has no registered customer", 409);
+    }
+
+    const result = await markPaymentSuccessful(
+      paymentId,
+      currentPayment.order.userId,
+    );
+
+    return {
+      reconciled: true,
+      status: "SUCCESS" as const,
+      result,
+    };
+  }
+
+  // Only explicit failed or abandoned statuses are terminal
+  // enough to release the inventory reservation.
+  if (verified.status !== "failed" && verified.status !== "abandoned") {
+    return {
+      reconciled: false,
+      status: verified.status,
+    };
+  }
+
+  return prisma.$transaction(
+    async (tx) => {
+      const currentPayment = await tx.payment.findUnique({
+        where: { id: paymentId },
+      });
+
+      if (!currentPayment) {
+        throw new AppError("Payment not found", 404);
+      }
+
+      if (currentPayment.status !== "INITIALIZATION_UNKNOWN") {
+        return {
+          reconciled: false,
+          status: currentPayment.status,
+        };
+      }
+
+      const confirmedReservations = await tx.inventoryReservation.count({
+        where: {
+          orderId: currentPayment.orderId,
+          status: "CONFIRMED",
+        },
+      });
+
+      if (confirmedReservations > 0) {
+        throw new AppError(
+          "Confirmed inventory reservations require manual payment reconciliation",
+          409,
+        );
+      }
+
+      // Claim the payment before releasing stock.
+      const failedPayment = await tx.payment.updateMany({
+        where: {
+          id: paymentId,
+          status: "INITIALIZATION_UNKNOWN",
+        },
+        data: {
+          status: "FAILED",
+          failedAt: new Date(),
+        },
+      });
+
+      if (failedPayment.count !== 1) {
+        throw new AppError("Payment state changed during reconciliation", 409);
+      }
+
+      const reservations = await tx.inventoryReservation.findMany({
+        where: {
+          orderId: currentPayment.orderId,
+          status: "PENDING",
+        },
+      });
+
+      for (const reservation of reservations) {
+        const released = await tx.inventoryReservation.updateMany({
+          where: {
+            id: reservation.id,
+            status: "PENDING",
+          },
+          data: {
+            status: "RELEASED",
+            releasedAt: new Date(),
+          },
+        });
+
+        if (released.count !== 1) {
+          throw new AppError(
+            "Inventory reservation changed during reconciliation",
+            409,
+          );
+        }
+
+        const inventoryUpdated = await tx.inventory.updateMany({
+          where: {
+            id: reservation.inventoryId,
+            reservedQuantity: {
+              gte: reservation.quantity,
+            },
+          },
+          data: {
+            reservedQuantity: {
+              decrement: reservation.quantity,
+            },
+          },
+        });
+
+        if (inventoryUpdated.count !== 1) {
+          throw new AppError(
+            "Unable to release reserved inventory safely",
+            409,
+          );
+        }
+      }
+
+      return {
+        reconciled: true,
+        status: "FAILED",
+      };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    },
+  );
 }
 
 export async function processPaystackSuccessfulWebhook(reference: string) {

@@ -45,11 +45,22 @@ export async function create(
 
   const paymentResult = await createPayment(result.data, req.user.id);
 
-  res.status(201).json({
-    message: "Payment initialized successfully",
+if (!paymentResult.authorizationUrl) {
+  res.status(202).json({
+    message:
+      "Payment initialization is being reconciled. Please do not initiate another payment.",
     payment: paymentResult.payment,
-    authorizationUrl: paymentResult.authorizationUrl,
+    authorizationUrl: null,
   });
+
+  return;
+}
+
+res.status(201).json({
+  message: "Payment initialized successfully",
+  payment: paymentResult.payment,
+  authorizationUrl: paymentResult.authorizationUrl,
+});
 }
 
 export async function markSuccessful(
