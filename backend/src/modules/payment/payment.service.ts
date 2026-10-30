@@ -404,11 +404,18 @@ export async function markPaymentSuccessful(paymentId: string, userId: string) {
           }
 
           if (
-            currentPayment.status !== "PENDING" ||
-            currentPayment.reference !== verified.reference
+            currentPayment.status !== "PENDING" &&
+            currentPayment.status !== "INITIALIZATION_UNKNOWN"
           ) {
             throw new AppError(
               "Payment state changed during verification",
+              409,
+            );
+          }
+
+          if (currentPayment.reference !== verified.reference) {
+            throw new AppError(
+              "Payment reference changed during verification",
               409,
             );
           }

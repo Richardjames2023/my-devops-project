@@ -131,13 +131,14 @@ async function paystackRequest<T>(
     body?: Record<string, unknown>;
   },
 ): Promise<PaystackApiResponse<T>> {
+  const secretKey = getSecretKey();
   let response: Response;
 
   try {
     response = await fetch(`${PAYSTACK_BASE_URL}${path}`, {
       method: options.method,
       headers: {
-        Authorization: `Bearer ${getSecretKey()}`,
+        Authorization: `Bearer ${secretKey}`,
         "Content-Type": "application/json",
       },
       ...(options.body ? { body: JSON.stringify(options.body) } : {}),

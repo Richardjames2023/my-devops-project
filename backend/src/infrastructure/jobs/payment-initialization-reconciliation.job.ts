@@ -57,10 +57,6 @@ async function runPaymentReconciliation() {
             `[PAYMENT RECONCILIATION] Payment ${payment.reference} remains in status: ${result.status}.`,
           );
         }
-
-        console.log(
-          `[PAYMENT RECONCILIATION] Payment ${payment.reference} successfully reconciled.`,
-        );
       } catch (error) {
         // A payment that Paystack has not confirmed remains unresolved.
         // Never release inventory because verification failed or timed out.
