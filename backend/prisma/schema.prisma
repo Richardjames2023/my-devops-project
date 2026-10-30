@@ -1,0 +1,728 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ProcessedWebhookEvent {
+  id                  String   @id @default(uuid()) @db.Uuid
+  eventKey            String   @unique
+  eventType           String
+  processedAt         DateTime @default(now())
+  status              String   @default("PROCESSING")
+  lastError           String?
+  processingStartedAt DateTime @default(now())
+
+  recoveryStartedAt DateTime?
+  recoveryToken     String?   @db.Uuid
+
+  transactionReference String?
+  refundReference      String?
+  amount               String?
+  currency             String?
+  providerStatus       String?
+
+  @@index([eventType, processedAt])
+  @@map("processed_webhook_events")
+}
+
+model User {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  email                 String                 @unique
+  passwordHash          String
+  firstName             String
+  lastName              String
+  phone                 String?                @unique
+  isActive              Boolean                @default(true)
+  emailVerified         Boolean                @default(false)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  auditLogs             AuditLog[]
+  carts                 Cart[]
+  orders                Order[]
+  returnRequests        ReturnRequest[]
+  userRoles             UserRole[]
+  warrantyClaims        WarrantyClaim[]
+  refreshTokens         RefreshToken[]
+  returnItemInspections ReturnItemInspection[] @relation("ReturnItemInspections")
+
+  @@index([email])
+  @@index([phone])
+  @@index([isActive])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  userRoles   UserRole[]
+
+  @@map("roles")
+}
+
+model GuestSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  cart Cart?
+
+  @@index([expiresAt])
+  @@map("guest_sessions")
+}
+
+model Permission {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  roleId    String   @db.Uuid
+  createdAt DateTime @default(now())
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  id           String     @id @default(uuid()) @db.Uuid
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  createdAt    DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  action    String
+  entity    String
+  entityId  String?
+  oldValues Json?
+  newValues Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@index([isActive])
+  @@map("categories")
+}
+
+model Product {
+  id          String           @id @default(uuid()) @db.Uuid
+  categoryId  String           @db.Uuid
+  name        String
+  slug        String           @unique
+  description String?
+  basePrice   Decimal          @db.Decimal(12, 2)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  images      ProductImage[]
+  variants    ProductVariant[]
+  category    Category         @relation(fields: [categoryId], references: [id])
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(uuid()) @db.Uuid
+  productId String   @db.Uuid
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([productId, sortOrder])
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id         String      @id @default(uuid()) @db.Uuid
+  productId  String      @db.Uuid
+  sku        String      @unique
+  name       String
+  price      Decimal     @db.Decimal(12, 2)
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  cartItems  CartItem[]
+  inventory  Inventory?
+  orderItems OrderItem[]
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([sku])
+  @@index([isActive])
+  @@map("product_variants")
+}
+
+model Inventory {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  productVariantId      String                 @unique @db.Uuid
+  quantity              Int                    @default(0)
+  reservedQuantity      Int                    @default(0)
+  quarantineQuantity    Int                    @default(0)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  productVariant        ProductVariant         @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
+  inventoryReservations InventoryReservation[]
+  movements             StockMovement[]
+
+  @@map("inventory")
+}
+
+model StockMovement {
+  id          String            @id @default(uuid()) @db.Uuid
+  inventoryId String            @db.Uuid
+  type        StockMovementType
+  quantity    Int
+  reference   String?
+  reason      String?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  inventory   Inventory         @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+model Cart {
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String?       @unique @db.Uuid
+  sessionId String?       @unique @db.Uuid
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  items     CartItem[]
+  user      User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session   GuestSession? @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("carts")
+}
+
+model CartItem {
+  id               String         @id @default(uuid()) @db.Uuid
+  cartId           String         @db.Uuid
+  productVariantId String         @db.Uuid
+  quantity         Int
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  cart             Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productVariant   ProductVariant @relation(fields: [productVariantId], references: [id])
+
+  @@unique([cartId, productVariantId])
+  @@index([cartId])
+  @@index([productVariantId])
+  @@map("cart_items")
+}
+
+model Order {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  userId                String?                @db.Uuid
+  orderNumber           String                 @unique
+  status                OrderStatus            @default(PENDING)
+  subtotal              Decimal                @db.Decimal(12, 2)
+  discountAmount        Decimal                @default(0) @db.Decimal(12, 2)
+  deliveryFee           Decimal                @default(0) @db.Decimal(12, 2)
+  totalAmount           Decimal                @db.Decimal(12, 2)
+  currency              String                 @default("NGN")
+  shippingAddress       Json
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  fulfillment           Fulfillment?
+  inventoryReservations InventoryReservation[]
+  items                 OrderItem[]
+  user                  User?                  @relation(fields: [userId], references: [id])
+  payments              Payment[]
+  refunds               Refund[]
+  returnRequests        ReturnRequest[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id               String          @id @default(uuid()) @db.Uuid
+  orderId          String          @db.Uuid
+  productVariantId String          @db.Uuid
+  productName      String
+  variantName      String
+  sku              String
+  quantity         Int
+  unitPrice        Decimal         @db.Decimal(12, 2)
+  discountAmount   Decimal         @default(0) @db.Decimal(12, 2)
+  totalPrice       Decimal         @db.Decimal(12, 2)
+  createdAt        DateTime        @default(now())
+  order            Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productVariant   ProductVariant  @relation(fields: [productVariantId], references: [id])
+  packageItems     PackageItem[]
+  returnItems      ReturnItem[]
+  warrantyClaims   WarrantyClaim[]
+
+  @@index([orderId])
+  @@index([productVariantId])
+  @@map("order_items")
+}
+
+model Payment {
+  id                String          @id @default(uuid()) @db.Uuid
+  orderId           String          @db.Uuid
+  reference         String          @unique
+  provider          PaymentProvider
+  status            PaymentStatus
+  amount            Decimal         @db.Decimal(12, 2)
+  currency          String          @default("NGN")
+  providerReference String?
+  paidAt            DateTime?
+  failedAt          DateTime?
+  metadata          Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  order             Order           @relation(fields: [orderId], references: [id])
+  refunds           Refund[]
+
+  @@index([orderId])
+  @@index([status])
+  @@index([provider])
+  @@map("payments")
+}
+
+model Fulfillment {
+  id          String            @id @default(uuid()) @db.Uuid
+  orderId     String            @unique @db.Uuid
+  status      FulfillmentStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  order       Order             @relation(fields: [orderId], references: [id])
+  packages    Package[]
+
+  @@index([status])
+  @@map("fulfillments")
+}
+
+model Package {
+  id             String        @id @default(uuid()) @db.Uuid
+  fulfillmentId  String        @db.Uuid
+  trackingNumber String?       @unique
+  status         PackageStatus @default(PENDING)
+  weight         Decimal?      @db.Decimal(10, 3)
+  dimensions     Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  delivery       Delivery?
+  items          PackageItem[]
+  fulfillment    Fulfillment   @relation(fields: [fulfillmentId], references: [id])
+
+  @@index([fulfillmentId])
+  @@index([status])
+  @@map("packages")
+}
+
+model PackageItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  packageId   String    @db.Uuid
+  orderItemId String    @db.Uuid
+  quantity    Int
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+  package     Package   @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([packageId, orderItemId])
+  @@index([packageId])
+  @@index([orderItemId])
+  @@map("package_items")
+}
+
+model Delivery {
+  id                String            @id @default(uuid()) @db.Uuid
+  packageId         String            @unique @db.Uuid
+  provider          String?
+  externalReference String?
+  status            DeliveryStatus    @default(PENDING)
+  shippedAt         DateTime?
+  deliveredAt       DateTime?
+  package           Package           @relation(fields: [packageId], references: [id])
+  attempts          DeliveryAttempt[]
+
+  @@index([status])
+  @@index([provider])
+  @@map("deliveries")
+}
+
+model DeliveryAttempt {
+  id          String                @id @default(uuid()) @db.Uuid
+  deliveryId  String                @db.Uuid
+  status      DeliveryAttemptStatus
+  attemptedAt DateTime              @default(now())
+  notes       String?
+  location    Json?
+  delivery    Delivery              @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId])
+  @@index([status])
+  @@index([attemptedAt])
+  @@map("delivery_attempts")
+}
+
+model ReturnEvidence {
+  id              String        @id @default(uuid()) @db.Uuid
+  returnRequestId String        @db.Uuid
+  url             String
+  type            String?
+  description     String?
+  publicId        String?
+  resourceType    String?
+  createdAt       DateTime      @default(now())
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+
+  @@index([returnRequestId])
+  @@map("return_evidence")
+}
+
+model ReturnRequest {
+  id          String           @id @default(uuid()) @db.Uuid
+  orderId     String           @db.Uuid
+  userId      String?          @db.Uuid
+  status      ReturnStatus     @default(PENDING)
+  reason      String?
+  description String?
+  requestedAt DateTime         @default(now())
+  reviewedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  evidence    ReturnEvidence[]
+  items       ReturnItem[]
+  order       Order            @relation(fields: [orderId], references: [id])
+  user        User?            @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@map("return_requests")
+}
+
+model ReturnItem {
+  id              String @id @default(uuid()) @db.Uuid
+  returnRequestId String @db.Uuid
+  orderItemId     String @db.Uuid
+
+  quantity         Int
+  receivedQuantity Int @default(0)
+  acceptedQuantity Int @default(0)
+
+  condition ReturnCondition
+  notes     String?
+  createdAt DateTime        @default(now())
+
+  refundItems   RefundItem[]
+  orderItem     OrderItem              @relation(fields: [orderItemId], references: [id])
+  returnRequest ReturnRequest          @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  inspections   ReturnItemInspection[]
+
+  @@unique([returnRequestId, orderItemId])
+  @@index([returnRequestId])
+  @@index([orderItemId])
+  @@map("return_items")
+}
+
+model ReturnItemInspection {
+  id                String @id @default(uuid()) @db.Uuid
+  returnItemId      String @db.Uuid
+  inspectedByUserId String @db.Uuid
+
+  inspectedQuantity Int
+  acceptedQuantity  Int
+  rejectedQuantity  Int
+  condition         ReturnCondition
+  notes             String?
+  createdAt         DateTime        @default(now())
+
+  returnItem  ReturnItem @relation(fields: [returnItemId], references: [id], onDelete: Restrict)
+  inspectedBy User       @relation("ReturnItemInspections", fields: [inspectedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([returnItemId, createdAt])
+  @@index([inspectedByUserId, createdAt])
+  @@map("return_item_inspections")
+}
+
+model Refund {
+  id                String       @id @default(uuid()) @db.Uuid
+  orderId           String       @db.Uuid
+  paymentId         String?      @db.Uuid
+  reference         String       @unique
+  status            RefundStatus @default(PENDING)
+  amount            Decimal      @db.Decimal(12, 2)
+  currency          String       @default("NGN")
+  reason            String?
+  providerReference String?
+  processedAt       DateTime?
+  needsAttentionAt  DateTime?
+  createdAt         DateTime     @default(now())
+  retryStartedAt    DateTime?
+  updatedAt         DateTime     @updatedAt
+  items             RefundItem[]
+  order             Order        @relation(fields: [orderId], references: [id])
+  payment           Payment?     @relation(fields: [paymentId], references: [id])
+
+  @@index([orderId])
+  @@index([paymentId])
+  @@index([status])
+  @@map("refunds")
+}
+
+model RefundItem {
+  id           String     @id @default(uuid()) @db.Uuid
+  refundId     String     @db.Uuid
+  returnItemId String     @db.Uuid
+  quantity     Int
+  amount       Decimal    @db.Decimal(12, 2)
+  refund       Refund     @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  returnItem   ReturnItem @relation(fields: [returnItemId], references: [id])
+
+  @@unique([refundId, returnItemId])
+  @@index([refundId])
+  @@index([returnItemId])
+  @@map("refund_items")
+}
+
+model WarrantyClaim {
+  id              String              @id @default(uuid()) @db.Uuid
+  orderItemId     String              @db.Uuid
+  userId          String?             @db.Uuid
+  status          WarrantyStatus      @default(PENDING)
+  claimNumber     String              @unique
+  issue           String
+  description     String?
+  submittedAt     DateTime            @default(now())
+  resolvedAt      DateTime?
+  resolution      WarrantyResolution?
+  resolutionNotes String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  orderItem       OrderItem           @relation(fields: [orderItemId], references: [id])
+  user            User?               @relation(fields: [userId], references: [id])
+
+  @@index([orderItemId])
+  @@index([userId])
+  @@index([status])
+  @@map("warranty_claims")
+}
+
+model InventoryReservation {
+  id          String            @id @default(uuid()) @db.Uuid
+  orderId     String            @db.Uuid
+  inventoryId String            @db.Uuid
+  quantity    Int
+  status      ReservationStatus @default(PENDING)
+  expiresAt   DateTime
+  releasedAt  DateTime?
+  confirmedAt DateTime?
+  inventory   Inventory         @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  order       Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, inventoryId])
+  @@index([inventoryId])
+  @@index([orderId])
+  @@map("inventory_reservations")
+}
+
+enum StockMovementType {
+  RECEIVED
+  SOLD
+  RETURNED
+  DAMAGED
+  LOST
+  ADJUSTMENT
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentProvider {
+  PAYSTACK
+  FLUTTERWAVE
+  STRIPE
+  BANK_TRANSFER
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PROCESSING
+  READY
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
+}
+
+enum PackageStatus {
+  PENDING
+  PACKING
+  PACKED
+  HANDED_TO_COURIER
+  IN_TRANSIT
+  DELIVERED
+  LOST
+  DAMAGED
+  RETURNED
+}
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  CANCELLED
+  RETURNED
+}
+
+enum DeliveryAttemptStatus {
+  SUCCESSFUL
+  CUSTOMER_UNAVAILABLE
+  WRONG_ADDRESS
+  REFUSED
+  DAMAGED_PACKAGE
+  OTHER
+}
+
+enum ReturnStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RECEIVED
+  INSPECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum ReturnCondition {
+  UNOPENED
+  USED
+  DAMAGED
+  DEFECTIVE
+  WRONG_ITEM
+  OTHER
+}
+
+enum RefundStatus {
+  PENDING
+  PROCESSING
+  NEEDS_ATTENTION
+  SUBMISSION_UNKNOWN
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum WarrantyStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RESOLVED
+  CANCELLED
+}
+
+enum WarrantyResolution {
+  REPAIR
+  REPLACEMENT
+  REFUND
+  REJECTED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  RELEASED
+  EXPIRED
+}

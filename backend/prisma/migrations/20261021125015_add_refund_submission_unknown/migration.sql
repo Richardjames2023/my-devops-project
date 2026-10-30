@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "RefundStatus" ADD VALUE 'SUBMISSION_UNKNOWN';
