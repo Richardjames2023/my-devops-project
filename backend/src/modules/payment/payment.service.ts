@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   initializePaystackTransaction,
   verifyPaystackTransaction,
@@ -27,7 +27,42 @@ function generatePaymentReference(): string {
   return `PAY-${randomUUID()}`;
 }
 
-export async function createPayment(input: CreatePaymentInput, userId: string) {
+type PaymentOrderAccess = { userId: string } | { guestAccessToken: string };
+
+function hashGuestOrderAccessToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function assertPaymentOrderAccess(
+  order: {
+    userId: string | null;
+    guestAccessTokenHash: string | null;
+  },
+  access: PaymentOrderAccess,
+): void {
+  if ("userId" in access) {
+    if (!order.userId || order.userId !== access.userId) {
+      throw new AppError("You are not allowed to access this order", 403);
+    }
+
+    return;
+  }
+
+  const suppliedTokenHash = hashGuestOrderAccessToken(access.guestAccessToken);
+
+  if (
+    order.userId !== null ||
+    !order.guestAccessTokenHash ||
+    order.guestAccessTokenHash !== suppliedTokenHash
+  ) {
+    throw new AppError("You are not allowed to access this order", 403);
+  }
+}
+
+async function createPaymentWithAccess(
+  input: CreatePaymentInput,
+  access: PaymentOrderAccess,
+) {
   // Paystack is the only provider integrated in this phase.
   if (input.provider !== "PAYSTACK") {
     throw new AppError("This payment provider is not available yet", 400);
@@ -48,11 +83,31 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
       throw new AppError("Order not found", 404);
     }
 
-    if (!order.userId || order.userId !== userId) {
-      throw new AppError("You are not allowed to access this order", 403);
+    let customerEmail: string | null = null;
+
+    if ("userId" in access) {
+      if (!order.userId || order.userId !== access.userId) {
+        throw new AppError("You are not allowed to access this order", 403);
+      }
+
+      customerEmail = order.user?.email ?? null;
+    } else {
+      const suppliedTokenHash = hashGuestOrderAccessToken(
+        access.guestAccessToken,
+      );
+
+      if (
+        order.userId !== null ||
+        !order.guestAccessTokenHash ||
+        order.guestAccessTokenHash !== suppliedTokenHash
+      ) {
+        throw new AppError("You are not allowed to access this order", 403);
+      }
+
+      customerEmail = order.customerEmail;
     }
 
-    if (!order.user?.email) {
+    if (!customerEmail) {
       throw new AppError("A valid customer email is required for payment", 400);
     }
 
@@ -181,7 +236,7 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
 
     return {
       payment,
-      email: order.user.email,
+      email: customerEmail,
     };
   });
 
@@ -320,7 +375,25 @@ export async function createPayment(input: CreatePaymentInput, userId: string) {
   };
 }
 
-export async function markPaymentSuccessful(paymentId: string, userId: string) {
+export async function createPayment(input: CreatePaymentInput, userId: string) {
+  return createPaymentWithAccess(input, { userId });
+}
+
+export async function createGuestPayment(
+  input: CreatePaymentInput,
+  guestAccessToken: string,
+) {
+  if (!/^[a-f0-9]{64}$/i.test(guestAccessToken)) {
+    throw new AppError("Invalid guest order access token", 401);
+  }
+
+  return createPaymentWithAccess(input, { guestAccessToken });
+}
+
+async function markPaymentSuccessfulWithAccess(
+  paymentId: string,
+  access?: PaymentOrderAccess,
+) {
   // Load the payment and verify ownership.
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
@@ -331,8 +404,8 @@ export async function markPaymentSuccessful(paymentId: string, userId: string) {
     throw new AppError("Payment not found", 404);
   }
 
-  if (payment.order.userId !== userId) {
-    throw new AppError("You are not allowed to access this order", 403);
+  if (access) {
+    assertPaymentOrderAccess(payment.order, access);
   }
 
   if (payment.provider !== "PAYSTACK") {
@@ -401,8 +474,8 @@ export async function markPaymentSuccessful(paymentId: string, userId: string) {
             throw new AppError("Payment not found", 404);
           }
 
-          if (currentPayment.order.userId !== userId) {
-            throw new AppError("You are not allowed to access this order", 403);
+          if (access) {
+            assertPaymentOrderAccess(currentPayment.order, access);
           }
 
           // Another request may have completed this payment.
@@ -621,6 +694,23 @@ export async function markPaymentSuccessful(paymentId: string, userId: string) {
   throw new AppError("Payment could not be completed. Please try again.", 409);
 }
 
+export async function markPaymentSuccessful(paymentId: string, userId: string) {
+  return markPaymentSuccessfulWithAccess(paymentId, { userId });
+}
+
+export async function markGuestPaymentSuccessful(
+  paymentId: string,
+  guestAccessToken: string,
+) {
+  if (!/^[a-f0-9]{64}$/i.test(guestAccessToken)) {
+    throw new AppError("Invalid guest order access token", 401);
+  }
+
+  return markPaymentSuccessfulWithAccess(paymentId, {
+    guestAccessToken,
+  });
+}
+
 export async function reconcileUnknownPayment(paymentId: string) {
   const payment = await prisma.payment.findUnique({
     where: { id: paymentId },
@@ -665,23 +755,7 @@ export async function reconcileUnknownPayment(paymentId: string) {
   // Successful payments must use the existing verification
   // and inventory-finalization workflow.
   if (verified.status === "success") {
-    const currentPayment = await prisma.payment.findUnique({
-      where: { id: paymentId },
-      include: {
-        order: {
-          select: { userId: true },
-        },
-      },
-    });
-
-    if (!currentPayment?.order.userId) {
-      throw new AppError("Payment order has no registered customer", 409);
-    }
-
-    const result = await markPaymentSuccessful(
-      paymentId,
-      currentPayment.order.userId,
-    );
+    const result = await markPaymentSuccessfulWithAccess(paymentId);
 
     return {
       reconciled: true,
@@ -808,11 +882,6 @@ export async function reconcileUnknownPayment(paymentId: string) {
 export async function processPaystackSuccessfulWebhook(reference: string) {
   const payment = await prisma.payment.findUnique({
     where: { reference },
-    include: {
-      order: {
-        select: { userId: true },
-      },
-    },
   });
 
   if (!payment) {
@@ -828,9 +897,6 @@ export async function processPaystackSuccessfulWebhook(reference: string) {
     return { alreadyProcessed: true };
   }
 
-  if (!payment.order.userId) {
-    throw new AppError("Payment order has no registered customer", 409);
-  }
-
-  return markPaymentSuccessful(payment.id, payment.order.userId);
+  // Webhook signature is verified by the controller before this function runs.
+  return markPaymentSuccessfulWithAccess(payment.id);
 }

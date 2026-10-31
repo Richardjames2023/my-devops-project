@@ -2,10 +2,18 @@ import type { Request, Response } from "express";
 import crypto from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { createPaymentSchema } from "./payment.validation";
+import {
+  createPaymentSchema,
+  createGuestPaymentSchema,
+} from "./payment.validation";
 import { createHash } from "node:crypto";
 import prisma from "../../infrastructure/prisma/client";
-import { createPayment, markPaymentSuccessful } from "./payment.service";
+import {
+  createPayment,
+  createGuestPayment,
+  markPaymentSuccessful,
+  markGuestPaymentSuccessful,
+} from "./payment.service";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { processPaystackSuccessfulWebhook } from "./payment.service";
 import {
@@ -45,22 +53,61 @@ export async function create(
 
   const paymentResult = await createPayment(result.data, req.user.id);
 
-if (!paymentResult.authorizationUrl) {
-  res.status(202).json({
-    message:
-      "Payment initialization is being reconciled. Please do not initiate another payment.",
-    payment: paymentResult.payment,
-    authorizationUrl: null,
-  });
+  if (!paymentResult.authorizationUrl) {
+    res.status(202).json({
+      message:
+        "Payment initialization is being reconciled. Please do not initiate another payment.",
+      payment: paymentResult.payment,
+      authorizationUrl: null,
+    });
 
-  return;
+    return;
+  }
+
+  res.status(201).json({
+    message: "Payment initialized successfully",
+    payment: paymentResult.payment,
+    authorizationUrl: paymentResult.authorizationUrl,
+  });
 }
 
-res.status(201).json({
-  message: "Payment initialized successfully",
-  payment: paymentResult.payment,
-  authorizationUrl: paymentResult.authorizationUrl,
-});
+export async function createGuest(req: Request, res: Response): Promise<void> {
+  const result = createGuestPaymentSchema.safeParse(req.body);
+
+  if (!result.success) {
+    const { fieldErrors } = z.flattenError(result.error);
+
+    res.status(400).json({
+      message: "Validation failed",
+      errors: fieldErrors,
+    });
+
+    return;
+  }
+
+  const { guestAccessToken, ...paymentInput } = result.data;
+
+  const paymentResult = await createGuestPayment(
+    paymentInput,
+    guestAccessToken,
+  );
+
+  if (!paymentResult.authorizationUrl) {
+    res.status(202).json({
+      message:
+        "Payment initialization is being reconciled. Please do not initiate another payment.",
+      payment: paymentResult.payment,
+      authorizationUrl: null,
+    });
+
+    return;
+  }
+
+  res.status(201).json({
+    message: "Guest payment initialized successfully",
+    payment: paymentResult.payment,
+    authorizationUrl: paymentResult.authorizationUrl,
+  });
 }
 
 export async function markSuccessful(
@@ -91,6 +138,58 @@ export async function markSuccessful(
   res.status(200).json({
     message: "Payment verified successfully",
     ...result,
+  });
+}
+
+export async function markGuestSuccessful(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const paramsResult = paymentIdSchema.safeParse(req.params);
+
+  if (!paramsResult.success) {
+    const { fieldErrors } = z.flattenError(paramsResult.error);
+
+    res.status(400).json({
+      message: "Validation failed",
+      errors: fieldErrors,
+    });
+
+    return;
+  }
+
+  const bodySchema = z.object({
+    guestAccessToken: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/i, "Invalid guest order access token"),
+  });
+
+  const bodyResult = bodySchema.safeParse(req.body);
+
+  if (!bodyResult.success) {
+    const { fieldErrors } = z.flattenError(bodyResult.error);
+
+    res.status(400).json({
+      message: "Validation failed",
+      errors: fieldErrors,
+    });
+
+    return;
+  }
+
+  const result = await markGuestPaymentSuccessful(
+    paramsResult.data.paymentId,
+    bodyResult.data.guestAccessToken,
+  );
+
+  const { guestAccessTokenHash: storedTokenHash, ...safeOrder } = result.order;
+
+  void storedTokenHash;
+
+  res.status(200).json({
+    message: "Guest payment verified successfully",
+    payment: result.payment,
+    order: safeOrder,
   });
 }
 

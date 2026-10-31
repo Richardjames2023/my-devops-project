@@ -24,13 +24,6 @@ async function runPaymentReconciliation() {
           lte: cutoff,
         },
       },
-      include: {
-        order: {
-          select: {
-            userId: true,
-          },
-        },
-      },
       orderBy: {
         createdAt: "asc",
       },
@@ -38,13 +31,6 @@ async function runPaymentReconciliation() {
     });
 
     for (const payment of unresolvedPayments) {
-      if (!payment.order.userId) {
-        console.error(
-          `[PAYMENT RECONCILIATION] Payment ${payment.reference} has no registered customer.`,
-        );
-        continue;
-      }
-
       try {
         const result = await reconcileUnknownPayment(payment.id);
 

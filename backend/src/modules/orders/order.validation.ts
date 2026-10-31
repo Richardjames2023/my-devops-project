@@ -38,10 +38,23 @@ const shippingAddressSchema = z.object({
     .optional(),
 });
 
+// Existing authenticated checkout validation
 export const createOrderSchema = z.object({
   shippingAddress: shippingAddressSchema,
 });
 
+// Guest checkout requires a valid customer email
+export const createGuestOrderSchema = createOrderSchema.extend({
+  customerEmail: z
+    .string()
+    .trim()
+    .email("A valid email address is required"),
+});
+
 export type CreateOrderInput = z.infer<
   typeof createOrderSchema
+>;
+
+export type CreateGuestOrderInput = z.infer<
+  typeof createGuestOrderSchema
 >;

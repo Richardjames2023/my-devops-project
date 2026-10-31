@@ -1,7 +1,11 @@
+import crypto from "node:crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
-import type { CreateOrderInput } from "./order.validation";
+import type {
+  CreateOrderInput,
+  CreateGuestOrderInput,
+} from "./order.validation";
 
 function generateOrderNumber(): string {
   const timestamp = Date.now();
@@ -10,14 +14,40 @@ function generateOrderNumber(): string {
   return `ORD-${timestamp}-${random}`;
 }
 
-export async function createOrder(
-  userId: string,
-  input: CreateOrderInput,
+function generateGuestOrderAccessToken(): string {
+  return crypto.randomBytes(32).toString("hex");
+}
+
+function hashGuestOrderAccessToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+async function createOrderFromCart(
+  cartOwner: Prisma.CartWhereUniqueInput,
+  userId: string | null,
+  input: CreateOrderInput | CreateGuestOrderInput,
+  guestAccessToken?: string,
 ) {
   return prisma.$transaction(async (tx) => {
-    // 1. Retrieve the customer's cart from PostgreSQL.
+    // Validate the guest session when creating a guest order.
+    if ("sessionId" in cartOwner && cartOwner.sessionId) {
+      const session = await tx.guestSession.findFirst({
+        where: {
+          id: cartOwner.sessionId,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+      });
+
+      if (!session) {
+        throw new AppError("Guest session is invalid or expired", 401);
+      }
+    }
+
+    // Retrieve the appropriate customer's cart.
     const cart = await tx.cart.findUnique({
-      where: { userId },
+      where: cartOwner,
       include: {
         items: {
           include: {
@@ -36,7 +66,6 @@ export async function createOrder(
       throw new AppError("Your cart is empty", 400);
     }
 
-    // Validate products, variants and available inventory.
     let subtotal = new Prisma.Decimal(0);
 
     const orderItems = cart.items.map((item) => {
@@ -72,7 +101,6 @@ export async function createOrder(
         );
       }
 
-      // Calculate prices using current database prices.
       const unitPrice = variant.price;
       const totalPrice = unitPrice.mul(item.quantity);
 
@@ -90,7 +118,6 @@ export async function createOrder(
       };
     });
 
-    // Calculate the order total.
     const discountAmount = new Prisma.Decimal(0);
     const deliveryFee = new Prisma.Decimal(0);
 
@@ -98,10 +125,27 @@ export async function createOrder(
       .minus(discountAmount)
       .plus(deliveryFee);
 
-    // Create the order and its items in the same transaction.
+    const isGuestOrder = Boolean(guestAccessToken);
+
+    const customerEmail =
+      "customerEmail" in input ? input.customerEmail : null;
+
+    if (isGuestOrder && !customerEmail) {
+      throw new AppError("Customer email is required", 400);
+    }
+
     const order = await tx.order.create({
       data: {
         userId,
+        ...(isGuestOrder
+          ? {
+              customerName: input.shippingAddress.fullName,
+              customerEmail,
+              customerPhone: input.shippingAddress.phone,
+              guestAccessTokenHash:
+                hashGuestOrderAccessToken(guestAccessToken!),
+            }
+          : {}),
         orderNumber: generateOrderNumber(),
         status: "PENDING",
         subtotal,
@@ -121,4 +165,44 @@ export async function createOrder(
 
     return order;
   });
+}
+
+// Existing authenticated checkout remains supported.
+export async function createOrder(
+  userId: string,
+  input: CreateOrderInput,
+) {
+  return createOrderFromCart(
+    { userId },
+    userId,
+    input,
+  );
+}
+
+// New guest checkout.
+export async function createGuestOrder(
+  guestSessionId: string,
+  input: CreateGuestOrderInput,
+) {
+  const guestAccessToken = generateGuestOrderAccessToken();
+
+  const order = await createOrderFromCart(
+    { sessionId: guestSessionId },
+    null,
+    input,
+    guestAccessToken,
+  );
+
+  // Return the raw token only once.
+  const {
+    guestAccessTokenHash: storedTokenHash,
+    ...safeOrder
+  } = order;
+
+  void storedTokenHash;
+
+  return {
+    order: safeOrder,
+    guestAccessToken,
+  };
 }

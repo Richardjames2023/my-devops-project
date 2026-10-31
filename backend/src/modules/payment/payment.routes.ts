@@ -1,8 +1,14 @@
 import { Router } from "express";
-
 import { authenticate } from "../../common/middleware/authenticate";
 import { authorize } from "../../common/middleware/authorize";
-import { create, markSuccessful, listStaleWebhookEvents, reconcileStaleWebhookEvent, } from "./payment.controller";
+import {
+  create,
+  createGuest,
+  markSuccessful,
+  markGuestSuccessful,
+  listStaleWebhookEvents,
+  reconcileStaleWebhookEvent,
+} from "./payment.controller";
 
 const router = Router();
 
@@ -13,11 +19,19 @@ router.post(
   create,
 );
 
+// Guest checkout payment initialization
+router.post("/guest", createGuest);
+
 router.post(
   "/:paymentId/success",
   authenticate,
   authorize("orders.create"),
   markSuccessful,
+);
+
+router.post(
+  "/guest/:paymentId/success",
+  markGuestSuccessful,
 );
 
 router.get(
