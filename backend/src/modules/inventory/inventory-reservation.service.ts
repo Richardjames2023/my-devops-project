@@ -8,6 +8,12 @@ export async function createInventoryReservation(
   input: CreateInventoryReservationInput,
 ) {
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`
+    SELECT id
+    FROM orders
+    WHERE id = ${input.orderId}::uuid
+    FOR UPDATE
+  `;
     const order = await tx.order.findUnique({
       where: { id: input.orderId },
     });
@@ -82,6 +88,24 @@ export async function createInventoryReservation(
 
 export async function confirmInventoryReservation(reservationId: string) {
   return prisma.$transaction(async (tx) => {
+    // Initial lookup to obtain the order ID.
+    const existingReservation = await tx.inventoryReservation.findUnique({
+      where: { id: reservationId },
+    });
+
+    if (!existingReservation) {
+      throw new AppError("Reservation not found", 404);
+    }
+
+    // Acquire the order-level lock before modifying the reservation or inventory.
+    await tx.$queryRaw`
+      SELECT id
+      FROM orders
+      WHERE id = ${existingReservation.orderId}::uuid
+      FOR UPDATE
+    `;
+
+    // Re-fetch after acquiring the lock.
     const reservation = await tx.inventoryReservation.findUnique({
       where: { id: reservationId },
     });
@@ -96,6 +120,7 @@ export async function confirmInventoryReservation(reservationId: string) {
     const confirmed = await tx.inventoryReservation.updateMany({
       where: {
         id: reservationId,
+        orderId: reservation.orderId,
         status: "PENDING",
         expiresAt: {
           gt: now,
@@ -175,6 +200,24 @@ export async function confirmInventoryReservation(reservationId: string) {
 
 export async function releaseInventoryReservation(reservationId: string) {
   return prisma.$transaction(async (tx) => {
+    // Initial lookup to obtain the order ID.
+    const existingReservation = await tx.inventoryReservation.findUnique({
+      where: { id: reservationId },
+    });
+
+    if (!existingReservation) {
+      throw new AppError("Reservation not found", 404);
+    }
+
+    // Acquire the order-level lock before modifying reservation or inventory.
+    await tx.$queryRaw`
+      SELECT id
+      FROM orders
+      WHERE id = ${existingReservation.orderId}::uuid
+      FOR UPDATE
+    `;
+
+    // Re-fetch after acquiring the lock.
     const reservation = await tx.inventoryReservation.findUnique({
       where: { id: reservationId },
     });
@@ -183,16 +226,18 @@ export async function releaseInventoryReservation(reservationId: string) {
       throw new AppError("Reservation not found", 404);
     }
 
+    const now = new Date();
+
     // Atomically claim the release.
-    // Only one concurrent request can change PENDING to RELEASED.
     const released = await tx.inventoryReservation.updateMany({
       where: {
         id: reservationId,
+        orderId: reservation.orderId,
         status: "PENDING",
       },
       data: {
         status: "RELEASED",
-        releasedAt: new Date(),
+        releasedAt: now,
       },
     });
 
@@ -252,6 +297,7 @@ export async function expireInventoryReservations() {
     },
     select: {
       id: true,
+      orderId: true,
     },
   });
 
@@ -259,13 +305,19 @@ export async function expireInventoryReservations() {
 
   for (const reservation of expiredReservations) {
     const expired = await prisma.$transaction(async (tx) => {
-      // Claim the reservation first.
-      //
-      // Only a PENDING reservation that has actually expired
-      // can be changed to EXPIRED.
+      // Acquire the same order-level lock used by inventory finalization.
+      await tx.$queryRaw`
+        SELECT id
+        FROM orders
+        WHERE id = ${reservation.orderId}::uuid
+        FOR UPDATE
+      `;
+
+      // Claim the reservation only if it is still pending and expired.
       const updatedReservation = await tx.inventoryReservation.updateMany({
         where: {
           id: reservation.id,
+          orderId: reservation.orderId,
           status: "PENDING",
           expiresAt: {
             lte: now,
@@ -277,8 +329,8 @@ export async function expireInventoryReservations() {
         },
       });
 
-      // Another cleanup process may have already handled it.
-      if (updatedReservation.count === 0) {
+      // Another workflow may already have processed it.
+      if (updatedReservation.count !== 1) {
         return false;
       }
 
@@ -292,6 +344,7 @@ export async function expireInventoryReservations() {
         throw new AppError("Reservation disappeared during expiration", 409);
       }
 
+      // Release the reserved inventory quantity.
       const updatedInventory = await tx.inventory.updateMany({
         where: {
           id: reservationRecord.inventoryId,
@@ -306,7 +359,7 @@ export async function expireInventoryReservations() {
         },
       });
 
-      if (updatedInventory.count === 0) {
+      if (updatedInventory.count !== 1) {
         throw new AppError("Reserved inventory is inconsistent", 409);
       }
 

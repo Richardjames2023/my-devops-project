@@ -1,8 +1,6 @@
 import { Router } from "express";
-import {
-  create,
-  createGuest,
-} from "./order.controller";
+import { create, createGuest, getGuest,} from "./order.controller";
+import { guestOrderLimiter, guestOrderRetrievalLimiter, } from "../../common/middleware/rate-limit.middleware";
 import { authenticate } from "../../common/middleware/authenticate";
 import { authorize } from "../../common/middleware/authorize";
 import { requireGuestSession } from "../guest-session/guest-session.middleware";
@@ -20,8 +18,16 @@ router.post(
 // Guest checkout
 router.post(
   "/guest",
+  guestOrderLimiter,
   requireGuestSession,
   createGuest,
+);
+
+// Guest order retrieval
+router.get(
+  "/guest/:orderId",
+  guestOrderRetrievalLimiter,
+  getGuest,
 );
 
 export default router;

@@ -135,9 +135,14 @@ export async function markSuccessful(
     req.user.id,
   );
 
+  const reconciliationRequired = result.payment.reconciliationRequired;
+
   res.status(200).json({
-    message: "Payment verified successfully",
+    message: reconciliationRequired
+      ? "Payment received successfully, but your order requires manual review. Please contact support."
+      : "Payment verified successfully",
     ...result,
+    reconciliationRequired,
   });
 }
 
@@ -186,10 +191,15 @@ export async function markGuestSuccessful(
 
   void storedTokenHash;
 
+  const reconciliationRequired = result.payment.reconciliationRequired;
+
   res.status(200).json({
-    message: "Guest payment verified successfully",
+    message: reconciliationRequired
+      ? "Payment received successfully, but your order requires manual review. Please contact support."
+      : "Guest payment verified successfully",
     payment: result.payment,
     order: safeOrder,
+    reconciliationRequired,
   });
 }
 
@@ -467,8 +477,23 @@ export async function paystackWebhook(
   }
 
   try {
-    await processPaystackSuccessfulWebhook(event.data.reference);
-    res.sendStatus(200);
+    const result = await processPaystackSuccessfulWebhook(event.data.reference);
+
+    if (result.reconciliationRequired) {
+      console.error(
+        "[PAYSTACK WEBHOOK] Payment succeeded but inventory requires manual reconciliation.",
+        {
+          paymentId: result.paymentId,
+          reference: event.data.reference,
+        },
+      );
+    }
+
+    res.status(200).json({
+      received: true,
+      alreadyProcessed: result.alreadyProcessed,
+      reconciliationRequired: result.reconciliationRequired,
+    });
   } catch (error) {
     console.error("[PAYSTACK WEBHOOK] Processing failed:", error);
 

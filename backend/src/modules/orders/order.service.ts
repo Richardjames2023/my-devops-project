@@ -45,9 +45,26 @@ async function createOrderFromCart(
       }
     }
 
-    // Retrieve the appropriate customer's cart.
-    const cart = await tx.cart.findUnique({
+    // Retrieve the customer's cart ID.
+    const existingCart = await tx.cart.findUnique({
       where: cartOwner,
+      select: { id: true },
+    });
+
+    if (!existingCart) {
+      throw new AppError("Your cart is empty", 400);
+    }
+
+    // Lock the cart row to prevent simultaneous checkout requests.
+    await tx.$queryRaw`
+  SELECT id FROM carts
+  WHERE id = ${existingCart.id}::uuid
+  FOR UPDATE
+`;
+
+    // Retrieve the cart and its items after acquiring the lock.
+    const cart = await tx.cart.findUnique({
+      where: { id: existingCart.id },
       include: {
         items: {
           include: {
@@ -65,7 +82,6 @@ async function createOrderFromCart(
     if (!cart || cart.items.length === 0) {
       throw new AppError("Your cart is empty", 400);
     }
-
     let subtotal = new Prisma.Decimal(0);
 
     const orderItems = cart.items.map((item) => {
@@ -121,14 +137,11 @@ async function createOrderFromCart(
     const discountAmount = new Prisma.Decimal(0);
     const deliveryFee = new Prisma.Decimal(0);
 
-    const totalAmount = subtotal
-      .minus(discountAmount)
-      .plus(deliveryFee);
+    const totalAmount = subtotal.minus(discountAmount).plus(deliveryFee);
 
     const isGuestOrder = Boolean(guestAccessToken);
 
-    const customerEmail =
-      "customerEmail" in input ? input.customerEmail : null;
+    const customerEmail = "customerEmail" in input ? input.customerEmail : null;
 
     if (isGuestOrder && !customerEmail) {
       throw new AppError("Customer email is required", 400);
@@ -142,8 +155,9 @@ async function createOrderFromCart(
               customerName: input.shippingAddress.fullName,
               customerEmail,
               customerPhone: input.shippingAddress.phone,
-              guestAccessTokenHash:
-                hashGuestOrderAccessToken(guestAccessToken!),
+              guestAccessTokenHash: hashGuestOrderAccessToken(
+                guestAccessToken!,
+              ),
             }
           : {}),
         orderNumber: generateOrderNumber(),
@@ -162,21 +176,20 @@ async function createOrderFromCart(
         items: true,
       },
     });
+    // Clear the cart only after the order has been created successfully.
+    await tx.cartItem.deleteMany({
+      where: {
+        cartId: cart.id,
+      },
+    });
 
     return order;
   });
 }
 
 // Existing authenticated checkout remains supported.
-export async function createOrder(
-  userId: string,
-  input: CreateOrderInput,
-) {
-  return createOrderFromCart(
-    { userId },
-    userId,
-    input,
-  );
+export async function createOrder(userId: string, input: CreateOrderInput) {
+  return createOrderFromCart({ userId }, userId, input);
 }
 
 // New guest checkout.
@@ -194,10 +207,7 @@ export async function createGuestOrder(
   );
 
   // Return the raw token only once.
-  const {
-    guestAccessTokenHash: storedTokenHash,
-    ...safeOrder
-  } = order;
+  const { guestAccessTokenHash: storedTokenHash, ...safeOrder } = order;
 
   void storedTokenHash;
 
@@ -205,4 +215,52 @@ export async function createGuestOrder(
     order: safeOrder,
     guestAccessToken,
   };
+}
+
+// Retrieve a guest order using its access token.
+export async function getGuestOrder(orderId: string, guestAccessToken: string) {
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+    },
+    select: {
+      id: true,
+      orderNumber: true,
+      status: true,
+      customerName: true,
+      customerEmail: true,
+      customerPhone: true,
+      subtotal: true,
+      discountAmount: true,
+      deliveryFee: true,
+      totalAmount: true,
+      currency: true,
+      shippingAddress: true,
+      createdAt: true,
+      updatedAt: true,
+      items: true,
+      payments: {
+        select: {
+          status: true,
+          provider: true,
+          amount: true,
+          currency: true,
+          paidAt: true,
+          createdAt: true,
+        },
+      },
+      fulfillment: {
+        select: {
+          status: true,
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    throw new AppError("Order not found", 404);
+  }
+
+  return order;
 }

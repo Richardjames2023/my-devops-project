@@ -9,6 +9,10 @@ import {
   listStaleWebhookEvents,
   reconcileStaleWebhookEvent,
 } from "./payment.controller";
+import {
+  guestPaymentLimiter,
+  guestPaymentVerificationLimiter,
+} from "../../common/middleware/rate-limit.middleware";
 
 const router = Router();
 
@@ -20,17 +24,15 @@ router.post(
 );
 
 // Guest checkout payment initialization
-router.post("/guest", createGuest);
-
 router.post(
-  "/:paymentId/success",
-  authenticate,
-  authorize("orders.create"),
-  markSuccessful,
+  "/guest",
+  guestPaymentLimiter,
+  createGuest,
 );
 
 router.post(
   "/guest/:paymentId/success",
+  guestPaymentVerificationLimiter,
   markGuestSuccessful,
 );
 

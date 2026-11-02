@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { z } from "zod";
 import {
   createOrderSchema,
@@ -7,6 +7,7 @@ import {
 import {
   createOrder,
   createGuestOrder,
+  getGuestOrder,
 } from "./order.service";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import type { GuestSessionRequest } from "../guest-session/guest-session.middleware";
@@ -68,5 +69,33 @@ export async function createGuest(
     message: "Guest order created successfully",
     order: resultOrder.order,
     guestAccessToken: resultOrder.guestAccessToken,
+  });
+}
+
+export async function getGuest(
+  req: Request<{ orderId: string }, unknown, unknown, unknown, {}>
+  & { headers: { "x-guest-order-token"?: string } },
+  res: Response,
+): Promise<void> {
+  const orderIdSchema = z.uuid();
+  const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/i);
+
+  const orderIdResult = orderIdSchema.safeParse(req.params.orderId);
+  const tokenResult = tokenSchema.safeParse(
+    req.headers["x-guest-order-token"],
+  );
+
+  if (!orderIdResult.success || !tokenResult.success) {
+    throw new AppError("Order not found", 404);
+  }
+
+  const order = await getGuestOrder(
+    orderIdResult.data,
+    tokenResult.data,
+  );
+
+  res.status(200).json({
+    message: "Order retrieved successfully",
+    order,
   });
 }
