@@ -895,7 +895,10 @@ async function markPaymentSuccessfulWithAccess(
 
           if (
             currentPayment.status !== "PENDING" &&
-            currentPayment.status !== "INITIALIZATION_UNKNOWN"
+            currentPayment.status !== "INITIALIZATION_UNKNOWN" &&
+            currentPayment.status !== "FAILED" &&
+            currentPayment.status !== "CANCELLED" &&
+            currentPayment.status !== "EXPIRED"
           ) {
             throw new AppError(
               "Payment state changed during reconciliation",
