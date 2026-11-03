@@ -12,6 +12,7 @@ import {
   getReconciliationById,
   markReconciliationUnderReview,
   resolveReconciliationAsFulfilled,
+  resolveReconciliationAsRefunded,
 } from "./inventory-reconciliation.service";
 
 export async function list(
@@ -164,6 +165,50 @@ export async function resolveFulfilled(
 
   res.status(200).json({
     message: "Inventory reconciliation resolved through fulfilment",
+    ...result,
+  });
+}
+
+
+export async function resolveRefunded(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const paramsResult = reconciliationIdSchema.safeParse(req.params);
+  if (!paramsResult.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: paramsResult.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const bodyResult = resolveReconciliationSchema.safeParse(req.body);
+  if (!bodyResult.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: bodyResult.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const result = await resolveReconciliationAsRefunded(
+    paramsResult.data.id,
+    req.user.id,
+    bodyResult.data.notes,
+    {
+      ...(req.ip ? { ipAddress: req.ip } : {}),
+      ...(req.get("user-agent") ? { userAgent: req.get("user-agent")! } : {}),
+    },
+  );
+
+  res.status(200).json({
+    message: "Inventory reconciliation refund submitted",
     ...result,
   });
 }
