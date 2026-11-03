@@ -634,16 +634,8 @@ async function markPaymentSuccessfulWithAccess(
     };
   }
 
-  if (
-    payment.status === "FAILED" ||
-    payment.status === "CANCELLED" ||
-    payment.status === "EXPIRED"
-  ) {
-    throw new AppError(
-      `Payment cannot be completed because it is ${payment.status}`,
-      400,
-    );
-  }
+  // Terminal local states do not prove that Paystack did not capture funds.
+  // Verify with Paystack before deciding whether the payment needs recovery.
 
   // 2. Verify the transaction directly with Paystack.
   const verified = await verifyPaystackTransaction(payment.reference);
@@ -749,10 +741,18 @@ async function markPaymentSuccessfulWithAccess(
             };
           }
 
-          if (currentPayment.order.status !== "PENDING") {
-            throw new AppError(
-              `Order cannot be confirmed because it is ${currentPayment.order.status}`,
-              409,
+          // A late provider success must be recorded, but must never
+          // automatically fulfil a cancelled/non-pending order.
+          if (
+            currentPayment.order.status !== "PENDING" ||
+            currentPayment.status === "FAILED" ||
+            currentPayment.status === "CANCELLED" ||
+            currentPayment.status === "EXPIRED"
+          ) {
+            throw new InventoryReconciliationRequiredError(
+              currentPayment.order.status !== "PENDING"
+                ? `Paystack confirmed payment after the order entered ${currentPayment.order.status}; administrator review is required.`
+                : `Paystack confirmed payment after the local payment was marked ${currentPayment.status}; administrator review is required.`,
             );
           }
 
@@ -769,6 +769,16 @@ async function markPaymentSuccessfulWithAccess(
           ) {
             throw new AppError(
               "Payment details changed during verification",
+              409,
+            );
+          }
+
+          if (
+            currentPayment.providerReference &&
+            currentPayment.providerReference !== String(verified.id)
+          ) {
+            throw new AppError(
+              "Paystack transaction ID conflicts with the recorded payment",
               409,
             );
           }
@@ -898,7 +908,13 @@ async function markPaymentSuccessfulWithAccess(
             where: {
               id: currentPayment.id,
               status: {
-                in: ["PENDING", "INITIALIZATION_UNKNOWN"],
+                in: [
+                  "PENDING",
+                  "INITIALIZATION_UNKNOWN",
+                  "FAILED",
+                  "CANCELLED",
+                  "EXPIRED",
+                ],
               },
             },
             data: {
@@ -907,6 +923,7 @@ async function markPaymentSuccessfulWithAccess(
               paidAt: verified.paid_at
                 ? new Date(verified.paid_at)
                 : new Date(),
+              failedAt: null,
               reconciliationRequired: true,
               reconciliationReason: error.message,
               reconciliationAt: new Date(),
