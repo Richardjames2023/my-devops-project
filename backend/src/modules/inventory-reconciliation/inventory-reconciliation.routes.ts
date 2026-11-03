@@ -19,5 +19,6 @@ router.get("/:id", getById);
 router.patch("/:id/review", review);
 router.patch("/:id/resolve-fulfilled", resolveFulfilled);
 
-export default router;
 router.patch("/:id/resolve-refunded", resolveRefunded);
+
+export default router;
