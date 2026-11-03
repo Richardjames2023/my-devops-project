@@ -212,7 +212,43 @@ export async function resolveReconciliationAsFulfilled(
     try {
       return await prisma.$transaction(
         async (tx) => {
-          // Lock the reconciliation record.
+          // Read identifiers without locking, then acquire locks in the
+          // shared order used by payment and order-cancellation flows:
+          // Order -> Payment -> Reconciliation.
+          const initial = await tx.paymentInventoryReconciliation.findUnique({
+            where: { id },
+            select: { orderId: true, paymentId: true },
+          });
+
+          if (!initial) {
+            throw new AppError(
+              "Inventory reconciliation record not found",
+              404,
+            );
+          }
+
+          const lockedOrders = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id
+            FROM orders
+            WHERE id = ${initial.orderId}::uuid
+            FOR UPDATE
+          `;
+
+          if (lockedOrders.length === 0) {
+            throw new AppError("Order not found", 404);
+          }
+
+          const lockedPayments = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id
+            FROM payments
+            WHERE id = ${initial.paymentId}::uuid
+            FOR UPDATE
+          `;
+
+          if (lockedPayments.length === 0) {
+            throw new AppError("Payment not found", 404);
+          }
+
           await tx.$queryRaw`
             SELECT id
             FROM payment_inventory_reconciliations
@@ -237,6 +273,16 @@ export async function resolveReconciliationAsFulfilled(
           }
 
           if (
+            reconciliation.orderId !== initial.orderId ||
+            reconciliation.paymentId !== initial.paymentId
+          ) {
+            throw new AppError(
+              "Reconciliation links changed during processing",
+              409,
+            );
+          }
+
+          if (
             reconciliation.status !== InventoryReconciliationStatus.PENDING &&
             reconciliation.status !== InventoryReconciliationStatus.UNDER_REVIEW
           ) {
@@ -246,17 +292,7 @@ export async function resolveReconciliationAsFulfilled(
             );
           }
 
-          // Lock the payment record.
-          await tx.$queryRaw`
-            SELECT id
-            FROM payments
-            WHERE id = ${reconciliation.paymentId}::uuid
-            FOR UPDATE
-          `;
-
-          const payment = await tx.payment.findUnique({
-            where: { id: reconciliation.paymentId },
-          });
+          const payment = reconciliation.payment;
 
           if (!payment) {
             throw new AppError("Payment not found", 404);
