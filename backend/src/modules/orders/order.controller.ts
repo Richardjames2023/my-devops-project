@@ -8,6 +8,8 @@ import {
   createOrder,
   createGuestOrder,
   getGuestOrder,
+  cancelOrder,
+  adminCancelOrder,
 } from "./order.service";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import type { GuestSessionRequest } from "../guest-session/guest-session.middleware";
@@ -96,6 +98,73 @@ export async function getGuest(
 
   res.status(200).json({
     message: "Order retrieved successfully",
+    order,
+  });
+}
+
+
+export async function cancel(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    throw new AppError("Authentication required", 401);
+  }
+
+  const orderIdResult = z.uuid().safeParse(req.params.orderId);
+
+  if (!orderIdResult.success) {
+    throw new AppError("Invalid order ID", 400);
+  }
+
+  const order = await cancelOrder(
+    orderIdResult.data,
+    req.user.id,
+    {
+      ...(req.ip ? { ipAddress: req.ip } : {}),
+      ...(req.get("user-agent")
+        ? { userAgent: req.get("user-agent")! }
+        : {}),
+    },
+  );
+
+  res.status(200).json({
+    message: order.alreadyCancelled
+      ? "Order has already been cancelled"
+      : "Order cancelled successfully",
+    order,
+  });
+}
+
+export async function adminCancel(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    throw new AppError("Authentication required", 401);
+  }
+
+  const orderIdResult = z.uuid().safeParse(req.params.orderId);
+
+  if (!orderIdResult.success) {
+    throw new AppError("Invalid order ID", 400);
+  }
+
+  const order = await adminCancelOrder(
+    orderIdResult.data,
+    req.user.id,
+    {
+      ...(req.ip ? { ipAddress: req.ip } : {}),
+      ...(req.get("user-agent")
+        ? { userAgent: req.get("user-agent")! }
+        : {}),
+    },
+  );
+
+  res.status(200).json({
+    message: order.alreadyCancelled
+      ? "Order has already been cancelled"
+      : "Order cancelled successfully by admin",
     order,
   });
 }

@@ -6,6 +6,21 @@ import type {
   CreateOrderInput,
   CreateGuestOrderInput,
 } from "./order.validation";
+import { createAuditLog } from "../../common/utils/audit-log";
+
+const MAX_TRANSACTION_RETRIES = 3;
+const RETRY_DELAY_MS = 100;
+
+function isSerializationConflict(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2034"
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function generateOrderNumber(): string {
   const timestamp = Date.now();
@@ -263,4 +278,263 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
   }
 
   return order;
+}
+
+interface OrderCancellationAuditMeta {
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+interface CancelOrderOptions {
+  orderId: string;
+  actorUserId: string;
+  enforceOwnership: boolean;
+  auditMeta?: OrderCancellationAuditMeta;
+}
+
+async function cancelOrderTransaction({
+  orderId,
+  actorUserId,
+  enforceOwnership,
+  auditMeta,
+}: CancelOrderOptions) {
+  for (let attempt = 1; attempt <= MAX_TRANSACTION_RETRIES; attempt++) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          // Lock the order first. Payment initialization uses the same lock,
+          // preventing cancellation from racing with a new payment attempt.
+          const lockedOrders = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id
+        FROM orders
+        WHERE id = ${orderId}::uuid
+        FOR UPDATE
+      `;
+
+          if (lockedOrders.length === 0) {
+            throw new AppError("Order not found", 404);
+          }
+
+          const order = await tx.order.findUnique({
+            where: { id: orderId },
+            select: {
+              id: true,
+              orderNumber: true,
+              userId: true,
+              status: true,
+              payments: {
+                select: {
+                  id: true,
+                  status: true,
+                },
+              },
+              inventoryReservations: {
+                select: {
+                  id: true,
+                  inventoryId: true,
+                  quantity: true,
+                  status: true,
+                },
+                orderBy: {
+                  inventoryId: "asc",
+                },
+              },
+            },
+          });
+
+          if (!order) {
+            throw new AppError("Order not found", 404);
+          }
+
+          // Customer cancellation is restricted to the order owner.
+          if (enforceOwnership && order.userId !== actorUserId) {
+            throw new AppError("You are not allowed to cancel this order", 403);
+          }
+
+          // Make repeated cancellation requests idempotent.
+          if (order.status === "CANCELLED") {
+            return {
+              orderId: order.id,
+              orderNumber: order.orderNumber,
+              status: order.status,
+              alreadyCancelled: true,
+            };
+          }
+
+          if (order.status !== "PENDING") {
+            throw new AppError("Only pending orders can be cancelled", 409);
+          }
+
+          // Never cancel an order with a successful or potentially successful
+          // payment. Such payments must first be reconciled.
+          const unsafePaymentStatuses = [
+            "SUCCESS",
+            "PENDING",
+            "PROCESSING",
+            "INITIALIZATION_UNKNOWN",
+          ] as const;
+
+          const unsafePayment = order.payments.find((payment) =>
+            unsafePaymentStatuses.includes(
+              payment.status as (typeof unsafePaymentStatuses)[number],
+            ),
+          );
+
+          if (unsafePayment) {
+            throw new AppError(
+              "This order has a payment that must be reconciled before cancellation",
+              409,
+            );
+          }
+
+          // A confirmed reservation means stock has already been deducted.
+          // Do not attempt to restore it through ordinary cancellation.
+          const confirmedReservation = order.inventoryReservations.find(
+            (reservation) => reservation.status === "CONFIRMED",
+          );
+
+          if (confirmedReservation) {
+            throw new AppError(
+              "This order has confirmed inventory. Manual reconciliation is required before cancellation",
+              409,
+            );
+          }
+
+          // Release only pending reservations. Expired and already released
+          // reservations must not have their reserved quantities decremented again.
+          const pendingReservations = order.inventoryReservations.filter(
+            (reservation) => reservation.status === "PENDING",
+          );
+
+          for (const reservation of pendingReservations) {
+            const released = await tx.inventoryReservation.updateMany({
+              where: {
+                id: reservation.id,
+                orderId: order.id,
+                status: "PENDING",
+              },
+              data: {
+                status: "RELEASED",
+                releasedAt: new Date(),
+              },
+            });
+
+            if (released.count !== 1) {
+              throw new AppError(
+                "An inventory reservation changed during cancellation. Please retry",
+                409,
+              );
+            }
+
+            const inventoryUpdate = await tx.inventory.updateMany({
+              where: {
+                id: reservation.inventoryId,
+                reservedQuantity: {
+                  gte: reservation.quantity,
+                },
+              },
+              data: {
+                reservedQuantity: {
+                  decrement: reservation.quantity,
+                },
+              },
+            });
+
+            if (inventoryUpdate.count !== 1) {
+              throw new AppError(
+                "Inventory reservation quantities are inconsistent. Manual review is required",
+                409,
+              );
+            }
+          }
+
+          // Change the order status only after all reservation releases succeed.
+          const updatedOrder = await tx.order.update({
+            where: {
+              id: order.id,
+            },
+            data: {
+              status: "CANCELLED",
+            },
+            select: {
+              id: true,
+              orderNumber: true,
+              status: true,
+            },
+          });
+
+          // Record the cancellation in the same transaction.
+          await createAuditLog(tx, {
+            userId: actorUserId,
+            action: "ORDER_CANCELLED",
+            entity: "Order",
+            entityId: order.id,
+            oldValues: {
+              status: "PENDING",
+            },
+            newValues: {
+              status: "CANCELLED",
+              releasedReservationCount: pendingReservations.length,
+            },
+            ...(auditMeta?.ipAddress ? { ipAddress: auditMeta.ipAddress } : {}),
+            ...(auditMeta?.userAgent ? { userAgent: auditMeta.userAgent } : {}),
+          });
+
+          return {
+            ...updatedOrder,
+            alreadyCancelled: false,
+          };
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
+      );
+    } catch (error) {
+      if (!isSerializationConflict(error)) {
+        throw error;
+      }
+
+      if (attempt === MAX_TRANSACTION_RETRIES) {
+        throw new AppError(
+          "Order cancellation encountered a temporary conflict. Please try again.",
+          409,
+        );
+      }
+
+      await sleep(RETRY_DELAY_MS * attempt);
+    }
+  }
+
+  throw new AppError(
+    "Order cancellation could not be completed. Please try again.",
+    409,
+  );
+}
+
+// Customer cancellation: the customer must own the order.
+export async function cancelOrder(
+  orderId: string,
+  userId: string,
+  auditMeta?: OrderCancellationAuditMeta,
+) {
+  return cancelOrderTransaction({
+    orderId,
+    actorUserId: userId,
+    enforceOwnership: true,
+    ...(auditMeta ? { auditMeta } : {}),
+  });
+}
+
+// Admin cancellation: the route must enforce orders.manage before calling this.
+export async function adminCancelOrder(
+  orderId: string,
+  adminUserId: string,
+  auditMeta?: OrderCancellationAuditMeta,
+) {
+  return cancelOrderTransaction({
+    orderId,
+    actorUserId: adminUserId,
+    enforceOwnership: false,
+    ...(auditMeta ? { auditMeta } : {}),
+  });
 }

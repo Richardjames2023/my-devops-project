@@ -1,6 +1,15 @@
 import { Router } from "express";
-import { create, createGuest, getGuest,} from "./order.controller";
-import { guestOrderLimiter, guestOrderRetrievalLimiter, } from "../../common/middleware/rate-limit.middleware";
+import {
+  create,
+  createGuest,
+  getGuest,
+  cancel,
+  adminCancel,
+} from "./order.controller";
+import {
+  guestOrderLimiter,
+  guestOrderRetrievalLimiter,
+} from "../../common/middleware/rate-limit.middleware";
 import { authenticate } from "../../common/middleware/authenticate";
 import { authorize } from "../../common/middleware/authorize";
 import { requireGuestSession } from "../guest-session/guest-session.middleware";
@@ -13,6 +22,21 @@ router.post(
   authenticate,
   authorize("orders.create"),
   create,
+);
+
+// Registered customer order cancellation
+router.patch(
+  "/:orderId/cancel",
+  authenticate,
+  cancel,
+);
+
+// Admin order cancellation
+router.patch(
+  "/:orderId/admin-cancel",
+  authenticate,
+  authorize("orders.manage"),
+  adminCancel,
 );
 
 // Guest checkout
