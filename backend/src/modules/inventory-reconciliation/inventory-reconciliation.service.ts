@@ -1,4 +1,8 @@
-import { InventoryReconciliationStatus, Prisma, RefundStatus } from "@prisma/client";
+import {
+  InventoryReconciliationStatus,
+  Prisma,
+  RefundStatus,
+} from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
@@ -7,6 +11,7 @@ import { createAuditLog } from "../../common/utils/audit-log";
 import type { ReviewReconciliationInput } from "./inventory-reconciliation.validation";
 import { finalizeOrderInventory } from "../inventory/inventory-finalization.service";
 import { createPaystackRefund } from "../payment/paystack.client";
+import { reconcileRefund } from "../refund/refund.service";
 
 interface ReconciliationOptions {
   ipAddress?: string;
@@ -396,7 +401,6 @@ export async function resolveReconciliationAsFulfilled(
   );
 }
 
-
 /**
  * Resolve a verified payment/inventory exception by refunding the full
  * captured payment. The local refund and reconciliation claim are committed
@@ -435,10 +439,12 @@ export async function resolveReconciliationAsRefunded(
         WHERE id = ${id}::uuid FOR UPDATE
       `;
 
-      const reconciliation = await tx.paymentInventoryReconciliation.findUnique({
-        where: { id },
-        include: { payment: true, order: true },
-      });
+      const reconciliation = await tx.paymentInventoryReconciliation.findUnique(
+        {
+          where: { id },
+          include: { payment: true, order: true },
+        },
+      );
 
       if (!reconciliation) {
         throw new AppError("Inventory reconciliation record not found", 404);
@@ -523,8 +529,12 @@ export async function resolveReconciliationAsRefunded(
           currency: refund.currency,
           notes,
         },
-        ...(options.ipAddress !== undefined ? { ipAddress: options.ipAddress } : {}),
-        ...(options.userAgent !== undefined ? { userAgent: options.userAgent } : {}),
+        ...(options.ipAddress !== undefined
+          ? { ipAddress: options.ipAddress }
+          : {}),
+        ...(options.userAgent !== undefined
+          ? { userAgent: options.userAgent }
+          : {}),
       });
 
       return { refund, payment: reconciliation.payment };
@@ -603,7 +613,7 @@ export async function resolveReconciliationAsRefunded(
       status: refundStatus,
       providerReference: String(providerRefund.id),
       ...(refundStatus === RefundStatus.SUCCESS
-        ? { processedAt: providerRefund.refunded_at ? new Date(providerRefund.refunded_at) : new Date() }
+        ? { processedAt: new Date() }
         : {}),
     },
   });
@@ -666,8 +676,12 @@ export async function resolveReconciliationAsRefunded(
           providerReference: updatedRefund.providerReference,
           notes,
         },
-        ...(options.ipAddress !== undefined ? { ipAddress: options.ipAddress } : {}),
-        ...(options.userAgent !== undefined ? { userAgent: options.userAgent } : {}),
+        ...(options.ipAddress !== undefined
+          ? { ipAddress: options.ipAddress }
+          : {}),
+        ...(options.userAgent !== undefined
+          ? { userAgent: options.userAgent }
+          : {}),
       });
     });
   } else if (
@@ -688,9 +702,266 @@ export async function resolveReconciliationAsRefunded(
   }
 
   return {
-    reconciliation: await prisma.paymentInventoryReconciliation.findUniqueOrThrow({
-      where: { id },
-    }),
+    reconciliation:
+      await prisma.paymentInventoryReconciliation.findUniqueOrThrow({
+        where: { id },
+      }),
     refund: updatedRefund,
   };
+}
+
+export async function withSerializableRetry<T>(
+  operation: () => Promise<T>,
+  maxAttempts = 3,
+): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      const isSerializationConflict =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2034";
+
+      if (!isSerializationConflict || attempt === maxAttempts) {
+        throw error;
+      }
+
+      // Short backoff before retrying the transaction.
+      await new Promise((resolve) => setTimeout(resolve, 50 * attempt));
+    }
+  }
+
+  throw new Error("Serializable transaction retry limit exceeded");
+}
+
+export async function reconcileInventoryRefund(
+  id: string,
+  adminId: string,
+  options: ReconciliationOptions = {},
+) {
+  const reconciliation = await prisma.paymentInventoryReconciliation.findUnique(
+    {
+      where: { id },
+      include: {
+        refund: true,
+        payment: true,
+      },
+    },
+  );
+
+  if (!reconciliation) {
+    throw new AppError("Inventory reconciliation record not found", 404);
+  }
+
+  if (!reconciliation.refund) {
+    throw new AppError(
+      "No refund is associated with this inventory reconciliation",
+      409,
+    );
+  }
+
+  // Allow safe repeated requests after a successful recovery.
+  if (
+    reconciliation.status === InventoryReconciliationStatus.RESOLVED_REFUNDED &&
+    reconciliation.refund.status === RefundStatus.SUCCESS
+  ) {
+    return {
+      reconciliation,
+      refund: reconciliation.refund,
+      reconciled: true,
+    };
+  }
+
+  if (reconciliation.status !== InventoryReconciliationStatus.REFUND_PENDING) {
+    throw new AppError(
+      "No pending inventory refund is available for reconciliation",
+      409,
+    );
+  }
+
+  // Reuse the existing Paystack refund recovery implementation.
+  // This function never submits another refund.
+  const refund = await reconcileRefund(reconciliation.refund.id);
+
+  if (
+    refund.status === RefundStatus.PENDING ||
+    refund.status === RefundStatus.PROCESSING ||
+    refund.status === RefundStatus.SUBMISSION_UNKNOWN ||
+    refund.status === RefundStatus.NEEDS_ATTENTION
+  ) {
+    return {
+      reconciliation,
+      refund,
+      reconciled: false,
+    };
+  }
+
+  if (
+    refund.status !== RefundStatus.SUCCESS &&
+    refund.status !== RefundStatus.FAILED &&
+    refund.status !== RefundStatus.CANCELLED
+  ) {
+    throw new AppError(
+      "Refund has an unsupported status. Manual review is required.",
+      409,
+    );
+  }
+
+  return withSerializableRetry(() =>
+    prisma.$transaction(
+      async (tx) => {
+        // Maintain the existing lock order: order -> payment -> reconciliation.
+        await tx.$queryRaw`
+        SELECT id FROM orders
+        WHERE id = ${reconciliation.orderId}::uuid
+        FOR UPDATE
+      `;
+
+        await tx.$queryRaw`
+        SELECT id FROM payments
+        WHERE id = ${reconciliation.paymentId}::uuid
+        FOR UPDATE
+      `;
+
+        await tx.$queryRaw`
+        SELECT id FROM payment_inventory_reconciliations
+        WHERE id = ${id}::uuid
+        FOR UPDATE
+      `;
+
+        const current = await tx.paymentInventoryReconciliation.findUnique({
+          where: { id },
+          include: {
+            refund: true,
+            payment: true,
+          },
+        });
+
+        if (!current) {
+          throw new AppError("Inventory reconciliation record not found", 404);
+        }
+
+        // Another recovery request may have completed while this request
+        // was communicating with Paystack.
+        if (
+          current.status === InventoryReconciliationStatus.RESOLVED_REFUNDED &&
+          current.refundId === refund.id &&
+          current.refund?.status === RefundStatus.SUCCESS
+        ) {
+          return {
+            reconciliation: current,
+            refund: current.refund,
+            reconciled: true,
+          };
+        }
+
+        if (
+          current.status !== InventoryReconciliationStatus.REFUND_PENDING ||
+          current.refundId !== refund.id
+        ) {
+          throw new AppError(
+            "Inventory reconciliation changed during refund recovery. Manual review is required.",
+            409,
+          );
+        }
+
+        if (refund.status === RefundStatus.SUCCESS) {
+          if (
+            current.payment.status !== "SUCCESS" ||
+            !current.payment.reconciliationRequired
+          ) {
+            throw new AppError(
+              "Payment state is inconsistent with the pending inventory reconciliation. Manual review is required.",
+              409,
+            );
+          }
+
+          const now = new Date();
+
+          await tx.payment.update({
+            where: { id: current.paymentId },
+            data: {
+              reconciliationRequired: false,
+              reconciliationReason: null,
+              reconciledAt: now,
+            },
+          });
+
+          await tx.paymentInventoryReconciliation.update({
+            where: { id },
+            data: {
+              status: InventoryReconciliationStatus.RESOLVED_REFUNDED,
+              resolvedAt: now,
+              resolvedByUserId: adminId,
+            },
+          });
+
+          await createAuditLog(tx, {
+            userId: adminId,
+            action: "INVENTORY_RECONCILIATION_REFUND_RECOVERED",
+            entity: "PaymentInventoryReconciliation",
+            entityId: id,
+            oldValues: {
+              status: InventoryReconciliationStatus.REFUND_PENDING,
+            },
+            newValues: {
+              status: InventoryReconciliationStatus.RESOLVED_REFUNDED,
+              refundId: refund.id,
+              refundReference: refund.reference,
+              providerReference: refund.providerReference,
+            },
+            ...(options.ipAddress !== undefined
+              ? { ipAddress: options.ipAddress }
+              : {}),
+            ...(options.userAgent !== undefined
+              ? { userAgent: options.userAgent }
+              : {}),
+          });
+        } else {
+          // A failed/cancelled refund returns the reconciliation to review.
+          // Keep refundId so the failed refund remains linked for audit history.
+          await tx.paymentInventoryReconciliation.update({
+            where: { id },
+            data: {
+              status: InventoryReconciliationStatus.UNDER_REVIEW,
+            },
+          });
+
+          await createAuditLog(tx, {
+            userId: adminId,
+            action: "INVENTORY_RECONCILIATION_REFUND_RECOVERY_FAILED",
+            entity: "PaymentInventoryReconciliation",
+            entityId: id,
+            oldValues: {
+              status: InventoryReconciliationStatus.REFUND_PENDING,
+            },
+            newValues: {
+              status: InventoryReconciliationStatus.UNDER_REVIEW,
+              refundId: refund.id,
+              refundReference: refund.reference,
+              refundStatus: refund.status,
+            },
+            ...(options.ipAddress !== undefined
+              ? { ipAddress: options.ipAddress }
+              : {}),
+            ...(options.userAgent !== undefined
+              ? { userAgent: options.userAgent }
+              : {}),
+          });
+        }
+
+        return {
+          reconciliation:
+            await tx.paymentInventoryReconciliation.findUniqueOrThrow({
+              where: { id },
+            }),
+          refund,
+          reconciled: true,
+        };
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      },
+    ),
+  );
 }

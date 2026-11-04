@@ -13,6 +13,7 @@ import {
   markReconciliationUnderReview,
   resolveReconciliationAsFulfilled,
   resolveReconciliationAsRefunded,
+  reconcileInventoryRefund,
 } from "./inventory-reconciliation.service";
 
 export async function list(
@@ -209,6 +210,44 @@ export async function resolveRefunded(
 
   res.status(200).json({
     message: "Inventory reconciliation refund submitted",
+    ...result,
+  });
+}
+
+export async function reconcileRefundStatus(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const paramsResult = reconciliationIdSchema.safeParse(req.params);
+
+  if (!paramsResult.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: paramsResult.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const result = await reconcileInventoryRefund(
+    paramsResult.data.id,
+    req.user.id,
+    {
+      ...(req.ip ? { ipAddress: req.ip } : {}),
+      ...(req.get("user-agent")
+        ? { userAgent: req.get("user-agent")! }
+        : {}),
+    },
+  );
+
+  res.status(200).json({
+    message: result.reconciled
+      ? "Inventory refund reconciliation completed"
+      : "Refund is still awaiting provider confirmation",
     ...result,
   });
 }

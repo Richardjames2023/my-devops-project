@@ -7,6 +7,7 @@ import {
   review,
   resolveFulfilled,
   resolveRefunded,
+  reconcileRefundStatus,
 } from "./inventory-reconciliation.controller";
 
 const router = Router();
@@ -18,7 +19,7 @@ router.get("/", list);
 router.get("/:id", getById);
 router.patch("/:id/review", review);
 router.patch("/:id/resolve-fulfilled", resolveFulfilled);
-
+router.patch("/:id/reconcile-refund", reconcileRefundStatus);
 router.patch("/:id/resolve-refunded", resolveRefunded);
 
 export default router;
