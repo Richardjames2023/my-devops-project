@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { env } from "./config/env";
 import authRoutes from "./modules/auth/auth.routes";
 import productRoutes from "./modules/products/product.routes";
+import categoryRoutes from "./modules/products/category.routes";
 import productVariantRoutes from "./modules/products/product-variant.routes";
 import inventoryRoutes from "./modules/inventory/inventory.routes";
 import stockMovementRoutes from "./modules/inventory/stock-movement.routes";
@@ -59,6 +60,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/product-variants", productVariantRoutes);
 app.use("/api/v1/cart", cartRoutes);
 app.use("/api/v1/inventory/movements", stockMovementRoutes);
