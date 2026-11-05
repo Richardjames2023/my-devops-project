@@ -151,35 +151,31 @@ export async function listCatalogProducts(query: ProductCatalogQuery) {
     };
   }
 
-  const priceFilters: Prisma.ProductWhereInput[] = [];
-  if (query.minPrice !== undefined) {
-    priceFilters.push({
-      OR: [
-        { variants: { some: { isActive: true, price: { gte: query.minPrice } } } },
-        {
-          AND: [
-            { variants: { none: { isActive: true } } },
-            { basePrice: { gte: query.minPrice } },
-          ],
-        },
-      ],
-    });
-  }
-  if (query.maxPrice !== undefined) {
-    priceFilters.push({
-      OR: [
-        { variants: { some: { isActive: true, price: { lte: query.maxPrice } } } },
-        {
-          AND: [
-            { variants: { none: { isActive: true } } },
-            { basePrice: { lte: query.maxPrice } },
-          ],
-        },
-      ],
-    });
-  }
-  if (priceFilters.length) {
-    where.AND = priceFilters;
+  if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+    const priceCondition: { gte?: string; lte?: string } = {};
+    if (query.minPrice !== undefined) priceCondition.gte = query.minPrice;
+    if (query.maxPrice !== undefined) priceCondition.lte = query.maxPrice;
+
+    where.AND = [
+      {
+        OR: [
+          {
+            variants: {
+              some: {
+                isActive: true,
+                price: priceCondition,
+              },
+            },
+          },
+          {
+            AND: [
+              { variants: { none: { isActive: true } } },
+              { basePrice: priceCondition },
+            ],
+          },
+        ],
+      },
+    ];
   }
 
   const orderBy: Prisma.ProductOrderByWithRelationInput =
