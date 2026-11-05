@@ -1,6 +1,10 @@
+
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
-import type { CreateFulfillmentInput, UpdatePackageStatusInput, } from "./fulfillment.validation";
+import type {
+  CreateFulfillmentInput,
+  UpdatePackageStatusInput,
+} from "./fulfillment.validation";
 
 export async function createFulfillment(
   input: CreateFulfillmentInput,
@@ -82,15 +86,12 @@ export async function updatePackageStatus(
       throw new AppError("Package not found", 404);
     }
 
-    const allowedTransitions: Record<
-      string,
-      string[]
-    > = {
+    const allowedTransitions: Record<string, string[]> = {
       PENDING: ["PACKING"],
       PACKING: ["PACKED"],
       PACKED: ["HANDED_TO_COURIER"],
       HANDED_TO_COURIER: ["IN_TRANSIT"],
-      IN_TRANSIT: ["DELIVERED"],
+      IN_TRANSIT: [],
       DELIVERED: [],
       LOST: [],
       DAMAGED: [],

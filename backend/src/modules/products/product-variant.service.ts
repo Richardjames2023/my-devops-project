@@ -2,9 +2,7 @@ import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type { CreateProductVariantInput } from "./product-variant.validation";
 
-export async function createProductVariant(
-  input: CreateProductVariantInput,
-) {
+export async function createProductVariant(input: CreateProductVariantInput) {
   const product = await prisma.product.findUnique({
     where: {
       id: input.productId,
@@ -26,10 +24,7 @@ export async function createProductVariant(
   });
 
   if (existingSku) {
-    throw new AppError(
-      "A variant with this SKU already exists",
-      409,
-    );
+    throw new AppError("A variant with this SKU already exists", 409);
   }
 
   const variant = await prisma.productVariant.create({
@@ -38,6 +33,9 @@ export async function createProductVariant(
       sku: input.sku,
       name: input.name,
       price: input.price,
+      hasWarranty: input.hasWarranty ?? null,
+      warrantyDuration: input.warrantyDuration ?? null,
+      warrantyTerms: input.warrantyTerms ?? null,
     },
   });
 

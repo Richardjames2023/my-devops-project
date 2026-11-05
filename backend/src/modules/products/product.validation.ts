@@ -1,35 +1,49 @@
 import { z } from "zod";
+export const createProductSchema = z
+  .object({
+    categoryId: z.uuid("Invalid category ID"),
 
-export const createProductSchema = z.object({
-  categoryId: z.uuid("Invalid category ID"),
+    name: z.string().trim().min(1, "Product name is required"),
 
-  name: z
-    .string()
-    .trim()
-    .min(1, "Product name is required"),
+    slug: z
+      .string()
+      .trim()
+      .min(1, "Product slug is required")
+      .regex(
+        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+        "Slug must contain only lowercase letters, numbers, and hyphens",
+      ),
 
-  slug: z
-    .string()
-    .trim()
-    .min(1, "Product slug is required")
-    .regex(
-      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-      "Slug must contain only lowercase letters, numbers, and hyphens",
-    ),
+    description: z.string().trim().optional(),
 
-  description: z
-    .string()
-    .trim()
-    .optional(),
+    basePrice: z.string().regex(/^\d+(?:\.\d{1,2})?$/, "Invalid price format"),
 
-  basePrice: z
-    .string()
-    .regex(
-      /^\d+(?:\.\d{1,2})?$/,
-      "Invalid price format",
-    ),
-});
+    hasWarranty: z.boolean().default(false),
 
-export type CreateProductInput = z.infer<
-  typeof createProductSchema
->;
+    warrantyDuration: z.number().int().positive().optional(),
+
+    warrantyTerms: z.string().trim().min(1).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.hasWarranty && data.warrantyDuration === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["warrantyDuration"],
+        message: "Warranty duration is required when warranty is enabled",
+      });
+    }
+
+    if (
+      !data.hasWarranty &&
+      (data.warrantyDuration !== undefined || data.warrantyTerms !== undefined)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["hasWarranty"],
+        message:
+          "Warranty duration and terms cannot be supplied when warranty is disabled",
+      });
+    }
+  });
+
+export type CreateProductInput = z.infer<typeof createProductSchema>;

@@ -1,0 +1,478 @@
+import { randomUUID } from "node:crypto";
+import { Pool } from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+function addMonthsClamped(date: Date, months: number): Date {
+  const result = new Date(date);
+  const originalDay = result.getUTCDate();
+
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+
+  const lastDay = new Date(
+    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+
+  result.setUTCDate(Math.min(originalDay, lastDay));
+
+  return result;
+}
+
+const databaseUrl = process.env.TEST_DATABASE_URL;
+
+if (!databaseUrl) {
+  throw new Error("TEST_DATABASE_URL is required");
+}
+
+const parsedUrl = new URL(databaseUrl);
+
+if (parsedUrl.pathname !== "/shop_db_test") {
+  throw new Error(
+    "Safety check failed: delivery tests may only use shop_db_test",
+  );
+}
+
+process.env.DATABASE_URL = databaseUrl;
+
+const pool = new Pool({
+  connectionString: databaseUrl,
+  max: 2,
+});
+
+const {
+  updateDeliveryStatus,
+  createDeliveryAttempt,
+  completeDelivery,
+  prisma,
+  disconnectDatabase,
+} = await import("../src/modules/delivery/delivery.service").then(
+  async (service) => {
+    const database = await import("../src/infrastructure/prisma/client");
+    const completion =
+      await import("../src/modules/delivery/delivery-completion.service");
+
+    return {
+      updateDeliveryStatus: service.updateDeliveryStatus,
+      createDeliveryAttempt: service.createDeliveryAttempt,
+      completeDelivery: completion.completeDelivery,
+      prisma: database.default,
+      disconnectDatabase: database.disconnectDatabase,
+    };
+  },
+);
+
+interface TestFixture {
+  categoryId: string;
+  productId: string;
+  variantId: string;
+  orderId: string;
+  orderItemId: string;
+  fulfillmentId: string;
+  packageIds: string[];
+  deliveryIds: string[];
+}
+
+interface CreateFixtureOptions {
+  quantities?: number[];
+  hasWarranty?: boolean;
+  warrantyDuration?: number | null;
+  orderQuantity?: number;
+}
+
+async function createFixture(
+  options: CreateFixtureOptions = {},
+): Promise<TestFixture> {
+  const {
+    quantities = [1],
+    hasWarranty = true,
+    warrantyDuration = 12,
+    orderQuantity = quantities.reduce((total, value) => total + value, 0),
+  } = options;
+
+  if (quantities.reduce((total, value) => total + value, 0) > orderQuantity) {
+    throw new Error("Package quantities cannot exceed order item quantity");
+  }
+
+  const fixture: TestFixture = {
+    categoryId: randomUUID(),
+    productId: randomUUID(),
+    variantId: randomUUID(),
+    orderId: randomUUID(),
+    orderItemId: randomUUID(),
+    fulfillmentId: randomUUID(),
+    packageIds: quantities.map(() => randomUUID()),
+    deliveryIds: quantities.map(() => randomUUID()),
+  };
+
+  try {
+    await pool.query(
+      `INSERT INTO categories
+       (id, name, slug, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, NOW(), NOW())`,
+      [
+        fixture.categoryId,
+        `Delivery Test Category ${fixture.categoryId}`,
+        `delivery-test-category-${fixture.categoryId}`,
+      ],
+    );
+
+    await pool.query(
+      `INSERT INTO products
+       (id, "categoryId", name, slug, "basePrice", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+      [
+        fixture.productId,
+        fixture.categoryId,
+        "Delivery Test Product",
+        `delivery-test-${fixture.productId}`,
+        10000,
+      ],
+    );
+
+    await pool.query(
+      `INSERT INTO product_variants
+       (id, "productId", sku, name, price, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+      [
+        fixture.variantId,
+        fixture.productId,
+        `DELIVERY-${fixture.variantId}`,
+        "Test Variant",
+        10000,
+      ],
+    );
+
+    await pool.query(
+      `INSERT INTO orders
+       (id, "orderNumber", status, subtotal, "totalAmount",
+        "shippingAddress", "createdAt", "updatedAt")
+       VALUES ($1, $2, 'CONFIRMED', $3, $3, $4, NOW(), NOW())`,
+      [
+        fixture.orderId,
+        `DELIVERY-${fixture.orderId}`,
+        orderQuantity * 10000,
+        JSON.stringify({ fullName: "Delivery Test Customer" }),
+      ],
+    );
+
+    await pool.query(
+      `INSERT INTO order_items
+       (id, "orderId", "productVariantId", "productName",
+        "variantName", sku, quantity, "unitPrice", "totalPrice",
+        "hasWarranty", "warrantyDuration", "createdAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+      [
+        fixture.orderItemId,
+        fixture.orderId,
+        fixture.variantId,
+        "Delivery Test Product",
+        "Test Variant",
+        `DELIVERY-${fixture.variantId}`,
+        orderQuantity,
+        10000,
+        orderQuantity * 10000,
+        hasWarranty,
+        hasWarranty ? warrantyDuration : null,
+      ],
+    );
+
+    await pool.query(
+      `INSERT INTO fulfillments
+       (id, "orderId", status, "createdAt", "updatedAt")
+       VALUES ($1, $2, 'PROCESSING', NOW(), NOW())`,
+      [fixture.fulfillmentId, fixture.orderId],
+    );
+
+    for (let index = 0; index < quantities.length; index++) {
+      const packageId = fixture.packageIds[index];
+      const deliveryId = fixture.deliveryIds[index];
+
+      await pool.query(
+        `INSERT INTO packages
+         (id, "fulfillmentId", status, "createdAt", "updatedAt")
+         VALUES ($1, $2, 'IN_TRANSIT', NOW(), NOW())`,
+        [packageId, fixture.fulfillmentId],
+      );
+
+      await pool.query(
+        `INSERT INTO package_items
+         (id, "packageId", "orderItemId", quantity, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+        [randomUUID(), packageId, fixture.orderItemId, quantities[index]],
+      );
+
+      await pool.query(
+        `INSERT INTO deliveries
+         (id, "packageId", status)
+         VALUES ($1, $2, 'OUT_FOR_DELIVERY')`,
+        [deliveryId, packageId],
+      );
+    }
+
+    return fixture;
+  } catch (error) {
+    await cleanupFixture(fixture);
+    throw error;
+  }
+}
+
+async function cleanupFixture(fixture: TestFixture): Promise<void> {
+  await pool.query(`DELETE FROM deliveries WHERE id = ANY($1::uuid[])`, [
+    fixture.deliveryIds,
+  ]);
+
+  await pool.query(
+    `DELETE FROM package_items WHERE "packageId" = ANY($1::uuid[])`,
+    [fixture.packageIds],
+  );
+
+  await pool.query(`DELETE FROM packages WHERE id = ANY($1::uuid[])`, [
+    fixture.packageIds,
+  ]);
+
+  await pool.query(`DELETE FROM fulfillments WHERE id = $1`, [
+    fixture.fulfillmentId,
+  ]);
+
+  await pool.query(`DELETE FROM order_items WHERE id = $1`, [
+    fixture.orderItemId,
+  ]);
+
+  await pool.query(`DELETE FROM orders WHERE id = $1`, [fixture.orderId]);
+
+  await pool.query(`DELETE FROM product_variants WHERE id = $1`, [
+    fixture.variantId,
+  ]);
+
+  await pool.query(`DELETE FROM products WHERE id = $1`, [fixture.productId]);
+
+  await pool.query(`DELETE FROM categories WHERE id = $1`, [
+    fixture.categoryId,
+  ]);
+}
+
+describe("PostgreSQL delivery and warranty activation", () => {
+  beforeAll(async () => {
+    const result = await pool.query("SELECT current_database() AS name");
+
+    if (result.rows[0]?.name !== "shop_db_test") {
+      throw new Error("Safety check failed: connected to the wrong database");
+    }
+  });
+
+  afterAll(async () => {
+    await disconnectDatabase();
+    await pool.end();
+  });
+
+  it("activates warranty only after all split-package quantities are delivered", async () => {
+    const fixture = await createFixture({
+      quantities: [3, 2],
+      orderQuantity: 5,
+      hasWarranty: true,
+      warrantyDuration: 12,
+    });
+
+    try {
+      // Deliver the first package containing 3 of the 5 units.
+      await updateDeliveryStatus(fixture.deliveryIds[0], "DELIVERED");
+
+      const firstDelivery = await pool.query(
+        `SELECT "deliveredAt" FROM deliveries WHERE id = $1`,
+        [fixture.deliveryIds[0]],
+      );
+
+      expect(firstDelivery.rows[0].deliveredAt).not.toBeNull();
+
+      const afterFirstDelivery = await pool.query(
+        `SELECT "warrantyStartedAt", "warrantyExpiresAt"
+       FROM order_items WHERE id = $1`,
+        [fixture.orderItemId],
+      );
+
+      expect(afterFirstDelivery.rows[0].warrantyStartedAt).toBeNull();
+      expect(afterFirstDelivery.rows[0].warrantyExpiresAt).toBeNull();
+
+      // Deliver the remaining 2 units.
+      await updateDeliveryStatus(fixture.deliveryIds[1], "DELIVERED");
+
+      const deliveryDates = await pool.query(
+        `SELECT "deliveredAt"
+       FROM deliveries
+       WHERE id = ANY($1::uuid[])`,
+        [fixture.deliveryIds],
+      );
+
+      const latestDeliveryDate = new Date(
+        Math.max(
+          ...deliveryDates.rows.map((row) =>
+            new Date(row.deliveredAt).getTime(),
+          ),
+        ),
+      );
+
+      const warranty = await pool.query(
+        `SELECT "warrantyStartedAt", "warrantyExpiresAt"
+       FROM order_items WHERE id = $1`,
+        [fixture.orderItemId],
+      );
+
+      expect(new Date(warranty.rows[0].warrantyStartedAt).toISOString()).toBe(
+        latestDeliveryDate.toISOString(),
+      );
+
+      const expectedExpiry = addMonthsClamped(latestDeliveryDate, 12);
+
+      expect(new Date(warranty.rows[0].warrantyExpiresAt).toISOString()).toBe(
+        expectedExpiry.toISOString(),
+      );
+
+      const packages = await pool.query(
+        `SELECT p.status AS package_status,
+              d.status AS delivery_status
+       FROM packages p
+       JOIN deliveries d ON d."packageId" = p.id
+       WHERE p.id = ANY($1::uuid[])`,
+        [fixture.packageIds],
+      );
+
+      expect(packages.rows).toHaveLength(2);
+
+      for (const row of packages.rows) {
+        expect(row.package_status).toBe("DELIVERED");
+        expect(row.delivery_status).toBe("DELIVERED");
+      }
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("activates warranty when a successful delivery attempt completes delivery", async () => {
+    const fixture = await createFixture({
+      quantities: [1],
+      orderQuantity: 1,
+      hasWarranty: true,
+      warrantyDuration: 6,
+    });
+
+    try {
+      const result = await createDeliveryAttempt(fixture.deliveryIds[0], {
+        status: "SUCCESSFUL",
+        notes: "Delivered to customer",
+      });
+
+      expect(result.delivery?.status).toBe("DELIVERED");
+
+      const warranty = await pool.query(
+        `SELECT "warrantyStartedAt", "warrantyExpiresAt"
+         FROM order_items WHERE id = $1`,
+        [fixture.orderItemId],
+      );
+
+      expect(warranty.rows[0].warrantyStartedAt).not.toBeNull();
+      expect(warranty.rows[0].warrantyExpiresAt).not.toBeNull();
+
+      const pkg = await pool.query(
+        `SELECT status FROM packages WHERE id = $1`,
+        [fixture.packageIds[0]],
+      );
+
+      expect(pkg.rows[0].status).toBe("DELIVERED");
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("does not activate warranty for an order item without warranty", async () => {
+    const fixture = await createFixture({
+      quantities: [1],
+      orderQuantity: 1,
+      hasWarranty: false,
+      warrantyDuration: null,
+    });
+
+    try {
+      await updateDeliveryStatus(fixture.deliveryIds[0], "DELIVERED");
+
+      const warranty = await pool.query(
+        `SELECT "hasWarranty", "warrantyStartedAt", "warrantyExpiresAt"
+         FROM order_items WHERE id = $1`,
+        [fixture.orderItemId],
+      );
+
+      expect(warranty.rows[0].hasWarranty).toBe(false);
+      expect(warranty.rows[0].warrantyStartedAt).toBeNull();
+      expect(warranty.rows[0].warrantyExpiresAt).toBeNull();
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("preserves the original delivery and warranty dates on duplicate completion", async () => {
+    const fixture = await createFixture({
+      quantities: [1],
+      orderQuantity: 1,
+      hasWarranty: true,
+      warrantyDuration: 12,
+    });
+
+    try {
+      const originalDeliveryDate = new Date("2026-01-31T10:00:00.000Z");
+
+      await prisma.$transaction((tx) =>
+        completeDelivery(tx, fixture.deliveryIds[0], originalDeliveryDate),
+      );
+
+      const original = await pool.query(
+        `SELECT
+      d."deliveredAt" AT TIME ZONE 'UTC' AS "deliveredAt",
+      oi."warrantyStartedAt" AT TIME ZONE 'UTC' AS "warrantyStartedAt",
+      oi."warrantyExpiresAt" AT TIME ZONE 'UTC' AS "warrantyExpiresAt"
+      FROM deliveries d
+      CROSS JOIN order_items oi
+      WHERE d.id = $1 AND oi.id = $2`,
+        [fixture.deliveryIds[0], fixture.orderItemId],
+      );
+      expect(new Date(original.rows[0].deliveredAt).toISOString()).toBe(
+        originalDeliveryDate.toISOString(),
+      );
+
+      expect(new Date(original.rows[0].warrantyExpiresAt).toISOString()).toBe(
+        "2027-01-31T10:00:00.000Z",
+      );
+
+      // Attempt completion again with a different timestamp.
+      await prisma.$transaction((tx) =>
+        completeDelivery(
+          tx,
+          fixture.deliveryIds[0],
+          new Date("2026-02-15T12:00:00.000Z"),
+        ),
+      );
+
+      const repeated = await pool.query(
+        `SELECT d."deliveredAt" AT TIME ZONE 'UTC' AS "deliveredAt",
+              oi."warrantyStartedAt" AT TIME ZONE 'UTC' AS "warrantyStartedAt",
+              oi."warrantyExpiresAt" AT TIME ZONE 'UTC' AS "warrantyExpiresAt"
+       FROM deliveries d
+       CROSS JOIN order_items oi
+       WHERE d.id = $1 AND oi.id = $2`,
+        [fixture.deliveryIds[0], fixture.orderItemId],
+      );
+
+      expect(new Date(repeated.rows[0].deliveredAt).toISOString()).toBe(
+        originalDeliveryDate.toISOString(),
+      );
+
+      expect(new Date(repeated.rows[0].warrantyStartedAt).toISOString()).toBe(
+        originalDeliveryDate.toISOString(),
+      );
+
+      expect(new Date(repeated.rows[0].warrantyExpiresAt).toISOString()).toBe(
+        "2027-01-31T10:00:00.000Z",
+      );
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+});

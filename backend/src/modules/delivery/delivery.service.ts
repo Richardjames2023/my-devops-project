@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type {
@@ -5,6 +6,7 @@ import type {
   UpdateDeliveryStatusInput,
   CreateDeliveryAttemptInput,
 } from "./delivery.validation";
+import { completeDelivery } from "./delivery-completion.service";
 
 export async function createDelivery(input: CreateDeliveryInput) {
   return prisma.$transaction(async (tx) => {
@@ -30,14 +32,12 @@ export async function createDelivery(input: CreateDeliveryInput) {
       );
     }
 
-    const delivery = await tx.delivery.create({
+    return tx.delivery.create({
       data: {
         packageId: pkg.id,
         status: "PENDING",
       },
     });
-
-    return delivery;
   });
 }
 
@@ -46,6 +46,14 @@ export async function updateDeliveryStatus(
   status: UpdateDeliveryStatusInput["status"],
 ) {
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw(
+      Prisma.sql`
+    SELECT id
+    FROM deliveries
+    WHERE id = ${deliveryId}::uuid
+    FOR UPDATE
+  `,
+    );
     const delivery = await tx.delivery.findUnique({
       where: { id: deliveryId },
     });
@@ -77,12 +85,17 @@ export async function updateDeliveryStatus(
 
     const now = new Date();
 
+    // The shared service updates both Delivery and Package,
+    // then checks whether warranties can be activated.
+    if (status === "DELIVERED") {
+      return completeDelivery(tx, delivery.id, now);
+    }
+
     return tx.delivery.update({
       where: { id: delivery.id },
       data: {
         status,
         ...(status === "PICKED_UP" && { shippedAt: now }),
-        ...(status === "DELIVERED" && { deliveredAt: now }),
       },
     });
   });
@@ -93,6 +106,14 @@ export async function createDeliveryAttempt(
   input: CreateDeliveryAttemptInput,
 ) {
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw(
+      Prisma.sql`
+    SELECT id
+    FROM deliveries
+    WHERE id = ${deliveryId}::uuid
+    FOR UPDATE
+  `,
+    );
     const delivery = await tx.delivery.findUnique({
       where: { id: deliveryId },
     });
@@ -124,15 +145,20 @@ export async function createDeliveryAttempt(
         }),
       },
     });
+
     if (input.status === "SUCCESSFUL") {
-      await tx.delivery.update({
-        where: { id: delivery.id },
-        data: {
-          status: "DELIVERED",
-          deliveredAt: new Date(),
-        },
-      });
-    } 
+      const completedDelivery = await completeDelivery(
+        tx,
+        delivery.id,
+        new Date(),
+      );
+
+      return {
+        attempt,
+        delivery: completedDelivery,
+      };
+    }
+
     return {
       attempt,
       delivery: await tx.delivery.findUnique({

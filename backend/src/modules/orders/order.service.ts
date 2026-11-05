@@ -104,6 +104,38 @@ async function createOrderFromCart(
       const product = variant.product;
       const inventory = variant.inventory;
 
+      // Resolve the effective warranty configuration.
+      // A null variant setting means inherit from the product.
+      const hasWarranty =
+        variant.hasWarranty === null
+          ? product.hasWarranty
+          : variant.hasWarranty;
+
+      const warrantyDuration = hasWarranty
+        ? variant.hasWarranty === true
+          ? variant.warrantyDuration
+          : product.warrantyDuration
+        : null;
+
+      const warrantyTerms = hasWarranty
+        ? variant.hasWarranty === true
+          ? variant.warrantyTerms
+          : product.warrantyTerms
+        : null;
+
+      // Protect checkout against incomplete warranty configuration.
+      if (
+        hasWarranty &&
+        (warrantyDuration === null ||
+          warrantyDuration === undefined ||
+          warrantyDuration <= 0)
+      ) {
+        throw new AppError(
+          `Invalid warranty configuration for ${product.name} - ${variant.name}`,
+          409,
+        );
+      }
+
       if (!variant.isActive || !product.isActive) {
         throw new AppError(
           `${product.name} - ${variant.name} is no longer available`,
@@ -146,6 +178,11 @@ async function createOrderFromCart(
         unitPrice,
         discountAmount: new Prisma.Decimal(0),
         totalPrice,
+
+        // Warranty snapshot at purchase time.
+        hasWarranty,
+        warrantyDuration,
+        warrantyTerms,
       };
     });
 
