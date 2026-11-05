@@ -1,41 +1,27 @@
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 
-import { hashPassword, verifyPassword, } from "../../common/utils/password";
-import { generateAccessToken, } from "../../common/utils/jwt";
-import { generateRefreshToken, hashRefreshToken, } from "../../common/utils/refreshToken";
-import { REFRESH_TOKEN_EXPIRES_IN_DAYS, } from "../../config/auth";
-import type { RegisterInput, LoginInput, RefreshTokenInput, } from "./auth.validation";
+import { hashPassword, verifyPassword } from "../../common/utils/password";
+import { generateAccessToken } from "../../common/utils/jwt";
+import { generateRefreshToken, hashRefreshToken } from "../../common/utils/refreshToken";
+import { REFRESH_TOKEN_EXPIRES_IN_DAYS } from "../../config/auth";
+import type { RegisterInput, LoginInput, RefreshTokenInput } from "./auth.validation";
 
-
-export async function registerUser(
-  input: RegisterInput,
-) {
+export async function registerUser(input: RegisterInput) {
   const existingUser = await prisma.user.findUnique({
-    where: {
-      email: input.email,
-    },
+    where: { email: input.email },
   });
 
   if (existingUser) {
-    throw new AppError(
-      "Unable to create account",
-      409,
-    );
+    throw new AppError("Unable to create account", 409);
   }
 
   const customerRole = await prisma.role.findUnique({
-    where: {
-      name: "CUSTOMER",
-    },
+    where: { name: "CUSTOMER" },
   });
 
   if (!customerRole) {
-    throw new AppError(
-      "Customer role is not configured",
-      500,
-      false,
-    );
+    throw new AppError("Customer role is not configured", 500, false);
   }
 
   const passwordHash = await hashPassword(input.password);
@@ -52,10 +38,7 @@ export async function registerUser(
     });
 
     await tx.userRole.create({
-      data: {
-        userId: createdUser.id,
-        roleId: customerRole.id,
-      },
+      data: { userId: createdUser.id, roleId: customerRole.id },
     });
 
     return createdUser;
@@ -72,23 +55,15 @@ export async function registerUser(
   };
 }
 
-export async function loginUser(
-  input: LoginInput,
-) {
+export async function loginUser(input: LoginInput) {
   const user = await prisma.user.findUnique({
-    where: {
-      email: input.email,
-    },
+    where: { email: input.email },
     include: {
       userRoles: {
         include: {
           role: {
             include: {
-              permissions: {
-                include: {
-                  permission: true,
-                },
-              },
+              permissions: { include: { permission: true } },
             },
           },
         },
@@ -97,43 +72,25 @@ export async function loginUser(
   });
 
   if (!user) {
-    throw new AppError(
-      "Invalid email or password",
-      401,
-    );
+    throw new AppError("Invalid email or password", 401);
   }
 
-  const passwordValid = await verifyPassword(
-    input.password,
-    user.passwordHash,
-  );
-
+  const passwordValid = await verifyPassword(input.password, user.passwordHash);
   if (!passwordValid) {
-    throw new AppError(
-      "Invalid email or password",
-      401,
-    );
+    throw new AppError("Invalid email or password", 401);
   }
 
   if (!user.isActive) {
-    throw new AppError(
-      "Account is inactive",
-      403,
-    );
+    throw new AppError("Account is inactive", 403);
   }
 
-  const roles = user.userRoles.map(
-    (userRole) => userRole.role.name,
-  );
-
+  const roles = user.userRoles.map((userRole) => userRole.role.name);
   const permissions = [
     ...new Set(
-      user.userRoles.flatMap(
-        (userRole) =>
-          userRole.role.permissions.map(
-            (rolePermission) =>
-              rolePermission.permission.name,
-          ),
+      user.userRoles.flatMap((userRole) =>
+        userRole.role.permissions.map((rolePermission) =>
+          rolePermission.permission.name,
+        ),
       ),
     ),
   ];
@@ -145,15 +102,10 @@ export async function loginUser(
   });
 
   const refreshToken = generateRefreshToken();
-
-  const refreshTokenHash =
-    hashRefreshToken(refreshToken);
-
+  const refreshTokenHash = hashRefreshToken(refreshToken);
   const refreshTokenExpiresAt = new Date();
-
   refreshTokenExpiresAt.setDate(
-    refreshTokenExpiresAt.getDate() +
-      REFRESH_TOKEN_EXPIRES_IN_DAYS,
+    refreshTokenExpiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN_DAYS,
   );
 
   await prisma.refreshToken.create({
@@ -180,17 +132,11 @@ export async function loginUser(
   };
 }
 
-export async function refreshAccessToken(
-  input: RefreshTokenInput,
-) {
-  const refreshTokenHash = hashRefreshToken(
-    input.refreshToken,
-  );
+export async function refreshAccessToken(input: RefreshTokenInput) {
+  const refreshTokenHash = hashRefreshToken(input.refreshToken);
 
   const storedToken = await prisma.refreshToken.findUnique({
-    where: {
-      tokenHash: refreshTokenHash,
-    },
+    where: { tokenHash: refreshTokenHash },
     include: {
       user: {
         include: {
@@ -198,11 +144,7 @@ export async function refreshAccessToken(
             include: {
               role: {
                 include: {
-                  permissions: {
-                    include: {
-                      permission: true,
-                    },
-                  },
+                  permissions: { include: { permission: true } },
                 },
               },
             },
@@ -213,47 +155,29 @@ export async function refreshAccessToken(
   });
 
   if (!storedToken) {
-    throw new AppError(
-      "Invalid refresh token",
-      401,
-    );
+    throw new AppError("Invalid refresh token", 401);
   }
 
   if (storedToken.revokedAt) {
-    throw new AppError(
-      "Refresh token has been revoked",
-      401,
-    );
+    throw new AppError("Refresh token has been revoked", 401);
   }
 
   if (storedToken.expiresAt <= new Date()) {
-    throw new AppError(
-      "Refresh token has expired",
-      401,
-    );
+    throw new AppError("Refresh token has expired", 401);
   }
 
   const user = storedToken.user;
-
   if (!user.isActive) {
-    throw new AppError(
-      "Account is inactive",
-      403,
-    );
+    throw new AppError("Account is inactive", 403);
   }
 
-  const roles = user.userRoles.map(
-    (userRole) => userRole.role.name,
-  );
-
+  const roles = user.userRoles.map((userRole) => userRole.role.name);
   const permissions = [
     ...new Set(
-      user.userRoles.flatMap(
-        (userRole) =>
-          userRole.role.permissions.map(
-            (rolePermission) =>
-              rolePermission.permission.name,
-          ),
+      user.userRoles.flatMap((userRole) =>
+        userRole.role.permissions.map((rolePermission) =>
+          rolePermission.permission.name,
+        ),
       ),
     ),
   ];
@@ -265,26 +189,27 @@ export async function refreshAccessToken(
   });
 
   const newRefreshToken = generateRefreshToken();
-
-  const newRefreshTokenHash =
-    hashRefreshToken(newRefreshToken);
-
+  const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
   const newRefreshTokenExpiresAt = new Date();
-
   newRefreshTokenExpiresAt.setDate(
-    newRefreshTokenExpiresAt.getDate() +
-      REFRESH_TOKEN_EXPIRES_IN_DAYS,
+    newRefreshTokenExpiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN_DAYS,
   );
 
   await prisma.$transaction(async (tx) => {
-    await tx.refreshToken.update({
+    // The conditional update is the single-use claim. Only one concurrent
+    // request can change this token from active to revoked.
+    const claimed = await tx.refreshToken.updateMany({
       where: {
         id: storedToken.id,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
       },
-      data: {
-        revokedAt: new Date(),
-      },
+      data: { revokedAt: new Date() },
     });
+
+    if (claimed.count !== 1) {
+      throw new AppError("Refresh token is invalid or has already been used", 401);
+    }
 
     await tx.refreshToken.create({
       data: {
