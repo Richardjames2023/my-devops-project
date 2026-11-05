@@ -20,6 +20,8 @@ import {
   getValidGuestSession,
   revokeGuestSession,
 } from "../guest-session/guest-session.service";
+import prisma from "../../infrastructure/prisma/client";
+import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 
 async function mergeGuestCartIfPresent(
   req: Request,
@@ -28,24 +30,18 @@ async function mergeGuestCartIfPresent(
 ): Promise<void> {
   const guestToken = req.cookies?.[GUEST_SESSION_COOKIE];
 
-  // No guest session: preserve the normal authentication flow.
   if (typeof guestToken !== "string" || !guestToken) {
     return;
   }
 
   const guestSession = await getValidGuestSession(guestToken);
 
-  // Invalid or expired guest cookies are cleared without
-  // preventing the user from logging in or registering.
   if (!guestSession) {
     clearGuestSessionCookie(res);
     return;
   }
 
-  // If merging fails, the error propagates and the guest
-  // session is not revoked or cleared.
   await mergeGuestCartIntoUserCart(userId, guestSession.id);
-
   await revokeGuestSession(guestToken);
   clearGuestSessionCookie(res);
 }
@@ -55,17 +51,11 @@ export async function register(req: Request, res: Response): Promise<void> {
 
   if (!result.success) {
     const { fieldErrors } = z.flattenError(result.error);
-
-    res.status(400).json({
-      message: "Validation failed",
-      errors: fieldErrors,
-    });
-
+    res.status(400).json({ message: "Validation failed", errors: fieldErrors });
     return;
   }
 
   const user = await registerUser(result.data);
-
   await mergeGuestCartIfPresent(req, res, user.id);
 
   res.status(201).json({
@@ -82,14 +72,11 @@ export async function login(req: Request, res: Response): Promise<void> {
       message: "Validation failed",
       errors: result.error.flatten().fieldErrors,
     });
-
     return;
   }
 
   const resultData = await loginUser(result.data);
-
   await mergeGuestCartIfPresent(req, res, resultData.user.id);
-
   res.status(200).json(resultData);
 }
 
@@ -101,11 +88,69 @@ export async function refresh(req: Request, res: Response): Promise<void> {
       message: "Validation failed",
       errors: result.error.flatten().fieldErrors,
     });
-
     return;
   }
 
   const resultData = await refreshAccessToken(result.data);
-
   res.status(200).json(resultData);
+}
+
+export async function getMe(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      emailVerified: true,
+      isActive: true,
+      createdAt: true,
+      userRoles: {
+        select: {
+          role: {
+            select: {
+              name: true,
+              permissions: {
+                select: {
+                  permission: {
+                    select: { name: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!user || !user.isActive) {
+    res.status(401).json({ message: "Authenticated user is unavailable" });
+    return;
+  }
+
+  const roles = user.userRoles.map(({ role }) => role.name);
+  const permissions = [
+    ...new Set(
+      user.userRoles.flatMap(({ role }) =>
+        role.permissions.map(({ permission }) => permission.name),
+      ),
+    ),
+  ];
+
+  const { userRoles: _userRoles, isActive: _isActive, ...profile } = user;
+  res.status(200).json({
+    message: "Profile retrieved successfully",
+    user: { ...profile, roles, permissions },
+  });
 }

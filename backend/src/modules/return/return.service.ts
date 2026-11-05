@@ -26,15 +26,9 @@ async function receiveReturnTransaction(
   return prisma.$transaction(
     async (tx) => {
       const returnRequest = await tx.returnRequest.findUnique({
-        where: {
-          id: returnRequestId,
-        },
+        where: { id: returnRequestId },
         include: {
-          items: {
-            include: {
-              orderItem: true,
-            },
-          },
+          items: { include: { orderItem: true } },
         },
       });
 
@@ -56,10 +50,6 @@ async function receiveReturnTransaction(
         returnRequest.items.map((item) => [item.id, item]),
       );
 
-      /*
-       * Validate all requested receipt quantities
-       * before changing anything.
-       */
       for (const inputItem of input.items) {
         const returnItem = returnItemMap.get(inputItem.returnItemId);
 
@@ -88,19 +78,11 @@ async function receiveReturnTransaction(
         }
       }
 
-      /*
-       * Receive the physical returned products.
-       *
-       * Returned products go into quarantine.
-       * They do NOT become sellable inventory yet.
-       */
       for (const inputItem of input.items) {
         const returnItem = returnItemMap.get(inputItem.returnItemId)!;
 
         const inventory = await tx.inventory.findUnique({
-          where: {
-            productVariantId: returnItem.orderItem.productVariantId,
-          },
+          where: { productVariantId: returnItem.orderItem.productVariantId },
         });
 
         if (!inventory) {
@@ -110,26 +92,19 @@ async function receiveReturnTransaction(
           );
         }
 
-        const newReceivedQuantity =
-          returnItem.receivedQuantity + inputItem.receivedQuantity;
-
         await tx.returnItem.update({
-          where: {
-            id: returnItem.id,
-          },
+          where: { id: returnItem.id },
           data: {
-            receivedQuantity: newReceivedQuantity,
+            receivedQuantity: {
+              increment: inputItem.receivedQuantity,
+            },
           },
         });
 
         await tx.inventory.update({
-          where: {
-            id: inventory.id,
-          },
+          where: { id: inventory.id },
           data: {
-            quarantineQuantity: {
-              increment: inputItem.receivedQuantity,
-            },
+            quarantineQuantity: { increment: inputItem.receivedQuantity },
           },
         });
 
@@ -145,52 +120,27 @@ async function receiveReturnTransaction(
         });
       }
 
-      /*
-       * Re-read the return items after the updates.
-       *
-       * RECEIVED means the complete return has
-       * physically arrived.
-       */
       const updatedReturnItems = await tx.returnItem.findMany({
-        where: {
-          returnRequestId: returnRequest.id,
-        },
+        where: { returnRequestId: returnRequest.id },
       });
 
       const allItemsReceived = updatedReturnItems.every(
         (item) => item.receivedQuantity >= item.quantity,
       );
 
-      /*
-       * Partial receipt:
-       *
-       * APPROVED -> APPROVED
-       *
-       * Complete receipt:
-       *
-       * APPROVED -> RECEIVED
-       */
       const nextStatus = allItemsReceived ? "RECEIVED" : "APPROVED";
 
-      const updatedReturnRequest = await tx.returnRequest.update({
-        where: {
-          id: returnRequest.id,
-        },
-        data: {
-          status: nextStatus,
-        },
+      return tx.returnRequest.update({
+        where: { id: returnRequest.id },
+        data: { status: nextStatus },
         include: {
           items: true,
           evidence: true,
           order: true,
         },
       });
-
-      return updatedReturnRequest;
     },
-    {
-      isolationLevel: "Serializable",
-    },
+    { isolationLevel: "Serializable" },
   );
 }
 
@@ -198,131 +148,182 @@ export async function createReturnRequest(
   userId: string,
   input: CreateReturnRequestInput,
 ) {
-  return prisma.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({
-      where: {
-        id: input.orderId,
-      },
-      include: {
-        items: true,
-        fulfillment: {
-          include: {
-            packages: {
-              include: {
-                delivery: true,
+  return prisma.$transaction(
+    async (tx) => {
+      // Serialize return creation for an order so two concurrent requests
+      // cannot reserve the same delivered units.
+      const lockedOrders = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM orders WHERE id = ${input.orderId}::uuid FOR UPDATE
+      `;
+
+      if (lockedOrders.length === 0) {
+        throw new AppError("Order not found", 404);
+      }
+
+      const order = await tx.order.findUnique({
+        where: { id: input.orderId },
+        include: {
+          items: true,
+          fulfillment: {
+            include: {
+              packages: {
+                include: {
+                  delivery: true,
+                  items: true,
+                },
               },
             },
           },
-        },
-      },
-    });
-
-    if (!order) {
-      throw new AppError("Order not found", 404);
-    }
-
-    if (order.userId !== userId) {
-      throw new AppError("You are not allowed to access this order", 403);
-    }
-
-    const deliveredAtDates = order.fulfillment?.packages
-      .map((pkg) => pkg.delivery?.deliveredAt)
-      .filter((date): date is Date => date instanceof Date);
-
-    if (!deliveredAtDates || deliveredAtDates.length === 0) {
-      throw new AppError(
-        "This order has not been delivered and cannot be returned",
-        400,
-      );
-    }
-
-    const latestDeliveredAt = new Date(
-      Math.max(...deliveredAtDates.map((date) => date.getTime())),
-    );
-
-    const returnDeadline = new Date(latestDeliveredAt);
-
-    returnDeadline.setDate(returnDeadline.getDate() + RETURN_WINDOW_DAYS);
-
-    const now = new Date();
-
-    if (now > returnDeadline) {
-      throw new AppError("The return window for this order has expired", 400);
-    }
-
-    const existingActiveReturn = await tx.returnRequest.findFirst({
-      where: {
-        orderId: order.id,
-        userId,
-        status: {
-          in: ["PENDING", "UNDER_REVIEW", "APPROVED", "RECEIVED"],
-        },
-      },
-    });
-
-    if (existingActiveReturn) {
-      throw new AppError(
-        "This order already has an active return request",
-        409,
-      );
-    }
-
-    const orderItemMap = new Map(order.items.map((item) => [item.id, item]));
-
-    for (const requestedItem of input.items) {
-      const orderItem = orderItemMap.get(requestedItem.orderItemId);
-
-      if (!orderItem) {
-        throw new AppError(
-          `Order item ${requestedItem.orderItemId} does not belong to this order`,
-          400,
-        );
-      }
-
-      if (requestedItem.quantity > orderItem.quantity) {
-        throw new AppError(
-          `Return quantity for ${orderItem.productName} cannot exceed purchased quantity`,
-          400,
-        );
-      }
-    }
-
-    const returnRequest = await tx.returnRequest.create({
-      data: {
-        orderId: order.id,
-        userId,
-        status: "PENDING",
-        reason: input.reason,
-
-        ...(input.description !== undefined && {
-          description: input.description,
-        }),
-
-        items: {
-          create: input.items.map((item) => ({
-            orderItem: {
-              connect: {
-                id: item.orderItemId,
+          returnRequests: {
+            where: {
+              status: {
+                notIn: ["REJECTED", "CANCELLED"],
               },
             },
-            quantity: item.quantity,
-            condition: item.condition,
-
-            ...(item.notes !== undefined && {
-              notes: item.notes,
-            }),
-          })),
+            include: { items: true },
+          },
         },
-      },
+      });
 
-      include: {
-        items: true,
-        evidence: true,
-      },
-    });
+      if (!order) {
+        throw new AppError("Order not found", 404);
+      }
 
-    return returnRequest;
-  });
+      if (order.userId !== userId) {
+        throw new AppError("You are not allowed to access this order", 403);
+      }
+
+      const deliveredAtDates = order.fulfillment?.packages
+        .filter(
+          (pkg) =>
+            pkg.status === "DELIVERED" &&
+            pkg.delivery?.status === "DELIVERED" &&
+            pkg.delivery.deliveredAt !== null,
+        )
+        .map((pkg) => pkg.delivery!.deliveredAt!);
+
+      if (!deliveredAtDates || deliveredAtDates.length === 0) {
+        throw new AppError(
+          "This order has not been delivered and cannot be returned",
+          400,
+        );
+      }
+
+      const latestDeliveredAt = new Date(
+        Math.max(...deliveredAtDates.map((date) => date.getTime())),
+      );
+
+      const returnDeadline = new Date(latestDeliveredAt);
+      returnDeadline.setDate(returnDeadline.getDate() + RETURN_WINDOW_DAYS);
+
+      if (new Date() > returnDeadline) {
+        throw new AppError("The return window for this order has expired", 400);
+      }
+
+      const existingActiveReturn = order.returnRequests.find((request) =>
+        ["PENDING", "UNDER_REVIEW", "APPROVED", "RECEIVED", "INSPECTED"].includes(
+          request.status,
+        ),
+      );
+
+      if (existingActiveReturn) {
+        throw new AppError(
+          "This order already has an active return request",
+          409,
+        );
+      }
+
+      const deliveredQuantityByOrderItem = new Map<string, number>();
+
+      for (const pkg of order.fulfillment?.packages ?? []) {
+        if (
+          pkg.status !== "DELIVERED" ||
+          pkg.delivery?.status !== "DELIVERED" ||
+          !pkg.delivery.deliveredAt
+        ) {
+          continue;
+        }
+
+        for (const packageItem of pkg.items) {
+          deliveredQuantityByOrderItem.set(
+            packageItem.orderItemId,
+            (deliveredQuantityByOrderItem.get(packageItem.orderItemId) ?? 0) +
+              packageItem.quantity,
+          );
+        }
+      }
+
+      const previouslyRequestedByOrderItem = new Map<string, number>();
+
+      for (const previousRequest of order.returnRequests) {
+        for (const previousItem of previousRequest.items) {
+          const reservedQuantity =
+            previousRequest.status === "INSPECTED" ||
+            previousRequest.status === "COMPLETED"
+              ? previousItem.acceptedQuantity
+              : previousItem.quantity;
+
+          previouslyRequestedByOrderItem.set(
+            previousItem.orderItemId,
+            (previouslyRequestedByOrderItem.get(previousItem.orderItemId) ?? 0) +
+              reservedQuantity,
+          );
+        }
+      }
+
+      const orderItemMap = new Map(order.items.map((item) => [item.id, item]));
+
+      for (const requestedItem of input.items) {
+        const orderItem = orderItemMap.get(requestedItem.orderItemId);
+
+        if (!orderItem) {
+          throw new AppError(
+            `Order item ${requestedItem.orderItemId} does not belong to this order`,
+            400,
+          );
+        }
+
+        const deliveredQuantity =
+          deliveredQuantityByOrderItem.get(orderItem.id) ?? 0;
+        const previouslyRequested =
+          previouslyRequestedByOrderItem.get(orderItem.id) ?? 0;
+        const availableReturnQuantity =
+          deliveredQuantity - previouslyRequested;
+
+        if (requestedItem.quantity > availableReturnQuantity) {
+          throw new AppError(
+            `Return quantity for ${orderItem.productName} exceeds the delivered quantity that has not already been returned or reserved`,
+            409,
+          );
+        }
+      }
+
+      return tx.returnRequest.create({
+        data: {
+          orderId: order.id,
+          userId,
+          status: "PENDING",
+          reason: input.reason,
+          ...(input.description !== undefined && {
+            description: input.description,
+          }),
+          items: {
+            create: input.items.map((item) => ({
+              orderItem: { connect: { id: item.orderItemId } },
+              quantity: item.quantity,
+              condition: item.condition,
+              ...(item.notes !== undefined && { notes: item.notes }),
+            })),
+          },
+        },
+        include: {
+          items: true,
+          evidence: true,
+        },
+      });
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+  );
 }
 
 export async function reviewReturnRequest(
@@ -331,9 +332,7 @@ export async function reviewReturnRequest(
 ) {
   return prisma.$transaction(async (tx) => {
     const returnRequest = await tx.returnRequest.findUnique({
-      where: {
-        id: returnRequestId,
-      },
+      where: { id: returnRequestId },
       include: {
         items: true,
         evidence: true,
@@ -346,24 +345,16 @@ export async function reviewReturnRequest(
     }
 
     const currentStatus = returnRequest.status;
-
     const requestedStatus = input.status;
 
     const allowedTransitions: Record<string, string[]> = {
       PENDING: ["UNDER_REVIEW"],
-
       UNDER_REVIEW: ["APPROVED", "REJECTED"],
-
       APPROVED: [],
-
       REJECTED: [],
-
       RECEIVED: [],
-
       INSPECTED: [],
-
       COMPLETED: [],
-
       CANCELLED: [],
     };
 
@@ -378,35 +369,20 @@ export async function reviewReturnRequest(
 
     const now = new Date();
 
-    const updatedReturnRequest = await tx.returnRequest.update({
-      where: {
-        id: returnRequest.id,
-      },
-
+    return tx.returnRequest.update({
+      where: { id: returnRequest.id },
       data: {
-        status: requestedStatus as "UNDER_REVIEW" | "APPROVED" | "REJECTED",
-
-        ...(requestedStatus === "UNDER_REVIEW" && {
-          reviewedAt: now,
-        }),
-
-        ...(requestedStatus === "APPROVED" && {
-          reviewedAt: now,
-        }),
-
-        ...(requestedStatus === "REJECTED" && {
-          reviewedAt: now,
-        }),
+        status: requestedStatus,
+        ...(requestedStatus === "UNDER_REVIEW" && { reviewedAt: now }),
+        ...(requestedStatus === "APPROVED" && { reviewedAt: now }),
+        ...(requestedStatus === "REJECTED" && { reviewedAt: now }),
       },
-
       include: {
         items: true,
         evidence: true,
         order: true,
       },
     });
-
-    return updatedReturnRequest;
   });
 }
 
@@ -445,11 +421,7 @@ async function inspectReturnTransaction(
       const returnRequest = await tx.returnRequest.findUnique({
         where: { id: returnRequestId },
         include: {
-          items: {
-            include: {
-              orderItem: true,
-            },
-          },
+          items: { include: { orderItem: true } },
         },
       });
 
@@ -473,12 +445,9 @@ async function inspectReturnTransaction(
 
       const returnItemIds = returnRequest.items.map((item) => item.id);
 
-      // Retrieve previous inspection history for this return request.
       const existingInspections = returnItemIds.length
         ? await tx.returnItemInspection.findMany({
-            where: {
-              returnItemId: { in: returnItemIds },
-            },
+            where: { returnItemId: { in: returnItemIds } },
             select: {
               returnItemId: true,
               inspectedQuantity: true,
@@ -506,8 +475,6 @@ async function inspectReturnTransaction(
 
       const totalInspectedByInventory = new Map<string, number>();
 
-      // Validate every item and collect inventory requirements
-      // before performing any database writes.
       for (const inputItem of input.items) {
         const returnItem = returnItemMap.get(inputItem.returnItemId);
 
@@ -519,7 +486,6 @@ async function inspectReturnTransaction(
         }
 
         const previouslyInspected = inspectedTotals.get(returnItem.id) ?? 0;
-
         const remainingReceived =
           returnItem.receivedQuantity - previouslyInspected;
 
@@ -556,15 +522,9 @@ async function inspectReturnTransaction(
             inputItem.inspectedQuantity,
         );
 
-        itemsToInspect.push({
-          returnItem,
-          inventory,
-          inputItem,
-        });
+        itemsToInspect.push({ returnItem, inventory, inputItem });
       }
 
-      // Check aggregate quantities because multiple return items can
-      // reference the same inventory record.
       for (const item of itemsToInspect) {
         const totalInspected = totalInspectedByInventory.get(
           item.inventory.id,
@@ -578,7 +538,6 @@ async function inspectReturnTransaction(
         }
       }
 
-      // Record inspection history and reconcile inventory atomically.
       for (const { returnItem, inventory, inputItem } of itemsToInspect) {
         await tx.returnItemInspection.create({
           data: {
@@ -588,32 +547,22 @@ async function inspectReturnTransaction(
             acceptedQuantity: inputItem.acceptedQuantity,
             rejectedQuantity: inputItem.rejectedQuantity,
             condition: inputItem.condition,
-            ...(inputItem.notes !== undefined && {
-              notes: inputItem.notes,
-            }),
+            ...(inputItem.notes !== undefined && { notes: inputItem.notes }),
           },
         });
 
         await tx.returnItem.update({
           where: { id: returnItem.id },
           data: {
-            acceptedQuantity: {
-              increment: inputItem.acceptedQuantity,
-            },
+            acceptedQuantity: { increment: inputItem.acceptedQuantity },
           },
         });
 
-        // Every inspected unit leaves quarantine.
-        // Only accepted units become sellable.
         await tx.inventory.update({
           where: { id: inventory.id },
           data: {
-            quarantineQuantity: {
-              decrement: inputItem.inspectedQuantity,
-            },
-            quantity: {
-              increment: inputItem.acceptedQuantity,
-            },
+            quarantineQuantity: { decrement: inputItem.inspectedQuantity },
+            quantity: { increment: inputItem.acceptedQuantity },
           },
         });
 
@@ -651,7 +600,6 @@ async function inspectReturnTransaction(
         }
       }
 
-      // Calculate whether every physically received unit has been inspected.
       const newlyInspectedTotals = new Map<string, number>();
 
       for (const { returnItem, inputItem } of itemsToInspect) {
@@ -673,22 +621,15 @@ async function inspectReturnTransaction(
 
       return tx.returnRequest.update({
         where: { id: returnRequest.id },
-        data: {
-          status: nextStatus,
-        },
+        data: { status: nextStatus },
         include: {
           items: {
             include: {
               inspections: {
-                orderBy: {
-                  createdAt: "desc",
-                },
+                orderBy: { createdAt: "desc" },
                 include: {
                   inspectedBy: {
-                    select: {
-                      id: true,
-                      email: true,
-                    },
+                    select: { id: true, email: true },
                   },
                 },
               },
@@ -699,9 +640,7 @@ async function inspectReturnTransaction(
         },
       });
     },
-    {
-      isolationLevel: "Serializable",
-    },
+    { isolationLevel: "Serializable" },
   );
 }
 

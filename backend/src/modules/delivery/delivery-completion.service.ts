@@ -42,6 +42,12 @@ export async function completeDelivery(
       package: {
         include: {
           items: true,
+          fulfillment: {
+            select: {
+              id: true,
+              orderId: true,
+            },
+          },
         },
       },
     },
@@ -85,6 +91,55 @@ export async function completeDelivery(
       },
     });
   }
+
+  // Recalculate the parent Fulfillment and Order from the package states.
+  // This keeps split-package orders partially fulfilled until every package
+  // has been delivered, then marks the fulfillment and order as fulfilled.
+  const fulfillment = await tx.fulfillment.findUnique({
+    where: { id: delivery.package.fulfillment.id },
+    include: {
+      packages: {
+        select: { status: true },
+      },
+    },
+  });
+
+  if (!fulfillment) {
+    throw new AppError("Fulfillment not found for delivered package", 404);
+  }
+
+  const deliveredPackageCount = fulfillment.packages.filter(
+    (pkg) => pkg.status === "DELIVERED",
+  ).length;
+  const allPackagesDelivered =
+    fulfillment.packages.length > 0 &&
+    deliveredPackageCount === fulfillment.packages.length;
+
+  const fulfillmentStatus = allPackagesDelivered
+    ? "FULFILLED"
+    : deliveredPackageCount > 0
+      ? "PARTIALLY_FULFILLED"
+      : "PROCESSING";
+
+  await tx.fulfillment.update({
+    where: { id: fulfillment.id },
+    data: {
+      status: fulfillmentStatus,
+      ...(allPackagesDelivered
+        ? { completedAt: fulfillment.completedAt ?? effectiveDeliveredAt }
+        : { completedAt: null }),
+    },
+  });
+
+  await tx.order.updateMany({
+    where: {
+      id: fulfillment.orderId,
+      status: { notIn: ["CANCELLED"] },
+    },
+    data: {
+      status: allPackagesDelivered ? "FULFILLED" : "PARTIALLY_FULFILLED",
+    },
+  });
 
   const orderItemIds = [
     ...new Set(delivery.package.items.map((item) => item.orderItemId)),

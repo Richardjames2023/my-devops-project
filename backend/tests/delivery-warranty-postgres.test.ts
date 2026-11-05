@@ -293,6 +293,16 @@ describe("PostgreSQL delivery and warranty activation", () => {
       expect(afterFirstDelivery.rows[0].warrantyStartedAt).toBeNull();
       expect(afterFirstDelivery.rows[0].warrantyExpiresAt).toBeNull();
 
+      const partialStatuses = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+      expect(partialStatuses.rows[0].order_status).toBe("PARTIALLY_FULFILLED");
+      expect(partialStatuses.rows[0].fulfillment_status).toBe("PARTIALLY_FULFILLED");
+
       // Deliver the remaining 2 units.
       await updateDeliveryStatus(fixture.deliveryIds[1], "DELIVERED");
 
@@ -326,6 +336,18 @@ describe("PostgreSQL delivery and warranty activation", () => {
       expect(new Date(warranty.rows[0].warrantyExpiresAt).toISOString()).toBe(
         expectedExpiry.toISOString(),
       );
+
+      const completedStatuses = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status,
+                f."completedAt"
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+      expect(completedStatuses.rows[0].order_status).toBe("FULFILLED");
+      expect(completedStatuses.rows[0].fulfillment_status).toBe("FULFILLED");
+      expect(completedStatuses.rows[0].completedAt).not.toBeNull();
 
       const packages = await pool.query(
         `SELECT p.status AS package_status,
