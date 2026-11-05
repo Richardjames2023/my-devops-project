@@ -7,28 +7,41 @@ export async function createStockMovement(
 ) {
   return prisma.$transaction(async (tx) => {
     const inventory = await tx.inventory.findUnique({
-      where: {
-        id: input.inventoryId,
-      },
+      where: { id: input.inventoryId },
     });
 
     if (!inventory) {
       throw new AppError("Inventory not found", 404);
     }
 
-    let quantityChange: number;
+    let updatedCount: number;
 
     switch (input.type) {
       case "RECEIVED":
-      case "RETURNED":
-        quantityChange = input.quantity;
+      case "RETURNED": {
+        const updated = await tx.inventory.updateMany({
+          where: { id: inventory.id },
+          data: { quantity: { increment: input.quantity } },
+        });
+        updatedCount = updated.count;
         break;
+      }
 
       case "SOLD":
       case "DAMAGED":
-      case "LOST":
-        quantityChange = -input.quantity;
+      case "LOST": {
+        // The quantity condition and decrement happen in one SQL UPDATE.
+        // Concurrent stock movements therefore cannot oversell stale stock.
+        const updated = await tx.inventory.updateMany({
+          where: {
+            id: inventory.id,
+            quantity: { gte: input.quantity },
+          },
+          data: { quantity: { decrement: input.quantity } },
+        });
+        updatedCount = updated.count;
         break;
+      }
 
       case "ADJUSTMENT":
         throw new AppError(
@@ -37,23 +50,20 @@ export async function createStockMovement(
         );
     }
 
-    const newQuantity = inventory.quantity + quantityChange;
-
-    if (newQuantity < 0) {
+    if (updatedCount !== 1) {
       throw new AppError(
         "Insufficient inventory for this movement",
-        400,
+        409,
       );
     }
 
-    const updatedInventory = await tx.inventory.update({
-      where: {
-        id: inventory.id,
-      },
-      data: {
-        quantity: newQuantity,
-      },
+    const updatedInventory = await tx.inventory.findUnique({
+      where: { id: inventory.id },
     });
+
+    if (!updatedInventory) {
+      throw new AppError("Inventory not found after stock movement", 404);
+    }
 
     const movement = await tx.stockMovement.create({
       data: {
