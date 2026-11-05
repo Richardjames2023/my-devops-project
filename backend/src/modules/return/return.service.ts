@@ -257,10 +257,16 @@ export async function createReturnRequest(
 
       for (const previousRequest of order.returnRequests) {
         for (const previousItem of previousRequest.items) {
+          const reservedQuantity =
+            previousRequest.status === "INSPECTED" ||
+            previousRequest.status === "COMPLETED"
+              ? previousItem.acceptedQuantity
+              : previousItem.quantity;
+
           previouslyRequestedByOrderItem.set(
             previousItem.orderItemId,
             (previouslyRequestedByOrderItem.get(previousItem.orderItemId) ?? 0) +
-              previousItem.quantity,
+              reservedQuantity,
           );
         }
       }
