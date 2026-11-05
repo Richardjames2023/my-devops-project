@@ -28,7 +28,15 @@ const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim())
 app.use(helmet());
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Permit non-browser requests (webhooks and server-to-server calls).
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error("Origin is not allowed by CORS"));
+    },
     credentials: true,
   }),
 );
