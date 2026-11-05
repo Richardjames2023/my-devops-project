@@ -14,7 +14,7 @@ export async function createStockMovement(
       throw new AppError("Inventory not found", 404);
     }
 
-    let updatedCount: number;
+    let updatedCount = 0;
 
     switch (input.type) {
       case "RECEIVED":
