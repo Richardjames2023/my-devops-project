@@ -214,7 +214,7 @@ describe("PostgreSQL return quantity guards", () => {
             },
           ],
         }),
-      ).rejects.toThrow(/already has an active return request/i);
+      ).rejects.toThrow(/exceeds the delivered quantity/i);
     } finally {
       await cleanupFixture(fixture);
     }
