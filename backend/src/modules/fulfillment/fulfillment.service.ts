@@ -92,7 +92,7 @@ export async function allocatePackage(
       }
     }
 
-    if (!["PENDING", "PROCESSING"].includes(fulfillment.status)) {
+    if (!["PENDING", "PROCESSING", "PARTIALLY_FULFILLED"].includes(fulfillment.status)) {
       throw new AppError("Packages cannot be allocated to a completed or cancelled fulfillment", 409);
     }
 
