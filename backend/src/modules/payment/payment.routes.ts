@@ -7,6 +7,7 @@ import {
   markSuccessful,
   markGuestSuccessful,
   reconcileUnknown,
+  reconcileStalePending,
   listStaleWebhookEvents,
   reconcileStaleWebhookEvent,
 } from "./payment.controller";
@@ -43,6 +44,13 @@ router.post(
   authenticate,
   authorize("orders.manage"),
   reconcileUnknown,
+);
+
+router.post(
+  "/:paymentId/reconcile-stale-pending",
+  authenticate,
+  authorize("orders.manage"),
+  reconcileStalePending,
 );
 
 router.get(
