@@ -580,7 +580,7 @@ export async function adminCancelOrder(
 export interface CustomerOrderHistoryQuery {
   page: number;
   limit: number;
-  status?: import("@prisma/client").OrderStatus;
+  status?: import("@prisma/client").OrderStatus | undefined;
 }
 
 export async function listCustomerOrders(
