@@ -50,6 +50,9 @@ async function getDelegableRoles(actorId: string, roleIds: string[]) {
     role.permissions.map(({ permission }) => permission.name),
   ));
   const isBusinessOwner = actorRoleNames.includes("BUSINESS_OWNER");
+  if (!actorPermissions.has("staff.manage")) {
+    throw new AppError("You do not have permission to manage staff roles", 403);
+  }
 
   const roles = await prisma.role.findMany({
     where: { id: { in: roleIds } },
