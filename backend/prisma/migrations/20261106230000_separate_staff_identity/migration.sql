@@ -150,7 +150,7 @@ WHERE EXISTS (
   WHERE ur."userId" = u."id" AND r."name" <> 'CUSTOMER'
 )
 AND NOT EXISTS (
-  SELECT 1 FROM "user_roles ur_customer"
+  SELECT 1 FROM "user_roles" ur_customer
   JOIN "roles" r_customer ON r_customer."id" = ur_customer."roleId"
   WHERE ur_customer."userId" = u."id" AND r_customer."name" = 'CUSTOMER'
 );
