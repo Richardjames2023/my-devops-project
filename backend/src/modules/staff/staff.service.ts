@@ -235,6 +235,7 @@ export async function updateStaffInvitationRoles(
 
 export async function revokeStaffInvitation(actorId: string, invitationId: string, metadata: RequestMetadata = {}) {
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM staff_invitations WHERE id = ${invitationId}::uuid FOR UPDATE`;
     const invitation = await tx.staffInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation) throw new AppError("Staff invitation not found", 404);
     if (invitation.status !== "PENDING") throw new AppError("Only pending invitations can be revoked", 409);
