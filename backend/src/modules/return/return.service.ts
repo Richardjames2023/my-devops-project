@@ -786,3 +786,114 @@ export async function listCustomerReturnRequests(
     },
   };
 }
+
+ 
+/**
+ * Retrieves one return request only when it belongs to the authenticated customer.
+ * Evidence URLs are excluded; use the authenticated evidence view/file endpoints.
+ */
+export async function getCustomerReturnRequest(
+  userId: string,
+  returnRequestId: string,
+) {
+  const returnRequest = await prisma.returnRequest.findFirst({
+    where: { id: returnRequestId, userId },
+    select: {
+      id: true,
+      orderId: true,
+      status: true,
+      reason: true,
+      description: true,
+      requestedAt: true,
+      reviewedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          currency: true,
+          subtotal: true,
+          discountAmount: true,
+          deliveryFee: true,
+          totalAmount: true,
+          createdAt: true,
+        },
+      },
+      items: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          quantity: true,
+          receivedQuantity: true,
+          acceptedQuantity: true,
+          condition: true,
+          notes: true,
+          createdAt: true,
+          orderItem: {
+            select: {
+              id: true,
+              productName: true,
+              variantName: true,
+              sku: true,
+              quantity: true,
+              unitPrice: true,
+              discountAmount: true,
+              totalPrice: true,
+            },
+          },
+          inspections: {
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              inspectedQuantity: true,
+              acceptedQuantity: true,
+              rejectedQuantity: true,
+              condition: true,
+              notes: true,
+              createdAt: true,
+              inspectedBy: {
+                select: { id: true, firstName: true, lastName: true },
+              },
+            },
+          },
+          refundItems: {
+            select: {
+              id: true,
+              quantity: true,
+              amount: true,
+              refund: {
+                select: {
+                  id: true,
+                  reference: true,
+                  status: true,
+                  amount: true,
+                  currency: true,
+                  reason: true,
+                  processedAt: true,
+                  createdAt: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      evidence: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          type: true,
+          description: true,
+          createdAt: true,
+        },
+      },
+    },
+  });
+
+  if (!returnRequest) {
+    throw new AppError("Return request not found", 404);
+  }
+
+  return returnRequest;
+}
