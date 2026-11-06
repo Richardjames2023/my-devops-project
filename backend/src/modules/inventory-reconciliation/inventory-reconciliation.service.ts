@@ -139,6 +139,9 @@ export async function getReconciliationById(id: string) {
             email: true,
           },
         },
+        resolvedByStaff: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
       },
     },
   );
