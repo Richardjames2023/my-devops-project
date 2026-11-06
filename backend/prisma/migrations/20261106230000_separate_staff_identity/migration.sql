@@ -15,7 +15,6 @@ CREATE TABLE "staff_accounts" (
   CONSTRAINT "staff_accounts_pkey" PRIMARY KEY ("id")
 );
 CREATE UNIQUE INDEX "staff_accounts_email_key" ON "staff_accounts"("email");
-CREATE INDEX "staff_accounts_email_idx" ON "staff_accounts"("email");
 CREATE INDEX "staff_accounts_status_idx" ON "staff_accounts"("status");
 
 CREATE TABLE "staff_account_roles" (
