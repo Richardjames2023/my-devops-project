@@ -115,7 +115,7 @@ WHERE EXISTS (
 -- Preserve every legacy staff role, but require the staff member to establish
 -- a new, independent credential before the staff account can be activated.
 INSERT INTO "staff_account_roles" ("staffAccountId", "roleId", "assignedAt")
-SELECT sa."id", ur."roleId", ur."createdAt"
+SELECT legacy_map."staffAccountId", ur."roleId", ur."createdAt"
 FROM "_legacy_staff_identity_map" legacy_map
 JOIN "user_roles" ur ON ur."userId" = legacy_map."legacyUserId"
 JOIN "roles" r ON r."id" = ur."roleId"
