@@ -13,6 +13,7 @@ import {
   createGuestPayment,
   markPaymentSuccessful,
   markGuestPaymentSuccessful,
+  reconcileUnknownPayment,
 } from "./payment.service";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { processPaystackSuccessfulWebhook } from "./payment.service";
@@ -200,6 +201,33 @@ export async function markGuestSuccessful(
     payment: result.payment,
     order: safeOrder,
     reconciliationRequired,
+  });
+}
+
+
+export async function reconcileUnknown(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const paramsResult = paymentIdSchema.safeParse(req.params);
+
+  if (!paramsResult.success) {
+    res.status(400).json({ message: "Invalid payment ID" });
+    return;
+  }
+
+  const result = await reconcileUnknownPayment(paramsResult.data.paymentId);
+
+  res.status(result.reconciled ? 200 : 202).json({
+    message: result.reconciled
+      ? "Unknown payment was reconciled using Paystack's verified transaction status."
+      : "Paystack has not returned a terminal transaction status. The payment and inventory reservation remain unchanged.",
+    ...result,
   });
 }
 
