@@ -81,7 +81,7 @@ async function getDelegableRoles(actorId: string, roleIds: string[]) {
 
 export async function createStaffInvitation(
   actorId: string,
-  input: { email: string; roleIds: string[]; expiresInDays?: number },
+  input: { email: string; roleIds: string[]; expiresInDays?: number | undefined },
   metadata: RequestMetadata = {},
 ) {
   const email = normalizeEmail(input.email);
@@ -310,7 +310,11 @@ export async function acceptStaffInvitation(input: {
 
     await tx.staffAccountRole.deleteMany({ where: { staffAccountId: staff.id } });
     await tx.staffAccountRole.createMany({
-      data: invitation.roles.map(({ roleId }) => ({ staffAccountId: staff.id, roleId })),
+      data: invitation.roles.map(({ roleId }) => ({
+        staffAccountId: staff.id,
+        roleId,
+        ...(invitation.createdByStaffAccountId ? { assignedByStaffAccountId: invitation.createdByStaffAccountId } : {}),
+      })),
     });
     await createAuditLog(tx, {
       staffAccountId: staff.id,
