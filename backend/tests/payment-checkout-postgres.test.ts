@@ -683,7 +683,7 @@ describe("PostgreSQL checkout payment initialization", () => {
       );
       await pool.query(
         `UPDATE inventory_reservations
-         SET "expiresAt" = NOW() - INTERVAL '1 minute'
+         SET "expiresAt" = timezone('UTC', NOW()) - INTERVAL '1 minute'
          WHERE "orderId" = $1`,
         [fixture.orderId],
       );
