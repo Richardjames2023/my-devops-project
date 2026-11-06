@@ -1405,7 +1405,7 @@ export async function reconcileStalePendingPayment(paymentId: string) {
             where: {
               id: paymentId,
               status: "PENDING",
-              createdAt: { lte: staleBefore },
+              createdAt: { lte: transactionStaleBefore },
             },
             data: {
               status: "INITIALIZATION_UNKNOWN",
