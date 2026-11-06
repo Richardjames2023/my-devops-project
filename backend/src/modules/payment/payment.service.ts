@@ -3,6 +3,7 @@ import {
   initializePaystackTransaction,
   verifyPaystackTransaction,
   PaystackInitializationUncertainError,
+  type PaystackVerifyData,
 } from "./paystack.client";
 import {
   finalizeOrderInventory,
@@ -15,6 +16,7 @@ import type { CreatePaymentInput } from "./payment.validation";
 
 const MAX_TRANSACTION_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
+const STALE_PENDING_PAYMENT_GRACE_PERIOD_MS = 15 * 60 * 1000;
 
 function isSerializationConflict(error: unknown): boolean {
   return (
@@ -597,6 +599,7 @@ export async function createGuestPayment(
 async function markPaymentSuccessfulWithAccess(
   paymentId: string,
   access?: PaymentOrderAccess,
+  verifiedTransaction?: PaystackVerifyData,
 ) {
   // Load the payment and verify ownership.
   const payment = await prisma.payment.findUnique({
@@ -642,7 +645,9 @@ async function markPaymentSuccessfulWithAccess(
   // Verify with Paystack before deciding whether the payment needs recovery.
 
   // 2. Verify the transaction directly with Paystack.
-  const verified = await verifyPaystackTransaction(payment.reference);
+  const verified =
+    verifiedTransaction ??
+    (await verifyPaystackTransaction(payment.reference));
 
   if (
     verified.status !== "success" ||
@@ -1091,7 +1096,11 @@ export async function reconcileUnknownPayment(paymentId: string) {
   // Successful payments must use the existing verification
   // and inventory-finalization workflow.
   if (verified.status === "success") {
-    const result = await markPaymentSuccessfulWithAccess(paymentId);
+    const result = await markPaymentSuccessfulWithAccess(
+      paymentId,
+      undefined,
+      verified,
+    );
 
     return {
       reconciled: true,
@@ -1253,6 +1262,143 @@ export async function reconcileUnknownPayment(paymentId: string) {
 
   throw new AppError(
     "Payment reconciliation could not be completed. Please try again.",
+    409,
+  );
+}
+
+/**
+ * Claims an aged PENDING payment for provider reconciliation.
+ *
+ * A pending checkout is not expired merely because its inventory reservation
+ * elapsed. We first move it to INITIALIZATION_UNKNOWN under the order lock,
+ * then reuse the provider-authoritative reconciliation flow. Inconclusive
+ * Paystack responses therefore keep the reservation protected.
+ */
+export async function reconcileStalePendingPayment(paymentId: string) {
+  const initialPayment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+  });
+
+  if (!initialPayment) {
+    throw new AppError("Payment not found", 404);
+  }
+
+  if (initialPayment.status !== "PENDING") {
+    return {
+      reconciled: false,
+      status: initialPayment.status,
+    };
+  }
+
+  if (initialPayment.provider !== "PAYSTACK") {
+    throw new AppError("Payment provider mismatch", 400);
+  }
+
+  const staleBefore = new Date(
+    Date.now() - STALE_PENDING_PAYMENT_GRACE_PERIOD_MS,
+  );
+
+  if (initialPayment.createdAt > staleBefore) {
+    return {
+      reconciled: false,
+      status: initialPayment.status,
+      stale: false as const,
+    };
+  }
+
+  for (let attempt = 1; attempt <= MAX_TRANSACTION_RETRIES; attempt++) {
+    try {
+      const claim = await prisma.$transaction(
+        async (tx) => {
+          const lockedOrders = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id
+            FROM orders
+            WHERE id = ${initialPayment.orderId}::uuid
+            FOR UPDATE
+          `;
+
+          if (lockedOrders.length === 0) {
+            throw new AppError("Order not found during payment reconciliation", 404);
+          }
+
+          const currentPayment = await tx.payment.findUnique({
+            where: { id: paymentId },
+          });
+
+          if (!currentPayment) {
+            throw new AppError("Payment not found", 404);
+          }
+
+          if (currentPayment.status !== "PENDING") {
+            return {
+              claimed: false as const,
+              status: currentPayment.status,
+            };
+          }
+
+          if (currentPayment.createdAt > staleBefore) {
+            return {
+              claimed: false as const,
+              status: currentPayment.status,
+              stale: false as const,
+            };
+          }
+
+          const updated = await tx.payment.updateMany({
+            where: {
+              id: paymentId,
+              status: "PENDING",
+              createdAt: { lte: staleBefore },
+            },
+            data: {
+              status: "INITIALIZATION_UNKNOWN",
+            },
+          });
+
+          if (updated.count !== 1) {
+            throw new AppError(
+              "Payment state changed during stale-payment reconciliation",
+              409,
+            );
+          }
+
+          return {
+            claimed: true as const,
+            status: "INITIALIZATION_UNKNOWN" as const,
+          };
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
+      );
+
+      if (!claim.claimed) {
+        return {
+          reconciled: false,
+          status: claim.status,
+          ...("stale" in claim ? { stale: claim.stale } : {}),
+        };
+      }
+
+      return reconcileUnknownPayment(paymentId);
+    } catch (error) {
+      if (!isSerializationConflict(error)) {
+        throw error;
+      }
+
+      if (attempt === MAX_TRANSACTION_RETRIES) {
+        throw new AppError(
+          "Stale payment reconciliation encountered a temporary conflict. Please try again.",
+          409,
+        );
+      }
+
+      await sleep(RETRY_DELAY_MS * attempt);
+    }
+  }
+
+  throw new AppError(
+    "Stale payment reconciliation could not be completed. Please try again.",
     409,
   );
 }
