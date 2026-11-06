@@ -3,12 +3,12 @@ import request from "supertest";
 import jwt from "jsonwebtoken";
 
 const mocks = vi.hoisted(() => ({
-  allocatePackage: vi.fn(),
+  allocatePackage: vi.fn(),\n  listReadyOrders: vi.fn(),
 }));
 
 vi.mock("../src/modules/fulfillment/fulfillment.service", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/modules/fulfillment/fulfillment.service")>();
-  return { ...actual, allocatePackage: mocks.allocatePackage };
+  return { ...actual, allocatePackage: mocks.allocatePackage, listReadyOrders: mocks.listReadyOrders };
 });
 
 import app from "../src/app.ts";
@@ -28,12 +28,22 @@ const orderItemId = "b4e7e6d2-2b5f-4c55-9b30-3c9c4f3b2a22";
 describe("package allocation HTTP endpoint", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.allocatePackage.mockResolvedValue({
+    mocks.listReadyOrders.mockResolvedValue([]);\n    mocks.allocatePackage.mockResolvedValue({
       id: "c4e7e6d2-2b5f-4c55-9b30-3c9c4f3b2a33",
       fulfillmentId,
       status: "PENDING",
       items: [{ orderItemId, quantity: 2 }],
     });
+  });
+
+  it("lists ready orders for authorized warehouse staff", async () => {
+    const response = await request(app)
+      .get("/api/v1/fulfillments/ready-orders")
+      .set("Authorization", `Bearer ${makeToken()}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.orders).toEqual([]);
+    expect(mocks.listReadyOrders).toHaveBeenCalledOnce();
   });
 
   it("requires authentication", async () => {
