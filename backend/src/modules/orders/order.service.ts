@@ -575,3 +575,110 @@ export async function adminCancelOrder(
     ...(auditMeta ? { auditMeta } : {}),
   });
 }
+
+
+export interface CustomerOrderHistoryQuery {
+  page: number;
+  limit: number;
+  status?: import("@prisma/client").OrderStatus;
+}
+
+export async function listCustomerOrders(
+  userId: string,
+  query: CustomerOrderHistoryQuery,
+) {
+  const where: Prisma.OrderWhereInput = {
+    userId,
+    ...(query.status ? { status: query.status } : {}),
+  };
+
+  const [orders, total] = await prisma.$transaction([
+    prisma.order.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        subtotal: true,
+        discountAmount: true,
+        deliveryFee: true,
+        totalAmount: true,
+        currency: true,
+        createdAt: true,
+        updatedAt: true,
+        items: {
+          select: {
+            id: true,
+            productName: true,
+            variantName: true,
+            sku: true,
+            quantity: true,
+            unitPrice: true,
+            discountAmount: true,
+            totalPrice: true,
+            hasWarranty: true,
+            warrantyStartedAt: true,
+            warrantyExpiresAt: true,
+          },
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            provider: true,
+            status: true,
+            amount: true,
+            currency: true,
+            paidAt: true,
+            createdAt: true,
+          },
+        },
+        fulfillment: {
+          select: {
+            status: true,
+            startedAt: true,
+            completedAt: true,
+            packages: {
+              orderBy: { createdAt: "asc" },
+              select: {
+                id: true,
+                trackingNumber: true,
+                status: true,
+                delivery: {
+                  select: {
+                    status: true,
+                    shippedAt: true,
+                    deliveredAt: true,
+                    attempts: {
+                      orderBy: { attemptedAt: "desc" },
+                      take: 1,
+                      select: {
+                        status: true,
+                        attemptedAt: true,
+                        notes: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  return {
+    orders,
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.ceil(total / query.limit),
+    },
+  };
+}
