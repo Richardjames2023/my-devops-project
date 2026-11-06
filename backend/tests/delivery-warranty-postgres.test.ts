@@ -42,7 +42,9 @@ const pool = new Pool({
 const {
   updateDeliveryStatus,
   createDeliveryAttempt,
+  createDelivery,
   completeDelivery,
+  allocatePackage,
   prisma,
   disconnectDatabase,
 } = await import("../src/modules/delivery/delivery.service").then(
@@ -54,7 +56,9 @@ const {
     return {
       updateDeliveryStatus: service.updateDeliveryStatus,
       createDeliveryAttempt: service.createDeliveryAttempt,
+      createDelivery: service.createDelivery,
       completeDelivery: completion.completeDelivery,
+      allocatePackage: (await import("../src/modules/fulfillment/fulfillment.service")).allocatePackage,
       prisma: database.default,
       disconnectDatabase: database.disconnectDatabase,
     };
@@ -263,6 +267,152 @@ describe("PostgreSQL delivery and warranty activation", () => {
   afterAll(async () => {
     await disconnectDatabase();
     await pool.end();
+  });
+
+  it("creates only one delivery when concurrent requests target the same package", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+
+    try {
+      await pool.query(
+        `UPDATE packages SET status = 'HANDED_TO_COURIER' WHERE id = $1`,
+        [fixture.packageIds[0]],
+      );
+      await pool.query(`DELETE FROM deliveries WHERE id = $1`, [
+        fixture.deliveryIds[0],
+      ]);
+
+      const results = await Promise.allSettled([
+        createDelivery({ packageId: fixture.packageIds[0] }),
+        createDelivery({ packageId: fixture.packageIds[0] }),
+      ]);
+
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+
+      const deliveries = await pool.query(
+        `SELECT id, status FROM deliveries WHERE "packageId" = $1`,
+        [fixture.packageIds[0]],
+      );
+      expect(deliveries.rows).toHaveLength(1);
+      expect(deliveries.rows[0].status).toBe("PENDING");
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("keeps package status synchronized when a delivery enters transit", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+
+    try {
+      await pool.query(
+        `UPDATE packages SET status = 'HANDED_TO_COURIER' WHERE id = $1`,
+        [fixture.packageIds[0]],
+      );
+      await pool.query(
+        `UPDATE deliveries SET status = 'PENDING' WHERE id = $1`,
+        [fixture.deliveryIds[0]],
+      );
+
+      await updateDeliveryStatus(fixture.deliveryIds[0], "ASSIGNED");
+      await updateDeliveryStatus(fixture.deliveryIds[0], "PICKED_UP");
+      await updateDeliveryStatus(fixture.deliveryIds[0], "IN_TRANSIT");
+
+      const states = await pool.query(
+        `SELECT p.status AS package_status, d.status AS delivery_status
+         FROM packages p
+         JOIN deliveries d ON d."packageId" = p.id
+         WHERE p.id = $1`,
+        [fixture.packageIds[0]],
+      );
+
+      expect(states.rows[0].package_status).toBe("IN_TRANSIT");
+      expect(states.rows[0].delivery_status).toBe("IN_TRANSIT");
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("serializes simultaneous split-package completions and fulfills only after both finish", async () => {
+    const fixture = await createFixture({
+      quantities: [1, 1],
+      orderQuantity: 2,
+      hasWarranty: true,
+      warrantyDuration: 12,
+    });
+
+    try {
+      await Promise.all(
+        fixture.deliveryIds.map((deliveryId) =>
+          updateDeliveryStatus(deliveryId, "DELIVERED"),
+        ),
+      );
+
+      const state = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status,
+                f."completedAt"
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+
+      expect(state.rows[0].order_status).toBe("FULFILLED");
+      expect(state.rows[0].fulfillment_status).toBe("FULFILLED");
+      expect(state.rows[0].completedAt).not.toBeNull();
+
+      const warranty = await pool.query(
+        `SELECT "warrantyStartedAt", "warrantyExpiresAt"
+         FROM order_items WHERE id = $1`,
+        [fixture.orderItemId],
+      );
+      expect(warranty.rows[0].warrantyStartedAt).not.toBeNull();
+      expect(warranty.rows[0].warrantyExpiresAt).not.toBeNull();
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("serializes package allocation with delivery completion", async () => {
+    const fixture = await createFixture({
+      quantities: [1],
+      orderQuantity: 2,
+      hasWarranty: true,
+      warrantyDuration: 12,
+    });
+
+    try {
+      const [completion, allocation] = await Promise.all([
+        updateDeliveryStatus(fixture.deliveryIds[0], "DELIVERED"),
+        allocatePackage(fixture.fulfillmentId, {
+          items: [{ orderItemId: fixture.orderItemId, quantity: 1 }],
+        }),
+      ]);
+
+      expect(completion.status).toBe("DELIVERED");
+      expect(allocation.status).toBe("PENDING");
+
+      const state = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+      expect(state.rows[0].order_status).toBe("PARTIALLY_FULFILLED");
+      expect(state.rows[0].fulfillment_status).toBe("PARTIALLY_FULFILLED");
+
+      const packages = await pool.query(
+        `SELECT status FROM packages WHERE "fulfillmentId" = $1 ORDER BY status`,
+        [fixture.fulfillmentId],
+      );
+      expect(packages.rows).toHaveLength(2);
+      expect(packages.rows.map((row) => row.status).sort()).toEqual([
+        "DELIVERED",
+        "PENDING",
+      ]);
+    } finally {
+      await cleanupFixture(fixture);
+    }
   });
 
   it("activates warranty only after all split-package quantities are delivered", async () => {
