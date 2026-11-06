@@ -16,6 +16,7 @@ vi.mock("../src/modules/return/return.service", async (importOriginal) => {
 
 import app from "../src/app.ts";
 import { JWT_ACCESS_SECRET } from "../src/config/auth";
+import { AppError } from "../src/common/errors/AppError";
 
 function makeToken(subject: string) {
   return jwt.sign(
@@ -87,7 +88,7 @@ describe("customer return detail HTTP endpoint", () => {
 
   it("returns not found when the request is not owned by the customer", async () => {
     mocks.getCustomerReturnRequest.mockRejectedValue(
-      Object.assign(new Error("Return request not found"), { statusCode: 404 }),
+      new AppError("Return request not found", 404),
     );
 
     const response = await request(app)
