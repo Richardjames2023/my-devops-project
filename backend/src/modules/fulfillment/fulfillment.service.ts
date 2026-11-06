@@ -164,7 +164,8 @@ export async function updatePackageStatus(
       PENDING: ["PACKING"],
       PACKING: ["PACKED"],
       PACKED: ["HANDED_TO_COURIER"],
-      HANDED_TO_COURIER: ["IN_TRANSIT"],
+      // Shipment progression is owned by the Delivery module after handover.
+      HANDED_TO_COURIER: [],
       IN_TRANSIT: [],
       DELIVERED: [],
       LOST: [],
