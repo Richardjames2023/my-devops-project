@@ -44,11 +44,13 @@ const {
   markPaymentSuccessful,
   markGuestPaymentSuccessful,
   reconcileUnknownPayment,
+  expireStaleInventoryReservations,
   disconnectDatabase,
 } =
   await import("../src/modules/payment/payment.service").then(
     async (service) => {
       const database = await import("../src/infrastructure/prisma/client");
+      const inventory = await import("../src/modules/inventory/inventory.service");
 
       return {
         createPayment: service.createPayment,
@@ -56,6 +58,8 @@ const {
         markPaymentSuccessful: service.markPaymentSuccessful,
         markGuestPaymentSuccessful: service.markGuestPaymentSuccessful,
         reconcileUnknownPayment: service.reconcileUnknownPayment,
+        expireStaleInventoryReservations:
+          inventory.expireStaleInventoryReservations,
         disconnectDatabase: database.disconnectDatabase,
       };
     },
@@ -662,5 +666,67 @@ describe("PostgreSQL checkout payment initialization", () => {
       paystackMocks.verify.mockReset();
     }
   });
+
+
+  it("allows a new payment attempt to reacquire stock after a failed payment reservation expires", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const firstPayment = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      await pool.query(
+        `UPDATE payments SET status = 'FAILED', "failedAt" = NOW() WHERE id = $1`,
+        [firstPayment.payment.id],
+      );
+      await pool.query(
+        `UPDATE inventory_reservations
+         SET "expiresAt" = NOW() - INTERVAL '1 minute'
+         WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+
+      const expiry = await expireStaleInventoryReservations({
+        now: new Date(),
+      });
+      expect(expiry.expired).toBe(1);
+
+      const secondPayment = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      expect(secondPayment.payment.status).toBe("PENDING");
+      expect(secondPayment.payment.id).not.toBe(firstPayment.payment.id);
+
+      const reservation = await pool.query(
+        `SELECT status, quantity, "releasedAt"
+         FROM inventory_reservations WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      expect(reservation.rows[0]).toMatchObject({
+        status: "PENDING",
+        quantity: 2,
+        releasedAt: null,
+      });
+
+      const inventory = await pool.query(
+        `SELECT quantity, "reservedQuantity"
+         FROM inventory WHERE id = $1`,
+        [fixture.inventoryId],
+      );
+      expect(inventory.rows[0]).toMatchObject({
+        quantity: 10,
+        reservedQuantity: 3,
+      });
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
 
 });
