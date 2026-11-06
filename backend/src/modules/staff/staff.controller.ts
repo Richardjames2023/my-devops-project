@@ -5,7 +5,7 @@ import {
   staffInvitationSchema, updateInvitationRolesSchema, updateStaffRolesSchema, updateStaffStatusSchema,
 } from "./staff.validation";
 import {
-  createStaffInvitation, listStaffAccounts, listStaffInvitations, resendStaffInvitation, revokeStaffInvitation,
+  createStaffInvitation, listStaffAccounts, listStaffInvitations, listStaffRoles, resendStaffInvitation, revokeStaffInvitation,
   updateStaffAccountRoles, updateStaffAccountStatus, updateStaffInvitationRoles,
 } from "./staff.service";
 
@@ -81,4 +81,8 @@ export async function resendInvitation(req: AuthenticatedRequest, res: Response)
     invitation: result.invitation,
     invitationToken: result.invitationToken,
   });
+}
+
+export async function listRoles(_req: AuthenticatedRequest, res: Response): Promise<void> {
+  res.status(200).json({ roles: await listStaffRoles() });
 }
