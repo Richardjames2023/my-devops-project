@@ -256,12 +256,20 @@ export async function reconcileStalePending(
     ? 200
     : "stale" in result && result.stale === false
       ? 409
-      : 202;
+      : result.status === "INITIALIZATION_UNKNOWN"
+        ? 202
+        : 200;
+
+  const message = result.reconciled
+    ? "Stale pending payment was reconciled using Paystack's verified transaction status."
+    : "stale" in result && result.stale === false
+      ? "This payment has not reached the 15-minute reconciliation threshold."
+      : result.status === "INITIALIZATION_UNKNOWN"
+        ? "Paystack has not returned a terminal transaction status. The payment and inventory reservation remain protected."
+        : `Payment is already in ${result.status}; no changes were made.`;
 
   res.status(responseStatus).json({
-    message: result.reconciled
-      ? "Stale pending payment was reconciled using Paystack's verified transaction status."
-      : "Payment was not reconciled. If Paystack's status is inconclusive, the payment and inventory reservation remain protected.",
+    message,
     ...result,
   });
 }
