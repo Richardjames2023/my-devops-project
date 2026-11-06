@@ -1,8 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
-import { authenticate } from "../../common/middleware/authenticate";
-import { requireStaff } from "../../common/middleware/authorize";
 import { acceptStaffInvitationSchema, staffLoginSchema, staffRefreshSchema } from "./staff.validation";
 import { acceptStaffInvitation, getStaffProfile, loginStaff, refreshStaffAccessToken } from "./staff.service";
 
