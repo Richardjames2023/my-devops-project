@@ -92,7 +92,7 @@ export async function allocatePackage(
       }
     }
 
-    if (["FULFILLED", "CANCELLED"].includes(fulfillment.status)) {
+    if (!["PENDING", "PROCESSING"].includes(fulfillment.status)) {
       throw new AppError("Packages cannot be allocated to a completed or cancelled fulfillment", 409);
     }
 
@@ -116,7 +116,7 @@ export async function allocatePackage(
       where: { id: fulfillmentId },
       data: {
         status: "PROCESSING",
-        startedAt: fulfillment.status === "PENDING" ? new Date() : undefined,
+        ...(fulfillment.status === "PENDING" ? { startedAt: new Date() } : {}),
       },
     });
 
