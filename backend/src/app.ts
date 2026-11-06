@@ -21,6 +21,7 @@ import guestSessionRoutes from "./modules/guest-session/guest-session.routes";
 import guestCartRoutes from "./modules/cart/guest-cart.routes";
 import inventoryReconciliationRoutes from "./modules/inventory-reconciliation/inventory-reconciliation.routes";
 import warrantyClaimRoutes from "./modules/warranty-claims/warranty-claim.routes";
+import productReviewRoutes from "./modules/product-reviews/product-review.routes";
 import { errorHandler } from "./common/errors/errorHandler";
 import cookieParser from "cookie-parser";
 
@@ -73,6 +74,7 @@ app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/deliveries", deliveryRoutes);
 app.use("/api/v1/returns", returnRoutes);
 app.use("/api/v1/warranty-claims", warrantyClaimRoutes);
+app.use("/api/v1/reviews", productReviewRoutes);
 app.use("/api/v1/refunds", refundRoutes);
 app.use("/api/v1/guest-session", guestSessionRoutes);
 app.use("/api/v1/inventory-reconciliation", inventoryReconciliationRoutes);
