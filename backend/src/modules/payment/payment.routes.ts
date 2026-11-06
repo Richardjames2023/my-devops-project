@@ -7,6 +7,7 @@ import {
   markSuccessful,
   markGuestSuccessful,
   reconcileUnknown,
+  listStalePending,
   reconcileStalePending,
   listStaleWebhookEvents,
   reconcileStaleWebhookEvent,
@@ -44,6 +45,13 @@ router.post(
   authenticate,
   authorize("orders.manage"),
   reconcileUnknown,
+);
+
+router.get(
+  "/stale-pending",
+  authenticate,
+  authorize("orders.manage"),
+  listStalePending,
 );
 
 router.post(
