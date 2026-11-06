@@ -185,6 +185,7 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
 
   const accessToken = generateAccessToken({
     sub: user.id,
+    identityType: "CUSTOMER",
     roles,
     permissions,
   });
