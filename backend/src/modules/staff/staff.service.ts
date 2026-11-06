@@ -109,14 +109,19 @@ export async function createStaffInvitation(
 
   const token = crypto.randomBytes(32).toString("hex");
   const invitation = await prisma.$transaction(async (tx) => {
-    const created = await tx.staffInvitation.create({
+    const createdBase = await tx.staffInvitation.create({
       data: {
         email,
         tokenHash: hashRefreshToken(token),
         expiresAt: expiryFromDays(days),
         createdByStaffAccountId: actorId,
-        roles: { create: roles.map((role) => ({ roleId: role.id })) },
       },
+    });
+    await tx.staffInvitationRole.createMany({
+      data: roles.map((role) => ({ invitationId: createdBase.id, roleId: role.id })),
+    });
+    const created = await tx.staffInvitation.findUniqueOrThrow({
+      where: { id: createdBase.id },
       include: { roles: { include: { role: { select: { id: true, name: true } } } } },
     });
     await createAuditLog(tx, {
