@@ -1270,7 +1270,11 @@ export async function reconcileUnknownPayment(paymentId: string) {
  * Lists aged Paystack payments that still hold pending orders for admin review.
  */
 export async function listStalePendingPayments(limit = 100) {
-  const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new AppError("Invalid stale payment list limit", 400);
+  }
+
+  const boundedLimit = Math.min(limit, 500);
   const staleBefore = new Date(
     Date.now() - STALE_PENDING_PAYMENT_GRACE_PERIOD_MS,
   );
@@ -1354,7 +1358,10 @@ export async function reconcileStalePendingPayment(paymentId: string) {
           `;
 
           if (lockedOrders.length === 0) {
-            throw new AppError("Order not found during payment reconciliation", 404);
+            throw new AppError(
+              "Order not found during payment reconciliation",
+              404,
+            );
           }
 
           const currentPayment = await tx.payment.findUnique({
