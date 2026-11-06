@@ -20,12 +20,13 @@ process.env.DATABASE_URL = databaseUrl;
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
 
-const { listCatalogProducts, getCatalogProductBySlug, disconnectDatabase } =
+const { listCatalogProducts, getCatalogProductBySlug, listActiveCategories, disconnectDatabase } =
   await import("../src/modules/products/product.service").then(async (service) => {
     const database = await import("../src/infrastructure/prisma/client");
     return {
       listCatalogProducts: service.listCatalogProducts,
       getCatalogProductBySlug: service.getCatalogProductBySlug,
+      listActiveCategories: (await import("../src/modules/products/category.service")).listActiveCategories,
       disconnectDatabase: database.disconnectDatabase,
     };
   });
@@ -267,6 +268,20 @@ describe("PostgreSQL product catalog queries", () => {
       expect(
         result.items.some((item) => item.id === fixture.productIds[2]),
       ).toBe(false);
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("lists only active categories and counts only active products", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const result = await listActiveCategories();
+      const category = result.find((item) => item.id === fixture.categoryId);
+
+      expect(category).toBeDefined();
+      expect(category?.productCount).toBe(2);
     } finally {
       await cleanupFixture(fixture);
     }
