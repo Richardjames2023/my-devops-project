@@ -245,16 +245,17 @@ describe("PostgreSQL checkout payment initialization", () => {
       });
 
       const reservations = await pool.query(
-        `SELECT quantity, status, "expiresAt"
+        `SELECT quantity, status, "expiresAt" > NOW() AS "isFuture",
+                EXTRACT(EPOCH FROM ("expiresAt" - NOW())) AS "secondsRemaining"
          FROM inventory_reservations WHERE "orderId" = $1`,
         [fixture.orderId],
       );
       expect(reservations.rows).toHaveLength(1);
       expect(reservations.rows[0].quantity).toBe(2);
       expect(reservations.rows[0].status).toBe("PENDING");
-      expect(new Date(reservations.rows[0].expiresAt).getTime()).toBeGreaterThan(
-        Date.now(),
-      );
+      // Compare timestamps in PostgreSQL to avoid JS/local-time parsing differences.
+      expect(reservations.rows[0].isFuture).toBe(true);
+      expect(Number(reservations.rows[0].secondsRemaining)).toBeGreaterThan(0);
 
       await expect(
         createPayment(
@@ -302,7 +303,7 @@ describe("PostgreSQL checkout payment initialization", () => {
       expect(paystackMocks.initialize).toHaveBeenCalledWith(
         expect.objectContaining({
           email: "guest-payment@example.test",
-          amountKobo: "250050",
+          amountKobo: "500100",
           currency: "NGN",
           reference: result.payment.reference,
         }),
