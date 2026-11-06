@@ -10,10 +10,19 @@ if (new URL(databaseUrl).pathname !== "/shop_db_test") {
 process.env.DATABASE_URL = databaseUrl;
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
 
-const ids = Object.fromEntries(
-  ["user", "category", "product", "variant", "order", "item", "payment", "fulfillment", "package", "packageItem", "delivery"]
-    .map((key) => [key, randomUUID()]),
-) as Record<string, string>;
+const ids = {
+  user: randomUUID(),
+  category: randomUUID(),
+  product: randomUUID(),
+  variant: randomUUID(),
+  order: randomUUID(),
+  item: randomUUID(),
+  payment: randomUUID(),
+  fulfillment: randomUUID(),
+  package: randomUUID(),
+  packageItem: randomUUID(),
+  delivery: randomUUID(),
+};
 
 const service = await import("../src/modules/product-reviews/product-review.service");
 const database = await import("../src/infrastructure/prisma/client");
