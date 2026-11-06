@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../src/common/middleware/authenticate";
-import { requireCustomer, requireStaff } from "../src/common/middleware/authorize";
+import { requireCustomer, requireStaff } from "../src/common/middleware/identity";
 import {
   acceptStaffInvitationSchema,
   staffInvitationSchema,
