@@ -43,6 +43,7 @@ const {
   createGuestPayment,
   markPaymentSuccessful,
   markGuestPaymentSuccessful,
+  reconcileUnknownPayment,
   disconnectDatabase,
 } =
   await import("../src/modules/payment/payment.service").then(
@@ -54,6 +55,7 @@ const {
         createGuestPayment: service.createGuestPayment,
         markPaymentSuccessful: service.markPaymentSuccessful,
         markGuestPaymentSuccessful: service.markGuestPaymentSuccessful,
+        reconcileUnknownPayment: service.reconcileUnknownPayment,
         disconnectDatabase: database.disconnectDatabase,
       };
     },
@@ -514,4 +516,151 @@ describe("PostgreSQL checkout payment initialization", () => {
       paystackMocks.initialize.mockClear();
     }
   });
+
+  it.each(["failed", "abandoned"] as const)(
+    "releases an unknown payment reservation only after Paystack confirms %s",
+    async (providerStatus) => {
+      const fixture = await createFixture();
+
+      try {
+        const initialized = await createPayment(
+          { orderId: fixture.orderId, provider: "PAYSTACK" },
+          fixture.userId,
+        );
+
+        await pool.query(
+          `UPDATE payments SET status = 'INITIALIZATION_UNKNOWN' WHERE id = $1`,
+          [initialized.payment.id],
+        );
+
+        paystackMocks.verify.mockResolvedValue({
+          id: 987654330,
+          status: providerStatus,
+          reference: initialized.payment.reference,
+          amount: 500100,
+          currency: "NGN",
+        });
+
+        const result = await reconcileUnknownPayment(initialized.payment.id);
+
+        expect(result).toMatchObject({
+          reconciled: true,
+          status: "FAILED",
+        });
+        expect(paystackMocks.verify).toHaveBeenCalledOnce();
+        expect(paystackMocks.verify).toHaveBeenCalledWith(
+          initialized.payment.reference,
+        );
+
+        const payment = await pool.query(
+          `SELECT status, "failedAt" IS NOT NULL AS "hasFailedAt"
+           FROM payments WHERE id = $1`,
+          [initialized.payment.id],
+        );
+        const order = await pool.query(
+          `SELECT status FROM orders WHERE id = $1`,
+          [fixture.orderId],
+        );
+        const inventory = await pool.query(
+          `SELECT quantity, "reservedQuantity"
+           FROM inventory WHERE id = $1`,
+          [fixture.inventoryId],
+        );
+        const reservation = await pool.query(
+          `SELECT status, "releasedAt" IS NOT NULL AS "hasReleasedAt"
+           FROM inventory_reservations WHERE "orderId" = $1`,
+          [fixture.orderId],
+        );
+
+        expect(payment.rows[0]).toMatchObject({
+          status: "FAILED",
+          hasFailedAt: true,
+        });
+        expect(order.rows[0].status).toBe("PENDING");
+        expect(inventory.rows[0]).toMatchObject({
+          quantity: 10,
+          reservedQuantity: 1,
+        });
+        expect(reservation.rows[0]).toMatchObject({
+          status: "RELEASED",
+          hasReleasedAt: true,
+        });
+
+        // A terminal local payment must not be verified or released twice.
+        const repeated = await reconcileUnknownPayment(initialized.payment.id);
+        expect(repeated).toMatchObject({
+          reconciled: false,
+          status: "FAILED",
+        });
+        expect(paystackMocks.verify).toHaveBeenCalledOnce();
+
+        const inventoryAfterRetry = await pool.query(
+          `SELECT "reservedQuantity" FROM inventory WHERE id = $1`,
+          [fixture.inventoryId],
+        );
+        expect(inventoryAfterRetry.rows[0].reservedQuantity).toBe(1);
+      } finally {
+        await cleanupFixture(fixture);
+        paystackMocks.initialize.mockClear();
+        paystackMocks.verify.mockReset();
+      }
+    },
+  );
+
+  it("preserves an unknown payment reservation while Paystack reports a non-terminal status", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const initialized = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      await pool.query(
+        `UPDATE payments SET status = 'INITIALIZATION_UNKNOWN' WHERE id = $1`,
+        [initialized.payment.id],
+      );
+
+      paystackMocks.verify.mockResolvedValue({
+        id: 987654331,
+        status: "ongoing",
+        reference: initialized.payment.reference,
+        amount: 500100,
+        currency: "NGN",
+      });
+
+      const result = await reconcileUnknownPayment(initialized.payment.id);
+
+      expect(result).toMatchObject({
+        reconciled: false,
+        status: "ongoing",
+      });
+
+      const payment = await pool.query(
+        `SELECT status FROM payments WHERE id = $1`,
+        [initialized.payment.id],
+      );
+      const inventory = await pool.query(
+        `SELECT quantity, "reservedQuantity"
+         FROM inventory WHERE id = $1`,
+        [fixture.inventoryId],
+      );
+      const reservation = await pool.query(
+        `SELECT status FROM inventory_reservations WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+
+      expect(payment.rows[0].status).toBe("INITIALIZATION_UNKNOWN");
+      expect(inventory.rows[0]).toMatchObject({
+        quantity: 10,
+        reservedQuantity: 3,
+      });
+      expect(reservation.rows[0].status).toBe("PENDING");
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
 });
