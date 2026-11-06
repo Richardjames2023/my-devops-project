@@ -83,6 +83,15 @@ export async function allocatePackage(
       Prisma.sql`SELECT id FROM orders WHERE id = ${fulfillment.orderId}::uuid FOR UPDATE`,
     );
 
+    // The order lock serializes allocation with delivery completion. Refresh the
+    // fulfillment after acquiring it so a concurrent completion cannot leave us
+    // acting on a stale status.
+    const lockedFulfillment = await tx.fulfillment.findUnique({
+      where: { id: fulfillmentId },
+      select: { id: true, orderId: true, status: true },
+    });
+    if (!lockedFulfillment) throw new AppError("Fulfillment not found", 404);
+
     const orderItems = await tx.orderItem.findMany({
       where: {
         orderId: fulfillment.orderId,
@@ -116,7 +125,7 @@ export async function allocatePackage(
       }
     }
 
-    if (!["PENDING", "PROCESSING", "PARTIALLY_FULFILLED"].includes(fulfillment.status)) {
+    if (!["PENDING", "PROCESSING", "PARTIALLY_FULFILLED"].includes(lockedFulfillment.status)) {
       throw new AppError("Packages cannot be allocated to a completed or cancelled fulfillment", 409);
     }
 
@@ -139,8 +148,8 @@ export async function allocatePackage(
     await tx.fulfillment.update({
       where: { id: fulfillmentId },
       data: {
-        status: fulfillment.status === "PARTIALLY_FULFILLED" ? "PARTIALLY_FULFILLED" : "PROCESSING",
-        ...(fulfillment.status === "PENDING" ? { startedAt: new Date() } : {}),
+        status: lockedFulfillment.status === "PARTIALLY_FULFILLED" ? "PARTIALLY_FULFILLED" : "PROCESSING",
+        ...(lockedFulfillment.status === "PENDING" ? { startedAt: new Date() } : {}),
       },
     });
 
