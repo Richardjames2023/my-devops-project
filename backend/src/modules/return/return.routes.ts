@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   listMine,
+  getMine,
   create,
   receive,
   review,
@@ -16,6 +17,7 @@ import { streamEvidenceFile } from "./return-evidence-file.controller";
 const router = Router();
 
 router.get("/", authenticate, listMine);
+router.get("/:returnRequestId", authenticate, getMine);
 
 router.post(
   "/",
