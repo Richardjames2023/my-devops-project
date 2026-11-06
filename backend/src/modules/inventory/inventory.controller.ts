@@ -1,7 +1,10 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { createInventorySchema } from "./inventory.validation";
-import { createInventory } from "./inventory.service";
+import {
+  createInventory,
+  expireStaleInventoryReservations,
+} from "./inventory.service";
 
 export async function create(
   req: Request,
@@ -24,5 +27,17 @@ export async function create(
   res.status(201).json({
     message: "Inventory created successfully",
     inventory,
+  });
+}
+
+export async function expireStaleReservations(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  const result = await expireStaleInventoryReservations();
+
+  res.status(200).json({
+    message: "Stale inventory reservations processed",
+    ...result,
   });
 }
