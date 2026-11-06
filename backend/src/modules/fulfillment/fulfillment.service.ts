@@ -162,6 +162,12 @@ export async function updatePackageStatus(
   status: UpdatePackageStatusInput["status"],
 ) {
   return prisma.$transaction(async (tx) => {
+    // Serialize package lifecycle changes with delivery creation, which takes
+    // the same row lock when a package is handed to the courier.
+    await tx.$queryRaw(
+      Prisma.sql`SELECT id FROM packages WHERE id = ${packageId}::uuid FOR UPDATE`,
+    );
+
     const pkg = await tx.package.findUnique({
       where: { id: packageId },
       include: { items: true },
