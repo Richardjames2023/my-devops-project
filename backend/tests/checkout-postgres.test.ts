@@ -262,23 +262,23 @@ describe("PostgreSQL customer checkout", () => {
         userId: fixture.userId,
         status: "PENDING",
         currency: "NGN",
-        subtotal: "2501",
-        discountAmount: "0",
-        deliveryFee: "0",
-        totalAmount: "2501",
       });
+      expect(order.subtotal.toString()).toBe("2501");
+      expect(order.discountAmount.toString()).toBe("0");
+      expect(order.deliveryFee.toString()).toBe("0");
+      expect(order.totalAmount.toString()).toBe("2501");
       expect(order.items).toHaveLength(1);
       expect(order.items[0]).toMatchObject({
         productVariantId: fixture.variantId,
         productName: "Checkout Test Product",
         variantName: "Standard Variant",
         quantity: 2,
-        unitPrice: "1250.5",
-        totalPrice: "2501",
         hasWarranty: true,
         warrantyDuration: 24,
         warrantyTerms: "Manufacturer warranty terms",
       });
+      expect(order.items[0].unitPrice.toString()).toBe("1250.5");
+      expect(order.items[0].totalPrice.toString()).toBe("2501");
 
       const cartItems = await pool.query(
         `SELECT id FROM cart_items WHERE "cartId" = $1`,
