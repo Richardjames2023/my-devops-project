@@ -88,7 +88,7 @@ INSERT INTO "staff_accounts" (
   "legacyUserId", "email", "firstName", "lastName", "passwordHash",
   "status", "createdAt", "updatedAt"
 )
-SELECT u."id", u."email", u."firstName", u."lastName", NULL,
+SELECT u."id", lower(u."email"), u."firstName", u."lastName", NULL,
        'PENDING_SETUP'::"StaffAccountStatus", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM "users" u
 WHERE EXISTS (
