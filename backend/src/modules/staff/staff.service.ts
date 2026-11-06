@@ -137,7 +137,8 @@ export async function createStaffInvitation(
 
   // The raw token is returned once so the trusted admin UI can hand it to the
   // configured email-delivery adapter. Only the hash is persisted.
-  return { invitation, invitationToken: token };
+  const { tokenHash: _tokenHash, ...safeInvitation } = invitation;
+  return { invitation: safeInvitation, invitationToken: token };
 }
 
 export async function listStaffInvitations() {
@@ -146,10 +147,16 @@ export async function listStaffInvitations() {
     data: { status: "EXPIRED" },
   });
   return prisma.staffInvitation.findMany({
-    include: {
-      roles: { include: { role: { select: { id: true, name: true } } } },
+    select: {
+      id: true, email: true, status: true, expiresAt: true, acceptedAt: true,
+      revokedAt: true, createdAt: true, updatedAt: true, createdByStaffAccountId: true,
+      roles: { select: { role: { select: { id: true, name: true } } } },
       createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
     },
+    /* include: {
+      roles: { include: { role: { select: { id: true, name: true } } } },
+      createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+    }, */
     orderBy: { createdAt: "desc" },
   });
 }
@@ -179,7 +186,8 @@ export async function resendStaffInvitation(
     });
     return result;
   });
-  return { invitation: updated, invitationToken: token };
+  const { tokenHash: _tokenHash, ...safeInvitation } = updated;
+  return { invitation: safeInvitation, invitationToken: token };
 }
 
 export async function updateStaffInvitationRoles(
@@ -242,7 +250,8 @@ export async function revokeStaffInvitation(actorId: string, invitationId: strin
       newValues: { status: updated.status },
       ...metadata,
     });
-    return updated;
+    const { tokenHash: _tokenHash, ...safeUpdated } = updated;
+    return safeUpdated;
   });
 }
 
