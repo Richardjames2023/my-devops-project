@@ -138,6 +138,7 @@ export async function createStaffInvitation(
   // The raw token is returned once so the trusted admin UI can hand it to the
   // configured email-delivery adapter. Only the hash is persisted.
   const { tokenHash: _tokenHash, ...safeInvitation } = invitation;
+  void _tokenHash;
   return { invitation: safeInvitation, invitationToken: token };
 }
 
@@ -153,10 +154,6 @@ export async function listStaffInvitations() {
       roles: { select: { role: { select: { id: true, name: true } } } },
       createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
     },
-    /* include: {
-      roles: { include: { role: { select: { id: true, name: true } } } },
-      createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
-    }, */
     orderBy: { createdAt: "desc" },
   });
 }
@@ -166,6 +163,7 @@ export async function resendStaffInvitation(
 ) {
   const token = crypto.randomBytes(32).toString("hex");
   const updated = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM staff_invitations WHERE id = ${invitationId}::uuid FOR UPDATE`;
     const invitation = await tx.staffInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation) throw new AppError("Staff invitation not found", 404);
     if (invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
@@ -187,6 +185,7 @@ export async function resendStaffInvitation(
     return result;
   });
   const { tokenHash: _tokenHash, ...safeInvitation } = updated;
+  void _tokenHash;
   return { invitation: safeInvitation, invitationToken: token };
 }
 
@@ -200,6 +199,7 @@ export async function updateStaffInvitationRoles(
   const { roles } = await getDelegableRoles(actorId, roleIds);
 
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM staff_invitations WHERE id = ${invitationId}::uuid FOR UPDATE`;
     const invitation = await tx.staffInvitation.findUnique({
       where: { id: invitationId },
       include: { roles: { include: { role: { select: { name: true } } } } },
@@ -227,8 +227,10 @@ export async function updateStaffInvitationRoles(
       newValues: { roleNames: roles.map((role) => role.name) },
       ...metadata,
     });
-    return updated;
-  });
+    const { tokenHash: _tokenHash, ...safeUpdated } = updated;
+    void _tokenHash;
+    return safeUpdated;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function revokeStaffInvitation(actorId: string, invitationId: string, metadata: RequestMetadata = {}) {
@@ -251,8 +253,9 @@ export async function revokeStaffInvitation(actorId: string, invitationId: strin
       ...metadata,
     });
     const { tokenHash: _tokenHash, ...safeUpdated } = updated;
+    void _tokenHash;
     return safeUpdated;
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function acceptStaffInvitation(input: {
@@ -260,6 +263,7 @@ export async function acceptStaffInvitation(input: {
 }) {
   const tokenHash = hashRefreshToken(input.token);
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM staff_invitations WHERE "tokenHash" = ${tokenHash} FOR UPDATE`;
     const invitation = await tx.staffInvitation.findUnique({
       where: { tokenHash },
       include: { roles: { select: { roleId: true, role: { select: { name: true } } } } },
