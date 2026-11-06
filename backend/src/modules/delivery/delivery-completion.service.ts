@@ -99,7 +99,13 @@ export async function completeDelivery(
     where: { id: delivery.package.fulfillment.id },
     include: {
       packages: {
-        select: { status: true },
+        select: {
+          status: true,
+          items: { select: { orderItemId: true, quantity: true } },
+        },
+      },
+      order: {
+        select: { items: { select: { id: true, quantity: true } } },
       },
     },
   });
@@ -115,7 +121,24 @@ export async function completeDelivery(
     fulfillment.packages.length > 0 &&
     deliveredPackageCount === fulfillment.packages.length;
 
-  const fulfillmentStatus = allPackagesDelivered
+  // A fulfillment is complete only when every ordered unit has been assigned
+  // to a package AND every package has been delivered. This matters when an
+  // order is intentionally split into packages created over multiple requests.
+  const allocatedByOrderItem = new Map<string, number>();
+  for (const pkg of fulfillment.packages) {
+    for (const item of pkg.items) {
+      allocatedByOrderItem.set(
+        item.orderItemId,
+        (allocatedByOrderItem.get(item.orderItemId) ?? 0) + item.quantity,
+      );
+    }
+  }
+  const allOrderItemsFullyAllocated = fulfillment.order.items.every(
+    (item) => (allocatedByOrderItem.get(item.id) ?? 0) === item.quantity,
+  );
+  const fulfillmentComplete = allPackagesDelivered && allOrderItemsFullyAllocated;
+
+  const fulfillmentStatus = fulfillmentComplete
     ? "FULFILLED"
     : deliveredPackageCount > 0
       ? "PARTIALLY_FULFILLED"
@@ -125,7 +148,7 @@ export async function completeDelivery(
     where: { id: fulfillment.id },
     data: {
       status: fulfillmentStatus,
-      ...(allPackagesDelivered
+      ...(fulfillmentComplete
         ? { completedAt: fulfillment.completedAt ?? effectiveDeliveredAt }
         : { completedAt: null }),
     },
@@ -137,7 +160,7 @@ export async function completeDelivery(
       status: { notIn: ["CANCELLED"] },
     },
     data: {
-      status: allPackagesDelivered ? "FULFILLED" : "PARTIALLY_FULFILLED",
+      status: fulfillmentComplete ? "FULFILLED" : "PARTIALLY_FULFILLED",
     },
   });
 
