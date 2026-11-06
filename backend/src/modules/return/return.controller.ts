@@ -13,7 +13,9 @@ import {
   receiveReturnRequest,
   reviewReturnRequest,
   inspectReturnRequest,
+  listCustomerReturnRequests,
 } from "./return.service";
+import { customerReturnHistoryQuerySchema } from "./return-history.validation";
 
 export async function create(
   req: AuthenticatedRequest,
@@ -202,3 +204,32 @@ export async function inspect(
   });
 }
 
+
+
+export async function listMine(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const queryResult = customerReturnHistoryQuerySchema.safeParse(req.query);
+
+  if (!queryResult.success) {
+    const { fieldErrors } = z.flattenError(queryResult.error);
+    res.status(400).json({
+      message: "Validation failed",
+      errors: fieldErrors,
+    });
+    return;
+  }
+
+  const result = await listCustomerReturnRequests(req.user.id, queryResult.data);
+
+  res.status(200).json({
+    message: "Customer return history retrieved successfully",
+    ...result,
+  });
+}
