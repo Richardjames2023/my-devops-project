@@ -130,6 +130,10 @@ describe("PostgreSQL verified product reviews", () => {
     );
     await pool.query(`UPDATE orders SET status='FULFILLED' WHERE id=$1`, [ids.order]);
 
+    await expect(
+      service.createProductReview(randomUUID(), ids.product, input),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
     const review = await service.createProductReview(ids.user, ids.product, input);
     expect(review.status).toBe("PENDING");
 
