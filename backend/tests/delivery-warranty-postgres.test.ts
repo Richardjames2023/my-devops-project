@@ -72,6 +72,11 @@ const {
   getGuestOrderDeliveryTracking,
 } = await import("../src/modules/delivery/delivery-tracking.service");
 
+const {
+  createWarrantyClaim,
+  reviewWarrantyClaim,
+} = await import("../src/modules/warranty-claims/warranty-claim.service");
+
 interface TestFixture {
   categoryId: string;
   productId: string;
@@ -253,6 +258,10 @@ async function cleanupFixture(fixture: TestFixture): Promise<void> {
 
   await pool.query(`DELETE FROM fulfillments WHERE id = $1`, [
     fixture.fulfillmentId,
+  ]);
+
+  await pool.query(`DELETE FROM warranty_claims WHERE "orderItemId" = $1`, [
+    fixture.orderItemId,
   ]);
 
   await pool.query(`DELETE FROM order_items WHERE id = $1`, [
@@ -705,4 +714,91 @@ describe("PostgreSQL delivery and warranty activation", () => {
       await cleanupFixture(fixture);
     }
   });
+  it("enforces warranty claim eligibility, quantity limits, ownership, and the review lifecycle", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+    const userId = randomUUID();
+    const otherUserId = randomUUID();
+
+    try {
+      await pool.query(
+        `INSERT INTO users (id, email, "passwordHash", "firstName", "lastName", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'test-hash', 'Warranty', 'Customer', NOW(), NOW())`,
+        [userId, `warranty-${userId}@example.test`],
+      );
+      await pool.query(
+        `INSERT INTO users (id, email, "passwordHash", "firstName", "lastName", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'test-hash', 'Other', 'Customer', NOW(), NOW())`,
+        [otherUserId, `warranty-${otherUserId}@example.test`],
+      );
+      await pool.query(`UPDATE orders SET "userId" = $2 WHERE id = $1`, [
+        fixture.orderId,
+        userId,
+      ]);
+      await pool.query(
+        `UPDATE order_items
+         SET "warrantyStartedAt" = NOW() - INTERVAL '1 day',
+             "warrantyExpiresAt" = NOW() + INTERVAL '30 days'
+         WHERE id = $1`,
+        [fixture.orderItemId],
+      );
+
+      const claim = await createWarrantyClaim(userId, {
+        orderItemId: fixture.orderItemId,
+        quantity: 1,
+        issue: "Device will not power on",
+        description: "The device stopped working during normal use.",
+      });
+      expect(claim.status).toBe("PENDING");
+      expect(claim.quantity).toBe(1);
+      expect(claim.claimNumber).toMatch(/^WAR-/);
+
+      await expect(
+        createWarrantyClaim(userId, {
+          orderItemId: fixture.orderItemId,
+          quantity: 1,
+          issue: "Another issue",
+        }),
+      ).rejects.toThrow("remaining eligible item quantity");
+
+      await expect(
+        createWarrantyClaim(otherUserId, {
+          orderItemId: fixture.orderItemId,
+          quantity: 1,
+          issue: "Not my purchase",
+        }),
+      ).rejects.toThrow("not allowed");
+
+      const underReview = await reviewWarrantyClaim(claim.id, {
+        status: "UNDER_REVIEW",
+      });
+      expect(underReview.status).toBe("UNDER_REVIEW");
+
+      const approved = await reviewWarrantyClaim(claim.id, {
+        status: "APPROVED",
+      });
+      expect(approved.status).toBe("APPROVED");
+
+      const resolved = await reviewWarrantyClaim(claim.id, {
+        status: "RESOLVED",
+        resolution: "REPAIR",
+        resolutionNotes: "Repaired and tested successfully.",
+      });
+      expect(resolved.status).toBe("RESOLVED");
+      expect(resolved.resolution).toBe("REPAIR");
+      expect(resolved.resolvedAt).not.toBeNull();
+
+      await expect(
+        reviewWarrantyClaim(claim.id, { status: "APPROVED" }),
+      ).rejects.toThrow("cannot move from RESOLVED");
+    } finally {
+      await pool.query(`DELETE FROM warranty_claims WHERE "orderItemId" = $1`, [
+        fixture.orderItemId,
+      ]);
+      await cleanupFixture(fixture);
+      await pool.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [
+        [userId, otherUserId],
+      ]);
+    }
+  });
+
 });
