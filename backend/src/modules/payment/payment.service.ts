@@ -1279,6 +1279,9 @@ export async function listStalePendingPayments(limit = 100) {
     SELECT NOW() - (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond')
       AS "staleBefore"
   `;
+  if (!cutoffRow) {
+    throw new AppError("Unable to determine stale payment cutoff", 500);
+  }
   const staleBefore = cutoffRow.staleBefore;
 
   return prisma.payment.findMany({
@@ -1342,6 +1345,9 @@ export async function reconcileStalePendingPayment(paymentId: string) {
     SELECT NOW() - (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond')
       AS "staleBefore"
   `;
+  if (!initialCutoffRow) {
+    throw new AppError("Unable to determine stale payment cutoff", 500);
+  }
   const staleBefore = initialCutoffRow.staleBefore;
 
   if (initialPayment.createdAt > staleBefore) {
@@ -1376,6 +1382,9 @@ export async function reconcileStalePendingPayment(paymentId: string) {
             SELECT NOW() - (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond')
               AS "staleBefore"
           `;
+          if (!transactionCutoffRow) {
+            throw new AppError("Unable to determine stale payment cutoff", 500);
+          }
           const transactionStaleBefore = transactionCutoffRow.staleBefore;
 
           const currentPayment = await tx.payment.findUnique({
