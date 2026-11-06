@@ -3,6 +3,8 @@ import cors from "cors";
 import helmet from "helmet";
 import { env } from "./config/env";
 import authRoutes from "./modules/auth/auth.routes";
+import staffAuthRoutes from "./modules/staff/staff-auth.routes";
+import staffRoutes from "./modules/staff/staff.routes";
 import productRoutes from "./modules/products/product.routes";
 import categoryRoutes from "./modules/products/category.routes";
 import productVariantRoutes from "./modules/products/product-variant.routes";
@@ -61,6 +63,8 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/staff-auth", staffAuthRoutes);
+app.use("/api/v1/staff", staffRoutes);
 app.use("/api/v1/products", productRoutes);
 app.use("/api/v1/categories", categoryRoutes);
 app.use("/api/v1/product-variants", productVariantRoutes);
