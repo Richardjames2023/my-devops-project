@@ -15,6 +15,8 @@
 // const permissions = [
 //   "users.read",
 //   "users.manage",
+  "staff.read",
+  "staff.manage",
 
 //   "products.read",
 //   "products.manage",
@@ -340,55 +342,7 @@ async function main(): Promise<void> {
 
   console.log("Roles seeded.");
 
-  // --------------------------------------------------
-  // Seed development BUSINESS_OWNER account
-  // --------------------------------------------------
-
-  console.log("Seeding business owner...");
-
-  const passwordHash = await argon2.hash(
-    "BusinessOwner123!",
-  );
-
-  const businessOwner = await prisma.user.upsert({
-    where: {
-      email: "business.owner@example.com",
-    },
-    update: {},
-    create: {
-      email: "business.owner@example.com",
-      passwordHash,
-      firstName: "Business",
-      lastName: "Owner",
-      isActive: true,
-    },
-  });
-
-  const businessOwnerRole = await prisma.role.findUnique({
-    where: {
-      name: "BUSINESS_OWNER",
-    },
-  });
-
-  if (!businessOwnerRole) {
-    throw new Error("BUSINESS_OWNER role not found.");
-  }
-
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: businessOwner.id,
-        roleId: businessOwnerRole.id,
-      },
-    },
-    update: {},
-    create: {
-      userId: businessOwner.id,
-      roleId: businessOwnerRole.id,
-    },
-  });
-
-  console.log("Business owner seeded.");
+  console.log("Roles and permissions seeded. Run the explicit staff bootstrap command to create the initial owner.");
 }
 
 main()
