@@ -14,8 +14,8 @@
 // const permissions = [
 //   "users.read",
 //   "users.manage",
-  "staff.read",
-  "staff.manage",
+//   "staff.read",
+//   "staff.manage",
 
 //   "products.read",
 //   "products.manage",
