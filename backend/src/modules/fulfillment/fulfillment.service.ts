@@ -7,6 +7,30 @@ import type {
   UpdatePackageStatusInput,
 } from "./fulfillment.validation";
 
+export async function listReadyOrders() {
+  return prisma.order.findMany({
+    where: { status: "CONFIRMED", fulfillment: null },
+    orderBy: { createdAt: "asc" },
+    take: 50,
+    select: {
+      id: true,
+      orderNumber: true,
+      customerName: true,
+      customerEmail: true,
+      createdAt: true,
+      items: {
+        select: {
+          id: true,
+          productName: true,
+          variantName: true,
+          sku: true,
+          quantity: true,
+        },
+      },
+    },
+  });
+}
+
 export async function createFulfillment(input: CreateFulfillmentInput) {
   return prisma.$transaction(async (tx) => {
     // Serialize fulfillment creation and package allocation against the order.
