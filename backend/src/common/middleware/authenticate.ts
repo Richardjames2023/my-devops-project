@@ -54,7 +54,7 @@ export function authenticate(
       typeof payload !== "object" ||
       payload === null ||
       typeof payload.sub !== "string" ||
-      (payload.identityType !== "CUSTOMER" && payload.identityType !== "STAFF") ||
+      (payload.identityType !== undefined && payload.identityType !== "CUSTOMER" && payload.identityType !== "STAFF") ||
       !Array.isArray(payload.roles) ||
       !Array.isArray(payload.permissions)
     ) {
@@ -69,7 +69,7 @@ export function authenticate(
 
     req.user = {
       id: payload.sub,
-      identityType: payload.identityType,
+      identityType: payload.identityType ?? "CUSTOMER",
       roles: payload.roles.filter(
         (role): role is string =>
           typeof role === "string",
