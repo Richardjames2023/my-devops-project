@@ -3,7 +3,8 @@ import request from "supertest";
 import jwt from "jsonwebtoken";
 
 const mocks = vi.hoisted(() => ({
-  allocatePackage: vi.fn(),\n  listReadyOrders: vi.fn(),
+  allocatePackage: vi.fn(),
+  listReadyOrders: vi.fn(),
 }));
 
 vi.mock("../src/modules/fulfillment/fulfillment.service", async (importOriginal) => {
@@ -28,7 +29,8 @@ const orderItemId = "b4e7e6d2-2b5f-4c55-9b30-3c9c4f3b2a22";
 describe("package allocation HTTP endpoint", () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.listReadyOrders.mockResolvedValue([]);\n    mocks.allocatePackage.mockResolvedValue({
+    mocks.listReadyOrders.mockResolvedValue([]);
+    mocks.allocatePackage.mockResolvedValue({
       id: "c4e7e6d2-2b5f-4c55-9b30-3c9c4f3b2a33",
       fulfillmentId,
       status: "PENDING",
