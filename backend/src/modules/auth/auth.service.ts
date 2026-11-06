@@ -97,6 +97,7 @@ export async function loginUser(input: LoginInput) {
 
   const accessToken = generateAccessToken({
     sub: user.id,
+    identityType: "CUSTOMER",
     roles,
     permissions,
   });
