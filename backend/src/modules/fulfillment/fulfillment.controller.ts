@@ -19,6 +19,15 @@ const fulfillmentIdSchema = z.object({
   fulfillmentId: z.uuid("Invalid fulfillment ID"),
 });
 
+export async function listReady(req: AuthenticatedRequest, res: Response): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+  const orders = await listReadyOrders();
+  res.status(200).json({ orders });
+}
+
 export async function create(req: AuthenticatedRequest, res: Response): Promise<void> {
   const result = createFulfillmentSchema.safeParse(req.body);
   if (!result.success) {
