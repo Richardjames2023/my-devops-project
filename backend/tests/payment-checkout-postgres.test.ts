@@ -922,6 +922,15 @@ describe("PostgreSQL checkout payment initialization", () => {
         fixture.userId,
       );
 
+      // Pin the row safely in the future so this test remains deterministic
+      // even when the application host and PostgreSQL clocks are skewed.
+      await pool.query(
+        `UPDATE payments
+         SET "createdAt" = NOW() + INTERVAL '1 minute'
+         WHERE id = $1`,
+        [initialized.payment.id],
+      );
+
       const result = await reconcileStalePendingPayment(initialized.payment.id);
 
       expect(result).toMatchObject({
