@@ -14,6 +14,7 @@ import {
   markPaymentSuccessful,
   markGuestPaymentSuccessful,
   reconcileUnknownPayment,
+  listStalePendingPayments,
   reconcileStalePendingPayment,
 } from "./payment.service";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -229,6 +230,35 @@ export async function reconcileUnknown(
       ? "Unknown payment was reconciled using Paystack's verified transaction status."
       : "Paystack has not returned a terminal transaction status. The payment and inventory reservation remain unchanged.",
     ...result,
+  });
+}
+
+export async function listStalePending(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const queryResult = z
+    .object({
+      limit: z.coerce.number().int().min(1).max(500).optional(),
+    })
+    .safeParse(req.query);
+
+  if (!queryResult.success) {
+    res.status(400).json({ message: "Invalid stale payment list limit" });
+    return;
+  }
+
+  const payments = await listStalePendingPayments(queryResult.data.limit);
+
+  res.status(200).json({
+    message: "Stale pending Paystack payments retrieved successfully",
+    count: payments.length,
+    payments,
   });
 }
 
