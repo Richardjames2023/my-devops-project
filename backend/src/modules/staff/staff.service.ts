@@ -449,6 +449,18 @@ export async function updateStaffAccountRoles(
       throw new AppError("You cannot change your own staff roles", 403);
     }
     const previousRoles = target.roles.map(({ role }) => role.name);
+    if (target.status === "ACTIVE" && previousRoles.includes("BUSINESS_OWNER") && !roles.some(({ name }) => name === "BUSINESS_OWNER")) {
+      const otherActiveOwners = await tx.staffAccountRole.count({
+        where: {
+          role: { name: "BUSINESS_OWNER" },
+          staffAccountId: { not: staffId },
+          staffAccount: { status: "ACTIVE" },
+        },
+      });
+      if (otherActiveOwners === 0) {
+        throw new AppError("The last active business owner cannot lose the BUSINESS_OWNER role", 409);
+      }
+    }
     await tx.staffAccountRole.deleteMany({ where: { staffAccountId: staffId } });
     await tx.staffAccountRole.createMany({
       data: roles.map((role) => ({ staffAccountId: staffId, roleId: role.id, assignedByStaffAccountId: actorId })),
@@ -478,9 +490,24 @@ export async function updateStaffAccountStatus(
 ) {
   if (actorId === staffId && status !== "ACTIVE") throw new AppError("You cannot suspend or deactivate your own account", 403);
   return prisma.$transaction(async (tx) => {
-    const target = await tx.staffAccount.findUnique({ where: { id: staffId } });
+    const target = await tx.staffAccount.findUnique({
+      where: { id: staffId },
+      include: { roles: { include: { role: { select: { name: true } } } } },
+    });
     if (!target) throw new AppError("Staff account not found", 404);
     if (target.status === "PENDING_SETUP") throw new AppError("Pending staff setup must be completed through an invitation", 409);
+    if (target.status === "ACTIVE" && status !== "ACTIVE" && target.roles.some(({ role }) => role.name === "BUSINESS_OWNER")) {
+      const otherActiveOwners = await tx.staffAccountRole.count({
+        where: {
+          role: { name: "BUSINESS_OWNER" },
+          staffAccountId: { not: staffId },
+          staffAccount: { status: "ACTIVE" },
+        },
+      });
+      if (otherActiveOwners === 0) {
+        throw new AppError("The last active business owner cannot be suspended or deactivated", 409);
+      }
+    }
     const updated = await tx.staffAccount.update({ where: { id: staffId }, data: { status } });
     if (status !== "ACTIVE") {
       await tx.staffRefreshToken.updateMany({
