@@ -406,6 +406,19 @@ export async function getStaffProfile(staffId: string) {
   };
 }
 
+export async function listStaffRoles() {
+  return prisma.role.findMany({
+    where: { name: { not: "CUSTOMER" } },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      permissions: { select: { permission: { select: { name: true } } } },
+    },
+    orderBy: { name: "asc" },
+  });
+}
+
 export async function listStaffAccounts() {
   return prisma.staffAccount.findMany({
     select: {
