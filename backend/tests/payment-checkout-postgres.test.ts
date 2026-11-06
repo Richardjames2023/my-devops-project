@@ -38,7 +38,13 @@ process.env.DATABASE_URL = databaseUrl;
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
 
-const { createPayment, createGuestPayment, disconnectDatabase } =
+const {
+  createPayment,
+  createGuestPayment,
+  markPaymentSuccessful,
+  markGuestPaymentSuccessful,
+  disconnectDatabase,
+} =
   await import("../src/modules/payment/payment.service").then(
     async (service) => {
       const database = await import("../src/infrastructure/prisma/client");
@@ -273,6 +279,189 @@ describe("PostgreSQL checkout payment initialization", () => {
     } finally {
       await cleanupFixture(fixture);
       paystackMocks.initialize.mockClear();
+    }
+  });
+
+
+  it("verifies a successful authenticated payment and finalizes the order inventory exactly once", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const initialized = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      paystackMocks.verify.mockResolvedValue({
+        id: 987654321,
+        status: "success",
+        reference: initialized.payment.reference,
+        amount: 500100,
+        currency: "NGN",
+        paid_at: new Date().toISOString(),
+      });
+
+      const result = await markPaymentSuccessful(
+        initialized.payment.id,
+        fixture.userId,
+      );
+
+      expect(paystackMocks.verify).toHaveBeenCalledOnce();
+      expect(paystackMocks.verify).toHaveBeenCalledWith(
+        initialized.payment.reference,
+      );
+      expect(result.payment.status).toBe("SUCCESS");
+      expect(result.order.status).toBe("CONFIRMED");
+
+      const inventory = await pool.query(
+        `SELECT quantity, "reservedQuantity", "quarantineQuantity"
+         FROM inventory WHERE id = $1`,
+        [fixture.inventoryId],
+      );
+      expect(inventory.rows[0]).toMatchObject({
+        quantity: 8,
+        reservedQuantity: 1,
+        quarantineQuantity: 1,
+      });
+
+      const reservation = await pool.query(
+        `SELECT status, quantity
+         FROM inventory_reservations WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      expect(reservation.rows).toHaveLength(1);
+      expect(reservation.rows[0]).toMatchObject({
+        status: "CONFIRMED",
+        quantity: 2,
+      });
+
+      const movements = await pool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM stock_movements
+         WHERE "inventoryId" = $1 AND reference = $2 AND type = 'SOLD'`,
+        [fixture.inventoryId, fixture.orderId],
+      );
+      expect(movements.rows[0].count).toBe(1);
+
+      // Re-verification must not deduct stock or create another movement.
+      await markPaymentSuccessful(initialized.payment.id, fixture.userId);
+      const movementCount = await pool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM stock_movements
+         WHERE "inventoryId" = $1 AND reference = $2 AND type = 'SOLD'`,
+        [fixture.inventoryId, fixture.orderId],
+      );
+      expect(movementCount.rows[0].count).toBe(1);
+      expect(paystackMocks.verify).toHaveBeenCalledOnce();
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
+  it("does not confirm an order or release inventory when Paystack reports an unsuccessful verification", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const initialized = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      paystackMocks.verify.mockResolvedValue({
+        id: 987654322,
+        status: "failed",
+        reference: initialized.payment.reference,
+        amount: 500100,
+        currency: "NGN",
+      });
+
+      await expect(
+        markPaymentSuccessful(initialized.payment.id, fixture.userId),
+      ).rejects.toMatchObject({ statusCode: 400 });
+
+      const payment = await pool.query(
+        `SELECT status FROM payments WHERE id = $1`,
+        [initialized.payment.id],
+      );
+      const order = await pool.query(
+        `SELECT status FROM orders WHERE id = $1`,
+        [fixture.orderId],
+      );
+      const inventory = await pool.query(
+        `SELECT quantity, "reservedQuantity"
+         FROM inventory WHERE id = $1`,
+        [fixture.inventoryId],
+      );
+      const reservation = await pool.query(
+        `SELECT status FROM inventory_reservations WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+
+      expect(payment.rows[0].status).toBe("PENDING");
+      expect(order.rows[0].status).toBe("PENDING");
+      expect(inventory.rows[0]).toMatchObject({
+        quantity: 10,
+        reservedQuantity: 3,
+      });
+      expect(reservation.rows[0].status).toBe("PENDING");
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
+  it("requires the guest access token to verify and complete a guest payment", async () => {
+    const fixture = await createFixture(true);
+
+    try {
+      const initialized = await createGuestPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.guestAccessToken,
+      );
+
+      paystackMocks.verify.mockResolvedValue({
+        id: 987654323,
+        status: "success",
+        reference: initialized.payment.reference,
+        amount: 500100,
+        currency: "NGN",
+        paid_at: new Date().toISOString(),
+      });
+
+      await expect(
+        markGuestPaymentSuccessful(
+          initialized.payment.id,
+          randomUUID().replace(/-/g, "").padEnd(64, "c"),
+        ),
+      ).rejects.toMatchObject({ statusCode: 403 });
+
+      expect(paystackMocks.verify).not.toHaveBeenCalled();
+
+      const result = await markGuestPaymentSuccessful(
+        initialized.payment.id,
+        fixture.guestAccessToken,
+      );
+
+      expect(result.payment.status).toBe("SUCCESS");
+      expect(result.order.status).toBe("CONFIRMED");
+      expect(paystackMocks.verify).toHaveBeenCalledOnce();
+
+      const inventory = await pool.query(
+        `SELECT quantity, "reservedQuantity"
+         FROM inventory WHERE id = $1`,
+        [fixture.inventoryId],
+      );
+      expect(inventory.rows[0]).toMatchObject({
+        quantity: 8,
+        reservedQuantity: 1,
+      });
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
     }
   });
 
