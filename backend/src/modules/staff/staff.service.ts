@@ -92,6 +92,10 @@ export async function createStaffInvitation(
   if (!input.roleIds.length) throw new AppError("At least one staff role is required", 400);
 
   const { roles } = await getDelegableRoles(actorId, input.roleIds);
+  await prisma.staffInvitation.updateMany({
+    where: { email, status: "PENDING", expiresAt: { lte: new Date() } },
+    data: { status: "EXPIRED" },
+  });
   const existingStaff = await prisma.staffAccount.findUnique({ where: { email }, select: { id: true, status: true } });
   if (existingStaff && existingStaff.status !== "PENDING_SETUP") {
     throw new AppError("A staff account already exists for this email address", 409);
