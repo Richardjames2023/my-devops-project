@@ -413,7 +413,7 @@ export async function receiveReturnRequest(
 
 async function inspectReturnTransaction(
   returnRequestId: string,
-  inspectedByUserId: string,
+  inspectedByStaffAccountId: string,
   input: InspectReturnRequestInput,
 ) {
   return prisma.$transaction(
@@ -542,7 +542,7 @@ async function inspectReturnTransaction(
         await tx.returnItemInspection.create({
           data: {
             returnItemId: returnItem.id,
-            inspectedByUserId,
+            inspectedByStaffAccountId,
             inspectedQuantity: inputItem.inspectedQuantity,
             acceptedQuantity: inputItem.acceptedQuantity,
             rejectedQuantity: inputItem.rejectedQuantity,
@@ -577,7 +577,7 @@ async function inspectReturnTransaction(
               notes:
                 `Accepted ${inputItem.acceptedQuantity} unit(s) of ` +
                 `${returnItem.orderItem.productName}. ` +
-                `Inspector user ID: ${inspectedByUserId}.`,
+                `Inspector staff account ID: ${inspectedByStaffAccountId}.`,
             },
           });
         }
@@ -628,8 +628,8 @@ async function inspectReturnTransaction(
               inspections: {
                 orderBy: { createdAt: "desc" },
                 include: {
-                  inspectedBy: {
-                    select: { id: true, email: true },
+                  inspectedByStaff: {
+                    select: { id: true, email: true, firstName: true, lastName: true },
                   },
                 },
               },
@@ -646,14 +646,14 @@ async function inspectReturnTransaction(
 
 export async function inspectReturnRequest(
   returnRequestId: string,
-  inspectedByUserId: string,
+  inspectedByStaffAccountId: string,
   input: InspectReturnRequestInput,
 ) {
   for (let attempt = 1; attempt <= MAX_TRANSACTION_RETRIES; attempt++) {
     try {
       return await inspectReturnTransaction(
         returnRequestId,
-        inspectedByUserId,
+        inspectedByStaffAccountId,
         input,
       );
     } catch (error) {
