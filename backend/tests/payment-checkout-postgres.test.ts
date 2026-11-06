@@ -176,6 +176,8 @@ async function createFixture(guest = false): Promise<Fixture> {
 }
 
 async function cleanupFixture(fixture: Fixture): Promise<void> {
+  // Payments reference orders with RESTRICT, so remove them before the order.
+  await pool.query(`DELETE FROM payments WHERE "orderId" = $1`, [fixture.orderId]);
   await pool.query(`DELETE FROM orders WHERE id = $1`, [fixture.orderId]);
   await pool.query(`DELETE FROM inventory WHERE id = $1`, [fixture.inventoryId]);
   await pool.query(`DELETE FROM product_variants WHERE id = $1`, [fixture.variantId]);
