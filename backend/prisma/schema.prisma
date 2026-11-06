@@ -72,7 +72,6 @@ model RefreshToken {
 
 model StaffAccount {
   id                                      String                           @id @default(uuid()) @db.Uuid
-  legacyUserId                            String?                          @unique @db.Uuid
   email                                   String                           @unique
   firstName                               String
   lastName                                String
