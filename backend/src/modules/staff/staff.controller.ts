@@ -5,7 +5,7 @@ import {
   staffInvitationSchema, updateInvitationRolesSchema, updateStaffRolesSchema, updateStaffStatusSchema,
 } from "./staff.validation";
 import {
-  createStaffInvitation, listStaffAccounts, revokeStaffInvitation,
+  createStaffInvitation, listStaffAccounts, listStaffInvitations, resendStaffInvitation, revokeStaffInvitation,
   updateStaffAccountRoles, updateStaffAccountStatus, updateStaffInvitationRoles,
 } from "./staff.service";
 
@@ -66,4 +66,19 @@ export async function updateStatus(req: AuthenticatedRequest, res: Response): Pr
   if (!params.success || !body.success) { res.status(400).json({ message: "Validation failed", errors: { ...(!params.success ? z.flattenError(params.error).fieldErrors : {}), ...(!body.success ? z.flattenError(body.error).fieldErrors : {}) } }); return; }
   const staff = await updateStaffAccountStatus(actorId, params.data.staffId, body.data.status, metadata(req));
   res.status(200).json({ message: "Staff status updated", staff });
+}
+
+export async function listInvitations(_req: AuthenticatedRequest, res: Response): Promise<void> {
+  res.status(200).json({ invitations: await listStaffInvitations() });
+}
+export async function resendInvitation(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const actorId = actor(req, res); if (!actorId) return;
+  const params = z.object({ invitationId: z.uuid() }).safeParse(req.params);
+  if (!params.success) { res.status(400).json({ message: "Validation failed", errors: z.flattenError(params.error).fieldErrors }); return; }
+  const result = await resendStaffInvitation(actorId, params.data.invitationId, metadata(req));
+  res.status(200).json({
+    message: "Invitation token rotated. Deliver the new token through the configured trusted email channel.",
+    invitation: result.invitation,
+    invitationToken: result.invitationToken,
+  });
 }
