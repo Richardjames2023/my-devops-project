@@ -131,6 +131,48 @@ export async function createStaffInvitation(
   return { invitation, invitationToken: token };
 }
 
+export async function listStaffInvitations() {
+  await prisma.staffInvitation.updateMany({
+    where: { status: "PENDING", expiresAt: { lte: new Date() } },
+    data: { status: "EXPIRED" },
+  });
+  return prisma.staffInvitation.findMany({
+    include: {
+      roles: { include: { role: { select: { id: true, name: true } } } },
+      createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function resendStaffInvitation(
+  actorId: string, invitationId: string, metadata: RequestMetadata = {},
+) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const updated = await prisma.$transaction(async (tx) => {
+    const invitation = await tx.staffInvitation.findUnique({ where: { id: invitationId } });
+    if (!invitation) throw new AppError("Staff invitation not found", 404);
+    if (invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
+      throw new AppError("Only unexpired pending invitations can be resent", 409);
+    }
+    const result = await tx.staffInvitation.update({
+      where: { id: invitationId },
+      data: { tokenHash: hashRefreshToken(token), expiresAt: expiryFromDays(invitationDaysDefault) },
+    });
+    await createAuditLog(tx, {
+      staffAccountId: actorId,
+      action: "STAFF_INVITATION_RESENT",
+      entity: "StaffInvitation",
+      entityId: invitationId,
+      oldValues: { expiresAt: invitation.expiresAt.toISOString() },
+      newValues: { expiresAt: result.expiresAt.toISOString() },
+      ...metadata,
+    });
+    return result;
+  });
+  return { invitation: updated, invitationToken: token };
+}
+
 export async function updateStaffInvitationRoles(
   actorId: string,
   invitationId: string,
