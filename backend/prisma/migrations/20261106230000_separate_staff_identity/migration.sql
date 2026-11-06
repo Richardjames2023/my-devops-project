@@ -50,6 +50,8 @@ CREATE UNIQUE INDEX "staff_invitations_tokenHash_key" ON "staff_invitations"("to
 CREATE INDEX "staff_invitations_email_status_idx" ON "staff_invitations"("email", "status");
 CREATE INDEX "staff_invitations_expiresAt_status_idx" ON "staff_invitations"("expiresAt", "status");
 CREATE INDEX "staff_invitations_createdByStaffAccountId_idx" ON "staff_invitations"("createdByStaffAccountId");
+CREATE UNIQUE INDEX "staff_invitations_one_pending_email_key"
+ON "staff_invitations"("email") WHERE "status" = 'PENDING';
 
 CREATE TABLE "staff_invitation_roles" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
