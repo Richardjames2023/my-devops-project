@@ -59,6 +59,7 @@ const {
         markPaymentSuccessful: service.markPaymentSuccessful,
         markGuestPaymentSuccessful: service.markGuestPaymentSuccessful,
         reconcileUnknownPayment: service.reconcileUnknownPayment,
+        reconcileStalePendingPayment: service.reconcileStalePendingPayment,
         expireStaleInventoryReservations:
           inventory.expireStaleInventoryReservations,
         disconnectDatabase: database.disconnectDatabase,
