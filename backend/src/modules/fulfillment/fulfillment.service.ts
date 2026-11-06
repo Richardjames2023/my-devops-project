@@ -115,7 +115,7 @@ export async function allocatePackage(
     await tx.fulfillment.update({
       where: { id: fulfillmentId },
       data: {
-        status: "PROCESSING",
+        status: fulfillment.status === "PARTIALLY_FULFILLED" ? "PARTIALLY_FULFILLED" : "PROCESSING",
         ...(fulfillment.status === "PENDING" ? { startedAt: new Date() } : {}),
       },
     });
