@@ -5,7 +5,7 @@ import {
   createDeliveryAttemptController,
 } from "./delivery.controller";
 import { authenticate } from "../../common/middleware/authenticate";
-import { authorize } from "../../common/middleware/authorize";
+import { authorize, requireCustomer } from "../../common/middleware/authorize";
 import { guestOrderRetrievalLimiter } from "../../common/middleware/rate-limit.middleware";
 import {
   updateTracking,
@@ -16,7 +16,7 @@ import {
 const router = Router();
 
 // Customer tracking: ownership is checked against the authenticated user.
-router.get("/orders/:orderId/tracking", authenticate, getCustomerTracking);
+router.get("/orders/:orderId/tracking", authenticate, requireCustomer, getCustomerTracking);
 
 // Guest tracking requires the original high-entropy guest order token.
 router.get(
