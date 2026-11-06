@@ -1,4 +1,5 @@
-import { Prisma, ProductReviewStatus } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { ProductReviewStatus } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type {
