@@ -149,31 +149,39 @@ export async function updateOwnProductReview(
   productId: string,
   input: CreateProductReviewInput,
 ) {
-  const existing = await prisma.productReview.findUnique({
-    where: { userId_productId: { userId, productId } },
-    select: { id: true },
-  });
-  if (!existing) throw new AppError("Review not found", 404);
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`
+      SELECT id FROM product_reviews
+      WHERE "userId" = ${userId}::uuid AND "productId" = ${productId}::uuid
+      FOR UPDATE
+    `;
 
-  return prisma.productReview.update({
-    where: { id: existing.id },
-    data: {
-      rating: input.rating,
-      title: input.title?.trim() || null,
-      comment: input.comment.trim(),
-      // Any edit must be reviewed again before it is publicly visible.
-      status: "PENDING",
-    },
-    select: {
-      id: true,
-      productId: true,
-      rating: true,
-      title: true,
-      comment: true,
-      status: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    const existing = await tx.productReview.findUnique({
+      where: { userId_productId: { userId, productId } },
+      select: { id: true },
+    });
+    if (!existing) throw new AppError("Review not found", 404);
+
+    return tx.productReview.update({
+      where: { id: existing.id },
+      data: {
+        rating: input.rating,
+        title: input.title?.trim() || null,
+        comment: input.comment.trim(),
+        // Any edit must be reviewed again before it is publicly visible.
+        status: "PENDING",
+      },
+      select: {
+        id: true,
+        productId: true,
+        rating: true,
+        title: true,
+        comment: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
   });
 }
 
@@ -276,7 +284,16 @@ export async function moderateProductReview(
 
     const review = await tx.productReview.findUnique({
       where: { id: reviewId },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        productId: true,
+        userId: true,
+        rating: true,
+        title: true,
+        comment: true,
+        status: true,
+        updatedAt: true,
+      },
     });
     if (!review) throw new AppError("Review not found", 404);
 
