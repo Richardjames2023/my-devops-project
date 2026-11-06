@@ -1267,6 +1267,42 @@ export async function reconcileUnknownPayment(paymentId: string) {
 }
 
 /**
+ * Lists aged Paystack payments that still hold pending orders for admin review.
+ */
+export async function listStalePendingPayments(limit = 100) {
+  const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);
+  const staleBefore = new Date(
+    Date.now() - STALE_PENDING_PAYMENT_GRACE_PERIOD_MS,
+  );
+
+  return prisma.payment.findMany({
+    where: {
+      provider: "PAYSTACK",
+      status: "PENDING",
+      createdAt: { lte: staleBefore },
+      order: {
+        is: { status: "PENDING" },
+      },
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: boundedLimit,
+    select: {
+      id: true,
+      orderId: true,
+      reference: true,
+      amount: true,
+      currency: true,
+      createdAt: true,
+      order: {
+        select: {
+          orderNumber: true,
+        },
+      },
+    },
+  });
+}
+
+/**
  * Claims an aged PENDING payment for provider reconciliation.
  *
  * A pending checkout is not expired merely because its inventory reservation
