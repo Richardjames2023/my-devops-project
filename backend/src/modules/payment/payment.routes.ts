@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../../common/middleware/authenticate";
-import { authorize } from "../../common/middleware/authorize";
+import { authorize, requireCustomer } from "../../common/middleware/authorize";
 import {
   create,
   createGuest,
@@ -22,7 +22,7 @@ const router = Router();
 router.post(
   "/",
   authenticate,
-  authorize("orders.create"),
+  requireCustomer,
   create,
 );
 
