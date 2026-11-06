@@ -2,9 +2,11 @@ import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { JWT_ACCESS_SECRET } from "../../config/auth";
 import { AppError } from "../errors/AppError";
+import type { AuthIdentityType } from "../utils/jwt";
 
 export interface AuthenticatedUser {
   id: string;
+  identityType: AuthIdentityType;
   roles: string[];
   permissions: string[];
 }
@@ -52,6 +54,7 @@ export function authenticate(
       typeof payload !== "object" ||
       payload === null ||
       typeof payload.sub !== "string" ||
+      (payload.identityType !== "CUSTOMER" && payload.identityType !== "STAFF") ||
       !Array.isArray(payload.roles) ||
       !Array.isArray(payload.permissions)
     ) {
@@ -66,6 +69,7 @@ export function authenticate(
 
     req.user = {
       id: payload.sub,
+      identityType: payload.identityType,
       roles: payload.roles.filter(
         (role): role is string =>
           typeof role === "string",
