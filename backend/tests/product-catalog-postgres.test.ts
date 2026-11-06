@@ -78,7 +78,7 @@ async function createFixture(): Promise<Fixture> {
     await pool.query(
       `INSERT INTO products
        (id, "categoryId", name, slug, "basePrice", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, 75, NOW(), NOW())`,
+       VALUES ($1, $2, $3, $4, 200, NOW(), NOW())`,
       [
         fixture.productIds[1],
         fixture.categoryId,
@@ -262,12 +262,50 @@ describe("PostgreSQL product catalog queries", () => {
         (item) => item.id === fixture.productIds[1],
       );
 
-      expect(basePriceProduct?.priceFrom).toBe("75.00");
-      expect(basePriceProduct?.priceTo).toBe("75.00");
+      expect(basePriceProduct?.priceFrom).toBe("200.00");
+      expect(basePriceProduct?.priceTo).toBe("200.00");
       expect(basePriceProduct?.variants).toEqual([]);
       expect(
         result.items.some((item) => item.id === fixture.productIds[2]),
       ).toBe(false);
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("sorts by the lowest active variant price and falls back to basePrice", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const ascending = await listCatalogProducts({
+        sort: "price_asc",
+        page: 1,
+        limit: 12,
+      });
+      const descending = await listCatalogProducts({
+        sort: "price_desc",
+        page: 1,
+        limit: 12,
+      });
+
+      const ascendingIds = ascending.items
+        .filter((item) => fixture.productIds.slice(0, 2).includes(item.id))
+        .map((item) => item.id);
+      const descendingIds = descending.items
+        .filter((item) => fixture.productIds.slice(0, 2).includes(item.id))
+        .map((item) => item.id);
+
+      // The variant product has basePrice 300 but its lowest active variant is 100.
+      // The base-price-only product costs 200, so effective-price ordering differs
+      // from sorting directly on products.basePrice.
+      expect(ascendingIds).toEqual([
+        fixture.productIds[0],
+        fixture.productIds[1],
+      ]);
+      expect(descendingIds).toEqual([
+        fixture.productIds[1],
+        fixture.productIds[0],
+      ]);
     } finally {
       await cleanupFixture(fixture);
     }
