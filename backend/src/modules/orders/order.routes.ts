@@ -5,6 +5,7 @@ import {
   getGuest,
   cancel,
   adminCancel,
+  listMine,
 } from "./order.controller";
 import {
   guestOrderLimiter,
@@ -15,6 +16,9 @@ import { authorize } from "../../common/middleware/authorize";
 import { requireGuestSession } from "../guest-session/guest-session.middleware";
 
 const router = Router();
+
+// Registered customer order history
+router.get("/", authenticate, listMine);
 
 // Registered customer checkout
 router.post(
