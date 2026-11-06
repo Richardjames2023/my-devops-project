@@ -690,6 +690,7 @@ describe("PostgreSQL checkout payment initialization", () => {
 
       const expiry = await expireStaleInventoryReservations({
         now: new Date(),
+        orderIds: [fixture.orderId],
       });
       expect(expiry.expired).toBe(1);
 
