@@ -45,6 +45,7 @@ const {
   markGuestPaymentSuccessful,
   reconcileUnknownPayment,
   reconcileStalePendingPayment,
+  listStalePendingPayments,
   expireStaleInventoryReservations,
   disconnectDatabase,
 } =
@@ -60,6 +61,7 @@ const {
         markGuestPaymentSuccessful: service.markGuestPaymentSuccessful,
         reconcileUnknownPayment: service.reconcileUnknownPayment,
         reconcileStalePendingPayment: service.reconcileStalePendingPayment,
+        listStalePendingPayments: service.listStalePendingPayments,
         expireStaleInventoryReservations:
           inventory.expireStaleInventoryReservations,
         disconnectDatabase: database.disconnectDatabase,
@@ -746,6 +748,11 @@ describe("PostgreSQL checkout payment initialization", () => {
          SET "createdAt" = NOW() - INTERVAL '20 minutes'
          WHERE id = $1`,
         [initialized.payment.id],
+      );
+
+      const staleQueue = await listStalePendingPayments();
+      expect(staleQueue.map((payment) => payment.id)).toContain(
+        initialized.payment.id,
       );
 
       paystackMocks.verify.mockResolvedValue({
