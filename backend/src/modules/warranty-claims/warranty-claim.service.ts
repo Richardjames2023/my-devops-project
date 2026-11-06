@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { Prisma, WarrantyStatus } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
@@ -68,7 +69,7 @@ export async function createWarrantyClaim(userId: string, input: CreateWarrantyC
 }
 
 function cryptoRandomSuffix(): string {
-  return Math.random().toString(36).slice(2, 8).toUpperCase();
+  return randomBytes(4).toString("hex").toUpperCase();
 }
 
 export async function listCustomerWarrantyClaims(userId: string, query: WarrantyClaimListQuery) {
