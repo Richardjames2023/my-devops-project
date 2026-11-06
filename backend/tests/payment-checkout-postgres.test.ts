@@ -44,6 +44,7 @@ const {
   markPaymentSuccessful,
   markGuestPaymentSuccessful,
   reconcileUnknownPayment,
+  reconcileStalePendingPayment,
   expireStaleInventoryReservations,
   disconnectDatabase,
 } =
@@ -722,6 +723,264 @@ describe("PostgreSQL checkout payment initialization", () => {
         quantity: 10,
         reservedQuantity: 3,
       });
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
+
+  it("reconciles an aged PENDING payment and releases stock only after Paystack confirms failure", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const initialized = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      await pool.query(
+        `UPDATE payments
+         SET "createdAt" = NOW() - INTERVAL '20 minutes'
+         WHERE id = $1`,
+        [initialized.payment.id],
+      );
+
+      paystackMocks.verify.mockResolvedValue({
+        id: 987654340,
+        status: "failed",
+        reference: initialized.payment.reference,
+        amount: 500100,
+        currency: "NGN",
+      });
+
+      const result = await reconcileStalePendingPayment(initialized.payment.id);
+
+      expect(result).toMatchObject({
+        reconciled: true,
+        status: "FAILED",
+      });
+      expect(paystackMocks.verify).toHaveBeenCalledOnce();
+
+      const payment = await pool.query(
+        `SELECT status FROM payments WHERE id = $1`,
+        [initialized.payment.id],
+      );
+      const reservation = await pool.query(
+        `SELECT status FROM inventory_reservations WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      const inventory = await pool.query(
+        `SELECT "reservedQuantity" FROM inventory WHERE id = $1`,
+        [fixture.inventoryId],
+      );
+
+      expect(payment.rows[0].status).toBe("FAILED");
+      expect(reservation.rows[0].status).toBe("RELEASED");
+      expect(inventory.rows[0].reservedQuantity).toBe(1);
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
+  it("keeps an aged PENDING payment and its reservation protected when Paystack is inconclusive", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const initialized = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      await pool.query(
+        `UPDATE payments
+         SET "createdAt" = NOW() - INTERVAL '20 minutes'
+         WHERE id = $1`,
+        [initialized.payment.id],
+      );
+
+      paystackMocks.verify.mockResolvedValue({
+        id: 987654341,
+        status: "ongoing",
+        reference: initialized.payment.reference,
+        amount: 500100,
+        currency: "NGN",
+      });
+
+      const result = await reconcileStalePendingPayment(initialized.payment.id);
+
+      expect(result).toMatchObject({
+        reconciled: false,
+        status: "ongoing",
+      });
+      expect(paystackMocks.verify).toHaveBeenCalledOnce();
+
+      const payment = await pool.query(
+        `SELECT status FROM payments WHERE id = $1`,
+        [initialized.payment.id],
+      );
+      const reservation = await pool.query(
+        `SELECT status FROM inventory_reservations WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      const inventory = await pool.query(
+        `SELECT "reservedQuantity" FROM inventory WHERE id = $1`,
+        [fixture.inventoryId],
+      );
+
+      expect(payment.rows[0].status).toBe("INITIALIZATION_UNKNOWN");
+      expect(reservation.rows[0].status).toBe("PENDING");
+      expect(inventory.rows[0].reservedQuantity).toBe(3);
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
+  it("finalizes an aged PENDING payment when Paystack confirms success", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const initialized = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      await pool.query(
+        `UPDATE payments
+         SET "createdAt" = NOW() - INTERVAL '20 minutes'
+         WHERE id = $1`,
+        [initialized.payment.id],
+      );
+
+      paystackMocks.verify.mockResolvedValue({
+        id: 987654342,
+        status: "success",
+        reference: initialized.payment.reference,
+        amount: 500100,
+        currency: "NGN",
+        paid_at: new Date().toISOString(),
+      });
+
+      const result = await reconcileStalePendingPayment(initialized.payment.id);
+
+      expect(result).toMatchObject({
+        reconciled: true,
+        status: "SUCCESS",
+      });
+      expect(paystackMocks.verify).toHaveBeenCalledOnce();
+
+      const payment = await pool.query(
+        `SELECT status FROM payments WHERE id = $1`,
+        [initialized.payment.id],
+      );
+      const order = await pool.query(
+        `SELECT status FROM orders WHERE id = $1`,
+        [fixture.orderId],
+      );
+      const reservation = await pool.query(
+        `SELECT status FROM inventory_reservations WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      const inventory = await pool.query(
+        `SELECT quantity, "reservedQuantity" FROM inventory WHERE id = $1`,
+        [fixture.inventoryId],
+      );
+
+      expect(payment.rows[0].status).toBe("SUCCESS");
+      expect(order.rows[0].status).toBe("CONFIRMED");
+      expect(reservation.rows[0].status).toBe("CONFIRMED");
+      expect(inventory.rows[0]).toMatchObject({
+        quantity: 8,
+        reservedQuantity: 1,
+      });
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
+  it("does not contact Paystack or change a PENDING payment before the stale threshold", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const initialized = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      const result = await reconcileStalePendingPayment(initialized.payment.id);
+
+      expect(result).toMatchObject({
+        reconciled: false,
+        status: "PENDING",
+        stale: false,
+      });
+      expect(paystackMocks.verify).not.toHaveBeenCalled();
+
+      const payment = await pool.query(
+        `SELECT status FROM payments WHERE id = $1`,
+        [initialized.payment.id],
+      );
+      const reservation = await pool.query(
+        `SELECT status FROM inventory_reservations WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+
+      expect(payment.rows[0].status).toBe("PENDING");
+      expect(reservation.rows[0].status).toBe("PENDING");
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
+  it("retains the reservation when Paystack verification fails during stale pending reconciliation", async () => {
+    const fixture = await createFixture();
+
+    try {
+      const initialized = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      await pool.query(
+        `UPDATE payments
+         SET "createdAt" = NOW() - INTERVAL '20 minutes'
+         WHERE id = $1`,
+        [initialized.payment.id],
+      );
+
+      paystackMocks.verify.mockRejectedValue(
+        new Error("Paystack verification timed out"),
+      );
+
+      await expect(
+        reconcileStalePendingPayment(initialized.payment.id),
+      ).rejects.toThrow("Paystack verification timed out");
+
+      const payment = await pool.query(
+        `SELECT status FROM payments WHERE id = $1`,
+        [initialized.payment.id],
+      );
+      const reservation = await pool.query(
+        `SELECT status FROM inventory_reservations WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      const inventory = await pool.query(
+        `SELECT "reservedQuantity" FROM inventory WHERE id = $1`,
+        [fixture.inventoryId],
+      );
+
+      expect(payment.rows[0].status).toBe("INITIALIZATION_UNKNOWN");
+      expect(reservation.rows[0].status).toBe("PENDING");
+      expect(inventory.rows[0].reservedQuantity).toBe(3);
     } finally {
       await cleanupFixture(fixture);
       paystackMocks.initialize.mockClear();
