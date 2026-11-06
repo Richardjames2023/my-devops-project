@@ -628,6 +628,9 @@ async function inspectReturnTransaction(
               inspections: {
                 orderBy: { createdAt: "desc" },
                 include: {
+                  inspectedBy: {
+                    select: { id: true, email: true, firstName: true, lastName: true },
+                  },
                   inspectedByStaff: {
                     select: { id: true, email: true, firstName: true, lastName: true },
                   },
