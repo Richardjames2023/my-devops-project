@@ -48,6 +48,7 @@ model User {
   refreshTokens                           RefreshToken[]
   returnItemInspections                   ReturnItemInspection[]           @relation("ReturnItemInspections")
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("PaymentInventoryReconciliationResolver")
+  productReviews                          ProductReview[]
 
   @@index([email])
   @@index([phone])
@@ -182,6 +183,7 @@ model Product {
   updatedAt        DateTime         @updatedAt
   images           ProductImage[]
   variants         ProductVariant[]
+  reviews          ProductReview[]
   category         Category         @relation(fields: [categoryId], references: [id])
 
   @@index([categoryId])
@@ -342,10 +344,34 @@ model OrderItem {
   packageItems      PackageItem[]
   returnItems       ReturnItem[]
   warrantyClaims    WarrantyClaim[]
+  productReviews    ProductReview[]
 
   @@index([orderId])
   @@index([productVariantId])
   @@map("order_items")
+}
+
+
+model ProductReview {
+  id          String              @id @default(uuid()) @db.Uuid
+  productId   String              @db.Uuid
+  userId      String              @db.Uuid
+  orderItemId String              @db.Uuid
+  rating      Int
+  title       String?
+  comment     String
+  status      ProductReviewStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  product     Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem           @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, productId])
+  @@index([productId, status, createdAt])
+  @@index([userId])
+  @@index([orderItemId])
+  @@map("product_reviews")
 }
 
 model Payment {
@@ -642,6 +668,12 @@ model PaymentInventoryReconciliation {
   @@index([status])
   @@index([resolvedByUserId])
   @@map("payment_inventory_reconciliations")
+}
+
+enum ProductReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum InventoryReconciliationStatus {
