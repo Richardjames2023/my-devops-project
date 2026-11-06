@@ -52,6 +52,8 @@ const {
       return {
         createPayment: service.createPayment,
         createGuestPayment: service.createGuestPayment,
+        markPaymentSuccessful: service.markPaymentSuccessful,
+        markGuestPaymentSuccessful: service.markGuestPaymentSuccessful,
         disconnectDatabase: database.disconnectDatabase,
       };
     },
