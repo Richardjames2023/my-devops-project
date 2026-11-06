@@ -6,6 +6,7 @@ import {
   getMe,
 } from "./auth.controller";
 import { authenticate } from "../../common/middleware/authenticate";
+import { requireCustomer } from "../../common/middleware/authorize";
 import {
   registrationLimiter,
   loginLimiter,
@@ -18,6 +19,6 @@ router.post("/register", registrationLimiter, register);
 router.post("/login", loginLimiter, login);
 router.post("/refresh", refreshLimiter, refresh);
 
-router.get("/me", authenticate, getMe);
+router.get("/me", authenticate, requireCustomer, getMe);
 
 export default router;
