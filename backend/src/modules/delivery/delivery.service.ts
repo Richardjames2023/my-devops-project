@@ -10,6 +10,11 @@ import { completeDelivery } from "./delivery-completion.service";
 
 export async function createDelivery(input: CreateDeliveryInput) {
   return prisma.$transaction(async (tx) => {
+    // Serialize delivery creation for a package; packageId is also unique on Delivery.
+    await tx.$queryRaw(
+      Prisma.sql`SELECT id FROM packages WHERE id = ${input.packageId}::uuid FOR UPDATE`,
+    );
+
     const pkg = await tx.package.findUnique({
       where: { id: input.packageId },
       include: {
@@ -91,13 +96,23 @@ export async function updateDeliveryStatus(
       return completeDelivery(tx, delivery.id, now);
     }
 
-    return tx.delivery.update({
+    const updatedDelivery = await tx.delivery.update({
       where: { id: delivery.id },
       data: {
         status,
         ...(status === "PICKED_UP" && { shippedAt: now }),
       },
     });
+
+    // Once the courier has the parcel moving, mirror that state on the package.
+    if (status === "IN_TRANSIT") {
+      await tx.package.update({
+        where: { id: delivery.packageId },
+        data: { status: "IN_TRANSIT" },
+      });
+    }
+
+    return updatedDelivery;
   });
 }
 
@@ -131,6 +146,13 @@ export async function createDeliveryAttempt(
 
     if (delivery.status === "DELIVERED") {
       throw new AppError("Cannot create an attempt for a delivered order", 400);
+    }
+
+    if (input.status === "SUCCESSFUL" && delivery.status !== "OUT_FOR_DELIVERY") {
+      throw new AppError(
+        `A successful delivery attempt requires OUT_FOR_DELIVERY status; current status is ${delivery.status}`,
+        400,
+      );
     }
 
     const attempt = await tx.deliveryAttempt.create({
