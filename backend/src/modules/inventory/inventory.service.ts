@@ -63,6 +63,7 @@ const ACTIVE_PAYMENT_STATUSES = [
 export async function expireStaleInventoryReservations(options?: {
   limit?: number;
   now?: Date;
+  orderIds?: string[];
 }) {
   const limit = Math.min(Math.max(options?.limit ?? 100, 1), 500);
   const now = options?.now ?? new Date();
@@ -75,6 +76,9 @@ export async function expireStaleInventoryReservations(options?: {
     where: {
       status: "PENDING",
       expiresAt: { lte: now },
+      ...(options?.orderIds
+        ? { orderId: { in: options.orderIds } }
+        : {}),
     },
     select: {
       id: true,
