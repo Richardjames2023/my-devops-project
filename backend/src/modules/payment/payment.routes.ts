@@ -6,6 +6,7 @@ import {
   createGuest,
   markSuccessful,
   markGuestSuccessful,
+  reconcileUnknown,
   listStaleWebhookEvents,
   reconcileStaleWebhookEvent,
 } from "./payment.controller";
@@ -34,6 +35,14 @@ router.post(
   "/guest/:paymentId/success",
   guestPaymentVerificationLimiter,
   markGuestSuccessful,
+);
+
+
+router.post(
+  "/:paymentId/reconcile-unknown",
+  authenticate,
+  authorize("orders.manage"),
+  reconcileUnknown,
 );
 
 router.get(
