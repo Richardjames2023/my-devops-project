@@ -57,6 +57,18 @@ export async function completeDelivery(
     throw new AppError("Delivery not found", 404);
   }
 
+  // Use the same order-level lock as package allocation. This makes the
+  // package snapshot used for fulfillment completion consistent with any
+  // concurrent allocation or delivery completion for this order.
+  await tx.$queryRaw(
+    Prisma.sql`
+      SELECT id
+      FROM orders
+      WHERE id = ${delivery.package.fulfillment.orderId}::uuid
+      FOR UPDATE
+    `,
+  );
+
   // Only deliveries that have reached OUT_FOR_DELIVERY can be completed.
   // DELIVERED is allowed to preserve idempotency.
   if (
