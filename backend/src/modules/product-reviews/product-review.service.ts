@@ -7,7 +7,7 @@ import type {
 } from "./product-review.types";
 
 async function findDeliveredPurchase(
-  db: typeof prisma,
+  db: Pick<Prisma.TransactionClient, "$queryRaw">,
   userId: string,
   productId: string,
 ): Promise<string | null> {
@@ -100,7 +100,7 @@ export async function createProductReview(
           );
         }
 
-        const orderItemId = await findDeliveredPurchase(tx as typeof prisma, userId, productId);
+        const orderItemId = await findDeliveredPurchase(tx, userId, productId);
         if (!orderItemId) {
           throw new AppError(
             "A verified, fully delivered purchase is required before reviewing this product",
