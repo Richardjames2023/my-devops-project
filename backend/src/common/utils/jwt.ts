@@ -4,8 +4,11 @@ import {
   ACCESS_TOKEN_EXPIRES_IN,
 } from "../../config/auth";
 
+export type AuthIdentityType = "CUSTOMER" | "STAFF";
+
 export interface AccessTokenPayload {
   sub: string;
+  identityType: AuthIdentityType;
   roles: string[];
   permissions: string[];
 }
