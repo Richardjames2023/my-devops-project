@@ -192,7 +192,7 @@ describe("PostgreSQL stale inventory reservation expiry", () => {
 
     try {
       const now = new Date();
-      const result = await expireStaleInventoryReservations({ now });
+      const result = await expireStaleInventoryReservations({ now, orderIds: [fixture.orderId] });
 
       expect(result.expired).toBe(1);
       expect(result.skipped).toBe(0);
@@ -213,7 +213,7 @@ describe("PostgreSQL stale inventory reservation expiry", () => {
         reservedQuantity: 0,
       });
 
-      const repeated = await expireStaleInventoryReservations({ now });
+      const repeated = await expireStaleInventoryReservations({ now, orderIds: [fixture.orderId] });
       expect(repeated.expired).toBe(0);
       expect(repeated.scanned).toBe(0);
     } finally {
@@ -229,6 +229,7 @@ describe("PostgreSQL stale inventory reservation expiry", () => {
       try {
         const result = await expireStaleInventoryReservations({
           now: new Date(),
+          orderIds: [fixture.orderId],
         });
 
         expect(result.expired).toBe(0);
@@ -260,6 +261,7 @@ describe("PostgreSQL stale inventory reservation expiry", () => {
     try {
       const result = await expireStaleInventoryReservations({
         now: new Date(),
+        orderIds: [fixture.orderId],
       });
 
       expect(result.expired).toBe(1);
