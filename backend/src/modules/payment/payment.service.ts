@@ -181,7 +181,11 @@ async function createPaymentWithAccess(
         },
       });
 
-      if (existingReservation && existingReservation.status !== "RELEASED") {
+      if (
+        existingReservation &&
+        existingReservation.status !== "RELEASED" &&
+        existingReservation.status !== "EXPIRED"
+      ) {
         throw new AppError(
           "An existing inventory reservation requires reconciliation",
           409,
@@ -207,7 +211,7 @@ async function createPaymentWithAccess(
         const reopenedReservation = await tx.inventoryReservation.updateMany({
           where: {
             id: existingReservation.id,
-            status: "RELEASED",
+            status: { in: ["RELEASED", "EXPIRED"] },
           },
           data: {
             status: "PENDING",
