@@ -452,9 +452,9 @@ export async function updateStaffAccountRoles(
     if (target.status === "ACTIVE" && previousRoles.includes("BUSINESS_OWNER") && !roles.some(({ name }) => name === "BUSINESS_OWNER")) {
       const otherActiveOwners = await tx.staffAccountRole.count({
         where: {
-          role: { name: "BUSINESS_OWNER" },
+          role: { is: { name: "BUSINESS_OWNER" } },
           staffAccountId: { not: staffId },
-          staffAccount: { status: "ACTIVE" },
+          staffAccount: { is: { status: "ACTIVE" } },
         },
       });
       if (otherActiveOwners === 0) {
