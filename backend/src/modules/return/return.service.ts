@@ -673,3 +673,116 @@ export async function inspectReturnRequest(
     "Return inspection transaction failed after maximum retry attempts",
   );
 }
+
+
+export interface CustomerReturnHistoryQuery {
+  page: number;
+  limit: number;
+  status?: import("@prisma/client").ReturnStatus | undefined;
+}
+
+/**
+ * Returns only return requests owned by the authenticated customer.
+ * Evidence file URLs are intentionally omitted; customers use the
+ * authenticated evidence view endpoint to access uploaded files.
+ */
+export async function listCustomerReturnRequests(
+  userId: string,
+  query: CustomerReturnHistoryQuery,
+) {
+  const where: Prisma.ReturnRequestWhereInput = {
+    userId,
+    ...(query.status ? { status: query.status } : {}),
+  };
+
+  const [returnRequests, total] = await prisma.$transaction([
+    prisma.returnRequest.findMany({
+      where,
+      orderBy: [{ requestedAt: "desc" }, { id: "desc" }],
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      select: {
+        id: true,
+        orderId: true,
+        status: true,
+        reason: true,
+        description: true,
+        requestedAt: true,
+        reviewedAt: true,
+        createdAt: true,
+        updatedAt: true,
+        order: {
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            currency: true,
+            totalAmount: true,
+            createdAt: true,
+          },
+        },
+        items: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            quantity: true,
+            receivedQuantity: true,
+            acceptedQuantity: true,
+            condition: true,
+            notes: true,
+            createdAt: true,
+            orderItem: {
+              select: {
+                id: true,
+                productName: true,
+                variantName: true,
+                sku: true,
+                quantity: true,
+                unitPrice: true,
+                totalPrice: true,
+              },
+            },
+            refundItems: {
+              select: {
+                id: true,
+                quantity: true,
+                amount: true,
+                refund: {
+                  select: {
+                    id: true,
+                    reference: true,
+                    status: true,
+                    amount: true,
+                    currency: true,
+                    processedAt: true,
+                    createdAt: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        evidence: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            type: true,
+            description: true,
+            createdAt: true,
+          },
+        },
+      },
+    }),
+    prisma.returnRequest.count({ where }),
+  ]);
+
+  return {
+    returnRequests,
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.ceil(total / query.limit),
+    },
+  };
+}
