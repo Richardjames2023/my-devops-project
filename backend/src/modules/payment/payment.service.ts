@@ -1275,9 +1275,11 @@ export async function listStalePendingPayments(limit = 100) {
   }
 
   const boundedLimit = Math.min(limit, 500);
-  const staleBefore = new Date(
-    Date.now() - STALE_PENDING_PAYMENT_GRACE_PERIOD_MS,
-  );
+  const [cutoffRow] = await prisma.$queryRaw<Array<{ staleBefore: Date }>>`
+    SELECT NOW() - (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond')
+      AS "staleBefore"
+  `;
+  const staleBefore = cutoffRow.staleBefore;
 
   return prisma.payment.findMany({
     where: {
@@ -1334,9 +1336,13 @@ export async function reconcileStalePendingPayment(paymentId: string) {
     throw new AppError("Payment provider mismatch", 400);
   }
 
-  const staleBefore = new Date(
-    Date.now() - STALE_PENDING_PAYMENT_GRACE_PERIOD_MS,
-  );
+  const [initialCutoffRow] = await prisma.$queryRaw<
+    Array<{ staleBefore: Date }>
+  >`
+    SELECT NOW() - (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond')
+      AS "staleBefore"
+  `;
+  const staleBefore = initialCutoffRow.staleBefore;
 
   if (initialPayment.createdAt > staleBefore) {
     return {
@@ -1364,6 +1370,14 @@ export async function reconcileStalePendingPayment(paymentId: string) {
             );
           }
 
+          const [transactionCutoffRow] = await tx.$queryRaw<
+            Array<{ staleBefore: Date }>
+          >`
+            SELECT NOW() - (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond')
+              AS "staleBefore"
+          `;
+          const transactionStaleBefore = transactionCutoffRow.staleBefore;
+
           const currentPayment = await tx.payment.findUnique({
             where: { id: paymentId },
           });
@@ -1379,7 +1393,7 @@ export async function reconcileStalePendingPayment(paymentId: string) {
             };
           }
 
-          if (currentPayment.createdAt > staleBefore) {
+          if (currentPayment.createdAt > transactionStaleBefore) {
             return {
               claimed: false as const,
               status: currentPayment.status,
