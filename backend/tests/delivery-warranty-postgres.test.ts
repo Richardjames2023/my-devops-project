@@ -52,13 +52,15 @@ const {
     const database = await import("../src/infrastructure/prisma/client");
     const completion =
       await import("../src/modules/delivery/delivery-completion.service");
+    const fulfillment =
+      await import("../src/modules/fulfillment/fulfillment.service");
 
     return {
       updateDeliveryStatus: service.updateDeliveryStatus,
       createDeliveryAttempt: service.createDeliveryAttempt,
       createDelivery: service.createDelivery,
       completeDelivery: completion.completeDelivery,
-      allocatePackage: (await import("../src/modules/fulfillment/fulfillment.service")).allocatePackage,
+      allocatePackage: fulfillment.allocatePackage,
       prisma: database.default,
       disconnectDatabase: database.disconnectDatabase,
     };
@@ -221,9 +223,10 @@ async function createFixture(
 }
 
 async function cleanupFixture(fixture: TestFixture): Promise<void> {
-  await pool.query(`DELETE FROM deliveries WHERE id = ANY($1::uuid[])`, [
-    fixture.deliveryIds,
-  ]);
+  await pool.query(
+    `DELETE FROM deliveries WHERE "packageId" = ANY($1::uuid[])`,
+    [fixture.packageIds],
+  );
 
   await pool.query(
     `DELETE FROM package_items WHERE "packageId" = ANY($1::uuid[])`,
