@@ -14,6 +14,7 @@ import {
   markPaymentSuccessful,
   markGuestPaymentSuccessful,
   reconcileUnknownPayment,
+  reconcileStalePendingPayment,
 } from "./payment.service";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { processPaystackSuccessfulWebhook } from "./payment.service";
@@ -227,6 +228,40 @@ export async function reconcileUnknown(
     message: result.reconciled
       ? "Unknown payment was reconciled using Paystack's verified transaction status."
       : "Paystack has not returned a terminal transaction status. The payment and inventory reservation remain unchanged.",
+    ...result,
+  });
+}
+
+export async function reconcileStalePending(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const paramsResult = paymentIdSchema.safeParse(req.params);
+
+  if (!paramsResult.success) {
+    res.status(400).json({ message: "Invalid payment ID" });
+    return;
+  }
+
+  const result = await reconcileStalePendingPayment(
+    paramsResult.data.paymentId,
+  );
+
+  const responseStatus = result.reconciled
+    ? 200
+    : "stale" in result && result.stale === false
+      ? 409
+      : 202;
+
+  res.status(responseStatus).json({
+    message: result.reconciled
+      ? "Stale pending payment was reconciled using Paystack's verified transaction status."
+      : "Payment was not reconciled. If Paystack's status is inconclusive, the payment and inventory reservation remain protected.",
     ...result,
   });
 }
