@@ -4,7 +4,6 @@ CREATE TYPE "StaffInvitationStatus" AS ENUM ('PENDING', 'ACCEPTED', 'REVOKED', '
 
 CREATE TABLE "staff_accounts" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-  "legacyUserId" UUID,
   "email" TEXT NOT NULL,
   "firstName" TEXT NOT NULL,
   "lastName" TEXT NOT NULL,
@@ -15,7 +14,6 @@ CREATE TABLE "staff_accounts" (
   "updatedAt" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "staff_accounts_pkey" PRIMARY KEY ("id")
 );
-CREATE UNIQUE INDEX "staff_accounts_legacyUserId_key" ON "staff_accounts"("legacyUserId");
 CREATE UNIQUE INDEX "staff_accounts_email_key" ON "staff_accounts"("email");
 CREATE INDEX "staff_accounts_email_idx" ON "staff_accounts"("email");
 CREATE INDEX "staff_accounts_status_idx" ON "staff_accounts"("status");
@@ -82,13 +80,19 @@ ALTER TABLE "return_item_inspections" ADD COLUMN "inspectedByStaffAccountId" UUI
 ALTER TABLE "return_item_inspections" ALTER COLUMN "inspectedByUserId" DROP NOT NULL;
 ALTER TABLE "payment_inventory_reconciliations" ADD COLUMN "resolvedByStaffAccountId" UUID;
 
+-- Temporary mapping is used only during migration and is dropped before completion.
+CREATE TEMP TABLE "_legacy_staff_identity_map" (
+  "legacyUserId" UUID PRIMARY KEY,
+  "staffAccountId" UUID NOT NULL
+);
+
 -- Convert every legacy non-customer role holder into a separate staff identity.
 -- Legacy customer credentials remain exclusively on the User record.
 INSERT INTO "staff_accounts" (
-  "legacyUserId", "email", "firstName", "lastName", "passwordHash",
+  "email", "firstName", "lastName", "passwordHash",
   "status", "createdAt", "updatedAt"
 )
-SELECT u."id", lower(u."email"), u."firstName", u."lastName", NULL,
+SELECT lower(u."email"), u."firstName", u."lastName", NULL,
        'PENDING_SETUP'::"StaffAccountStatus", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM "users" u
 WHERE EXISTS (
@@ -98,31 +102,43 @@ WHERE EXISTS (
   WHERE ur."userId" = u."id" AND r."name" <> 'CUSTOMER'
 );
 
+INSERT INTO "_legacy_staff_identity_map" ("legacyUserId", "staffAccountId")
+SELECT u."id", sa."id"
+FROM "users" u
+JOIN "staff_accounts" sa ON sa."email" = lower(u."email")
+WHERE EXISTS (
+  SELECT 1 FROM "user_roles" ur
+  JOIN "roles" r ON r."id" = ur."roleId"
+  WHERE ur."userId" = u."id" AND r."name" <> 'CUSTOMER'
+);
+
 -- Preserve every legacy staff role, but require the staff member to establish
 -- a new, independent credential before the staff account can be activated.
 INSERT INTO "staff_account_roles" ("staffAccountId", "roleId", "assignedAt")
 SELECT sa."id", ur."roleId", ur."createdAt"
-FROM "staff_accounts" sa
-JOIN "user_roles" ur ON ur."userId" = sa."legacyUserId"
+FROM "_legacy_staff_identity_map" legacy_map
+JOIN "user_roles" ur ON ur."userId" = legacy_map."legacyUserId"
 JOIN "roles" r ON r."id" = ur."roleId"
 WHERE r."name" <> 'CUSTOMER';
 
 -- Move historical staff actions to the staff actor column without losing the
 -- original actor identity. Customer-originated audit records remain on userId.
 UPDATE "audit_logs" al
-SET "staffAccountId" = sa."id", "userId" = NULL
-FROM "staff_accounts" sa
-WHERE al."userId" = sa."legacyUserId";
+SET "staffAccountId" = legacy_map."staffAccountId", "userId" = NULL
+FROM "_legacy_staff_identity_map" legacy_map
+WHERE al."userId" = legacy_map."legacyUserId";
 
 UPDATE "return_item_inspections" ri
-SET "inspectedByStaffAccountId" = sa."id", "inspectedByUserId" = NULL
-FROM "staff_accounts" sa
-WHERE ri."inspectedByUserId" = sa."legacyUserId";
+SET "inspectedByStaffAccountId" = legacy_map."staffAccountId", "inspectedByUserId" = NULL
+FROM "_legacy_staff_identity_map" legacy_map
+WHERE ri."inspectedByUserId" = legacy_map."legacyUserId";
 
 UPDATE "payment_inventory_reconciliations" pir
-SET "resolvedByStaffAccountId" = sa."id", "resolvedByUserId" = NULL
-FROM "staff_accounts" sa
-WHERE pir."resolvedByUserId" = sa."legacyUserId";
+SET "resolvedByStaffAccountId" = legacy_map."staffAccountId", "resolvedByUserId" = NULL
+FROM "_legacy_staff_identity_map" legacy_map
+WHERE pir."resolvedByUserId" = legacy_map."legacyUserId";
+
+DROP TABLE "_legacy_staff_identity_map";
 
 -- Every User row remains a customer identity. This intentionally keeps
 -- customer login credentials and commerce history separate from staff access.
