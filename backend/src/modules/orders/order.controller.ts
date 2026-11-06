@@ -14,7 +14,7 @@ import {
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import type { GuestSessionRequest } from "../guest-session/guest-session.middleware";
 import { AppError } from "../../common/errors/AppError";
-import { customerOrderHistoryQuerySchema } from "./order.validation";
+import { customerOrderHistoryQuerySchema } from "./order-history.validation";
 import { listCustomerOrders } from "./order.service";
 
 export async function create(
