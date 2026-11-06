@@ -70,14 +70,105 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+model StaffAccount {
+  id                                      String                           @id @default(uuid()) @db.Uuid
+  legacyUserId                            String?                          @unique @db.Uuid
+  email                                   String                           @unique
+  firstName                               String
+  lastName                                String
+  passwordHash                            String?
+  status                                  StaffAccountStatus               @default(PENDING_SETUP)
+  emailVerifiedAt                         DateTime?
+  createdAt                               DateTime                         @default(now())
+  updatedAt                               DateTime                         @updatedAt
+  roles                                   StaffAccountRole[]
+  refreshTokens                           StaffRefreshToken[]
+  auditLogs                               AuditLog[]
+  createdInvitations                      StaffInvitation[]                @relation("StaffInvitationCreator")
+  assignedRoleRecords                     StaffAccountRole[]                @relation("StaffRoleAssigner")
+  inspectedReturnItems                    ReturnItemInspection[]            @relation("StaffReturnItemInspections")
+  resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("StaffPaymentInventoryReconciliationResolver")
+
+  @@index([email])
+  @@index([status])
+  @@map("staff_accounts")
+}
+
+model StaffAccountRole {
+  id                       String       @id @default(uuid()) @db.Uuid
+  staffAccountId           String       @db.Uuid
+  roleId                   String       @db.Uuid
+  assignedByStaffAccountId String?      @db.Uuid
+  assignedAt               DateTime     @default(now())
+  staffAccount             StaffAccount @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
+  role                     Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  assignedBy               StaffAccount? @relation("StaffRoleAssigner", fields: [assignedByStaffAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([staffAccountId, roleId])
+  @@index([staffAccountId])
+  @@index([roleId])
+  @@index([assignedByStaffAccountId])
+  @@map("staff_account_roles")
+}
+
+model StaffInvitation {
+  id                      String                  @id @default(uuid()) @db.Uuid
+  email                   String
+  tokenHash               String                  @unique
+  status                  StaffInvitationStatus   @default(PENDING)
+  expiresAt               DateTime
+  acceptedAt              DateTime?
+  revokedAt               DateTime?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  createdByStaffAccountId String?                 @db.Uuid
+  createdBy               StaffAccount?           @relation("StaffInvitationCreator", fields: [createdByStaffAccountId], references: [id], onDelete: SetNull)
+  roles                   StaffInvitationRole[]
+
+  @@index([email, status])
+  @@index([expiresAt, status])
+  @@index([createdByStaffAccountId])
+  @@map("staff_invitations")
+}
+
+model StaffInvitationRole {
+  id             String         @id @default(uuid()) @db.Uuid
+  invitationId   String         @db.Uuid
+  roleId         String         @db.Uuid
+  createdAt      DateTime       @default(now())
+  invitation     StaffInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  role           Role           @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([invitationId, roleId])
+  @@index([invitationId])
+  @@index([roleId])
+  @@map("staff_invitation_roles")
+}
+
+model StaffRefreshToken {
+  id             String       @id @default(uuid()) @db.Uuid
+  staffAccountId String       @db.Uuid
+  tokenHash      String       @unique
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  staffAccount   StaffAccount @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
+
+  @@index([staffAccountId])
+  @@index([expiresAt])
+  @@map("staff_refresh_tokens")
+}
+
 model Role {
   id          String           @id @default(uuid()) @db.Uuid
   name        String           @unique
   description String?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
-  permissions RolePermission[]
-  userRoles   UserRole[]
+  permissions       RolePermission[]
+  userRoles         UserRole[]
+  staffAccountRoles StaffAccountRole[]
+  invitationRoles   StaffInvitationRole[]
 
   @@map("roles")
 }
@@ -135,19 +226,22 @@ model RolePermission {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String?  @db.Uuid
-  action    String
-  entity    String
-  entityId  String?
-  oldValues Json?
-  newValues Json?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
-  user      User?    @relation(fields: [userId], references: [id])
+  id             String        @id @default(uuid()) @db.Uuid
+  userId         String?       @db.Uuid
+  staffAccountId String?       @db.Uuid
+  action         String
+  entity         String
+  entityId       String?
+  oldValues      Json?
+  newValues      Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime      @default(now())
+  user           User?         @relation(fields: [userId], references: [id])
+  staffAccount   StaffAccount? @relation(fields: [staffAccountId], references: [id])
 
   @@index([userId])
+  @@index([staffAccountId])
   @@index([entity, entityId])
   @@index([action])
   @@index([createdAt])
@@ -544,9 +638,10 @@ model ReturnItem {
 }
 
 model ReturnItemInspection {
-  id                String @id @default(uuid()) @db.Uuid
-  returnItemId      String @db.Uuid
-  inspectedByUserId String @db.Uuid
+  id                      String        @id @default(uuid()) @db.Uuid
+  returnItemId            String        @db.Uuid
+  inspectedByUserId       String?       @db.Uuid
+  inspectedByStaffAccountId String?     @db.Uuid
 
   inspectedQuantity Int
   acceptedQuantity  Int
@@ -555,11 +650,13 @@ model ReturnItemInspection {
   notes             String?
   createdAt         DateTime        @default(now())
 
-  returnItem  ReturnItem @relation(fields: [returnItemId], references: [id], onDelete: Restrict)
-  inspectedBy User       @relation("ReturnItemInspections", fields: [inspectedByUserId], references: [id], onDelete: Restrict)
+  returnItem       ReturnItem    @relation(fields: [returnItemId], references: [id], onDelete: Restrict)
+  inspectedBy      User?         @relation("ReturnItemInspections", fields: [inspectedByUserId], references: [id], onDelete: Restrict)
+  inspectedByStaff StaffAccount? @relation("StaffReturnItemInspections", fields: [inspectedByStaffAccountId], references: [id], onDelete: Restrict)
 
   @@index([returnItemId, createdAt])
   @@index([inspectedByUserId, createdAt])
+  @@index([inspectedByStaffAccountId, createdAt])
   @@map("return_item_inspections")
 }
 
@@ -654,7 +751,8 @@ model PaymentInventoryReconciliation {
   status           InventoryReconciliationStatus @default(PENDING)
   reason           String
   resolutionNotes  String?
-  resolvedByUserId String?                       @db.Uuid
+  resolvedByUserId       String? @db.Uuid
+  resolvedByStaffAccountId String? @db.Uuid
   resolvedAt       DateTime?
   createdAt        DateTime                      @default(now())
   updatedAt        DateTime                      @updatedAt
@@ -662,12 +760,28 @@ model PaymentInventoryReconciliation {
   payment    Payment @relation(fields: [paymentId], references: [id])
   order      Order   @relation(fields: [orderId], references: [id])
   refund     Refund? @relation(fields: [refundId], references: [id])
-  resolvedBy User?   @relation("PaymentInventoryReconciliationResolver", fields: [resolvedByUserId], references: [id])
+  resolvedBy      User?         @relation("PaymentInventoryReconciliationResolver", fields: [resolvedByUserId], references: [id])
+  resolvedByStaff StaffAccount? @relation("StaffPaymentInventoryReconciliationResolver", fields: [resolvedByStaffAccountId], references: [id])
 
   @@index([orderId])
   @@index([status])
   @@index([resolvedByUserId])
+  @@index([resolvedByStaffAccountId])
   @@map("payment_inventory_reconciliations")
+}
+
+enum StaffAccountStatus {
+  PENDING_SETUP
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum StaffInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
 }
 
 enum ProductReviewStatus {
