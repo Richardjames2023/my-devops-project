@@ -88,7 +88,6 @@ model StaffAccount {
   inspectedReturnItems                    ReturnItemInspection[]            @relation("StaffReturnItemInspections")
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("StaffPaymentInventoryReconciliationResolver")
 
-  @@index([email])
   @@index([status])
   @@map("staff_accounts")
 }
@@ -131,12 +130,12 @@ model StaffInvitation {
 }
 
 model StaffInvitationRole {
-  id             String         @id @default(uuid()) @db.Uuid
-  invitationId   String         @db.Uuid
-  roleId         String         @db.Uuid
-  createdAt      DateTime       @default(now())
-  invitation     StaffInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
-  role           Role           @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  id           String          @id @default(uuid()) @db.Uuid
+  invitationId String          @db.Uuid
+  roleId       String          @db.Uuid
+  createdAt    DateTime        @default(now())
+  invitation   StaffInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  role         Role            @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   @@unique([invitationId, roleId])
   @@index([invitationId])
