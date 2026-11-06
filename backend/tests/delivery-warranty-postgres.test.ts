@@ -358,6 +358,53 @@ describe("PostgreSQL delivery and warranty activation", () => {
     }
   });
 
+  it("does not fulfill an order when a package is marked delivered but its delivery is not", async () => {
+    const fixture = await createFixture({
+      quantities: [1, 1],
+      orderQuantity: 2,
+      hasWarranty: true,
+      warrantyDuration: 12,
+    });
+
+    try {
+      // Simulate inconsistent legacy state: the second package says DELIVERED,
+      // but its courier delivery is still OUT_FOR_DELIVERY.
+      await pool.query(
+        `UPDATE packages SET status = 'DELIVERED' WHERE id = $1`,
+        [fixture.packageIds[1]],
+      );
+
+      await updateDeliveryStatus(fixture.deliveryIds[0], "DELIVERED");
+
+      let state = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+
+      expect(state.rows[0].order_status).toBe("PARTIALLY_FULFILLED");
+      expect(state.rows[0].fulfillment_status).toBe("PARTIALLY_FULFILLED");
+
+      // Once the second delivery is genuinely completed, fulfillment may finish.
+      await updateDeliveryStatus(fixture.deliveryIds[1], "DELIVERED");
+
+      state = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+
+      expect(state.rows[0].order_status).toBe("FULFILLED");
+      expect(state.rows[0].fulfillment_status).toBe("FULFILLED");
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
   it("serializes simultaneous split-package completions and fulfills only after both finish", async () => {
     const fixture = await createFixture({
       quantities: [1, 1],
