@@ -484,7 +484,7 @@ export async function updateStaffAccountRoles(
         roles: { select: { role: { select: { id: true, name: true } } } },
       },
     });
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 export async function updateStaffAccountStatus(
@@ -502,9 +502,9 @@ export async function updateStaffAccountStatus(
     if (target.status === "ACTIVE" && status !== "ACTIVE" && target.roles.some(({ role }) => role.name === "BUSINESS_OWNER")) {
       const otherActiveOwners = await tx.staffAccountRole.count({
         where: {
-          role: { name: "BUSINESS_OWNER" },
+          role: { is: { name: "BUSINESS_OWNER" } },
           staffAccountId: { not: staffId },
-          staffAccount: { status: "ACTIVE" },
+          staffAccount: { is: { status: "ACTIVE" } },
         },
       });
       if (otherActiveOwners === 0) {
@@ -528,5 +528,5 @@ export async function updateStaffAccountStatus(
       ...metadata,
     });
     return updated;
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
