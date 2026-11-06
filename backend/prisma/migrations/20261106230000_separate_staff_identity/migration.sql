@@ -174,7 +174,7 @@ ALTER TABLE "audit_logs"
   CHECK (NOT ("userId" IS NOT NULL AND "staffAccountId" IS NOT NULL));
 ALTER TABLE "return_item_inspections"
   ADD CONSTRAINT "return_item_inspections_single_actor_check"
-  CHECK (("inspectedByUserId" IS NOT NULL)::int + ("inspectedByStaffAccountId" IS NOT NULL)::int = 1);
+  CHECK (("inspectedByUserId" IS NOT NULL) <> ("inspectedByStaffAccountId" IS NOT NULL));
 ALTER TABLE "payment_inventory_reconciliations"
   ADD CONSTRAINT "payment_inventory_reconciliations_single_actor_check"
   CHECK (NOT ("resolvedByUserId" IS NOT NULL AND "resolvedByStaffAccountId" IS NOT NULL));
