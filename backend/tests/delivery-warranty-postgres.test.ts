@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -66,6 +66,11 @@ const {
     };
   },
 );
+
+const {
+  updateDeliveryTracking,
+  getGuestOrderDeliveryTracking,
+} = await import("../src/modules/delivery/delivery-tracking.service");
 
 interface TestFixture {
   categoryId: string;
@@ -655,6 +660,47 @@ describe("PostgreSQL delivery and warranty activation", () => {
       expect(new Date(repeated.rows[0].warrantyExpiresAt).toISOString()).toBe(
         "2027-01-31T10:00:00.000Z",
       );
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("updates package tracking details and exposes them only with the guest order token", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+    const guestToken = randomUUID().replace(/-/g, "").repeat(2);
+    const guestTokenHash = createHash("sha256").update(guestToken).digest("hex");
+
+    try {
+      await pool.query(
+        'UPDATE orders SET "guestAccessTokenHash" = $2 WHERE id = $1',
+        [fixture.orderId, guestTokenHash],
+      );
+
+      await updateDeliveryTracking(fixture.deliveryIds[0], {
+        trackingNumber: `TRACK-${fixture.packageIds[0]}`,
+        provider: "Test Courier",
+        externalReference: "COURIER-REF-001",
+      });
+
+      const tracking = await getGuestOrderDeliveryTracking(
+        fixture.orderId,
+        guestToken,
+      );
+
+      expect(tracking.fulfillment?.packages).toHaveLength(1);
+      expect(tracking.fulfillment?.packages[0].trackingNumber).toBe(
+        `TRACK-${fixture.packageIds[0]}`,
+      );
+      expect(tracking.fulfillment?.packages[0].delivery?.provider).toBe(
+        "Test Courier",
+      );
+      expect(
+        tracking.fulfillment?.packages[0].delivery?.externalReference,
+      ).toBe("COURIER-REF-001");
+
+      await expect(
+        getGuestOrderDeliveryTracking(fixture.orderId, "0".repeat(64)),
+      ).rejects.toThrow("Order not found");
     } finally {
       await cleanupFixture(fixture);
     }
