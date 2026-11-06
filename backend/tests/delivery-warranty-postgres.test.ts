@@ -223,19 +223,28 @@ async function createFixture(
 }
 
 async function cleanupFixture(fixture: TestFixture): Promise<void> {
+  // Tests may allocate additional packages after fixture creation. Clean up
+  // through the fulfillment relation rather than only the original IDs.
   await pool.query(
-    `DELETE FROM deliveries WHERE "packageId" = ANY($1::uuid[])`,
-    [fixture.packageIds],
+    `DELETE FROM deliveries
+     WHERE "packageId" IN (
+       SELECT id FROM packages WHERE "fulfillmentId" = $1
+     )`,
+    [fixture.fulfillmentId],
   );
 
   await pool.query(
-    `DELETE FROM package_items WHERE "packageId" = ANY($1::uuid[])`,
-    [fixture.packageIds],
+    `DELETE FROM package_items
+     WHERE "packageId" IN (
+       SELECT id FROM packages WHERE "fulfillmentId" = $1
+     )`,
+    [fixture.fulfillmentId],
   );
 
-  await pool.query(`DELETE FROM packages WHERE id = ANY($1::uuid[])`, [
-    fixture.packageIds,
-  ]);
+  await pool.query(
+    `DELETE FROM packages WHERE "fulfillmentId" = $1`,
+    [fixture.fulfillmentId],
+  );
 
   await pool.query(`DELETE FROM fulfillments WHERE id = $1`, [
     fixture.fulfillmentId,
