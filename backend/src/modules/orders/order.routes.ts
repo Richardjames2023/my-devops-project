@@ -12,19 +12,19 @@ import {
   guestOrderRetrievalLimiter,
 } from "../../common/middleware/rate-limit.middleware";
 import { authenticate } from "../../common/middleware/authenticate";
-import { authorize } from "../../common/middleware/authorize";
+import { authorize, requireCustomer } from "../../common/middleware/authorize";
 import { requireGuestSession } from "../guest-session/guest-session.middleware";
 
 const router = Router();
 
 // Registered customer order history
-router.get("/", authenticate, listMine);
+router.get("/", authenticate, requireCustomer, listMine);
 
 // Registered customer checkout
 router.post(
   "/",
   authenticate,
-  authorize("orders.create"),
+  requireCustomer,
   create,
 );
 
@@ -32,6 +32,7 @@ router.post(
 router.patch(
   "/:orderId/cancel",
   authenticate,
+  requireCustomer,
   cancel,
 );
 
