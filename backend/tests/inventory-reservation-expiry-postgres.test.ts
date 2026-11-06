@@ -191,7 +191,7 @@ describe("PostgreSQL stale inventory reservation expiry", () => {
     const fixture = await createFixture();
 
     try {
-      const now = new Date();
+      const now = new Date(Date.now() + 5 * 60_000);
       const result = await expireStaleInventoryReservations({ now, orderIds: [fixture.orderId] });
 
       expect(result.expired).toBe(1);
@@ -228,7 +228,7 @@ describe("PostgreSQL stale inventory reservation expiry", () => {
 
       try {
         const result = await expireStaleInventoryReservations({
-          now: new Date(),
+          now: new Date(Date.now() + 5 * 60_000),
           orderIds: [fixture.orderId],
         });
 
@@ -260,7 +260,7 @@ describe("PostgreSQL stale inventory reservation expiry", () => {
 
     try {
       const result = await expireStaleInventoryReservations({
-        now: new Date(),
+        now: new Date(Date.now() + 5 * 60_000),
         orderIds: [fixture.orderId],
       });
 
