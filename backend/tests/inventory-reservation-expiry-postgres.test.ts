@@ -57,7 +57,6 @@ async function createFixture(paymentStatus?: string): Promise<Fixture> {
   };
 
   const suffix = randomUUID();
-  const expiredAt = new Date(Date.now() - 60_000);
 
   try {
     await pool.query(
@@ -131,8 +130,8 @@ async function createFixture(paymentStatus?: string): Promise<Fixture> {
     await pool.query(
       `INSERT INTO inventory_reservations
        (id, "orderId", "inventoryId", quantity, status, "expiresAt")
-       VALUES ($1, $2, $3, 2, 'PENDING', $4)`,
-      [fixture.reservationId, fixture.orderId, fixture.inventoryId, expiredAt],
+       VALUES ($1, $2, $3, 2, 'PENDING', timezone('UTC', NOW()) - INTERVAL '1 minute')`,
+      [fixture.reservationId, fixture.orderId, fixture.inventoryId],
     );
 
     if (paymentStatus) {
