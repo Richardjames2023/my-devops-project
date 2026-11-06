@@ -8,7 +8,7 @@ export type AuthIdentityType = "CUSTOMER" | "STAFF";
 
 export interface AccessTokenPayload {
   sub: string;
-  identityType: AuthIdentityType;
+  identityType?: AuthIdentityType;
   roles: string[];
   permissions: string[];
 }
