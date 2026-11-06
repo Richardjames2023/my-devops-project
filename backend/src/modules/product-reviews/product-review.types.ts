@@ -1,6 +1,6 @@
 export interface CreateProductReviewInput {
   rating: number;
-  title?: string | null;
+  title?: string | null | undefined;
   comment: string;
 }
 
