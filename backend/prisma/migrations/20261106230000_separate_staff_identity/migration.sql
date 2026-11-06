@@ -139,18 +139,24 @@ WHERE pir."resolvedByUserId" = legacy_map."legacyUserId";
 
 DROP TABLE "_legacy_staff_identity_map";
 
--- Every User row remains a customer identity. This intentionally keeps
--- customer login credentials and commerce history separate from staff access.
-INSERT INTO "user_roles" ("id", "userId", "roleId", "createdAt")
-SELECT gen_random_uuid(), u."id", customer."id", CURRENT_TIMESTAMP
-FROM "users" u
-CROSS JOIN "roles" customer
-WHERE customer."name" = 'CUSTOMER'
-  AND NOT EXISTS (
-    SELECT 1 FROM "user_roles" existing
-    WHERE existing."userId" = u."id" AND existing."roleId" = customer."id"
-  );
+-- Preserve existing customer accounts as customers. Legacy staff-only User
+-- records are disabled as customer logins; staff must activate through a new
+-- invitation and establish a separate password.
+UPDATE "users" u
+SET "isActive" = FALSE
+WHERE EXISTS (
+  SELECT 1 FROM "user_roles" ur
+  JOIN "roles" r ON r."id" = ur."roleId"
+  WHERE ur."userId" = u."id" AND r."name" <> 'CUSTOMER'
+)
+AND NOT EXISTS (
+  SELECT 1 FROM "user_roles ur_customer"
+  JOIN "roles" r_customer ON r_customer."id" = ur_customer."roleId"
+  WHERE ur_customer."userId" = u."id" AND r_customer."name" = 'CUSTOMER'
+);
 
+-- Remove staff privileges from the customer identity. Existing CUSTOMER
+-- assignments and their password hashes remain untouched.
 DELETE FROM "user_roles" ur
 USING "roles" r
 WHERE ur."roleId" = r."id" AND r."name" <> 'CUSTOMER';
