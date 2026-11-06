@@ -138,7 +138,7 @@ async function createFixture(guest = false): Promise<Fixture> {
         "discountAmount", "deliveryFee", "totalAmount", currency,
         "shippingAddress", "createdAt", "updatedAt")
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING',
-               2500.50, 0, 0, 2500.50, 'NGN', $8::jsonb, NOW(), NOW())`,
+               5001.00, 0, 0, 5001.00, 'NGN', $8::jsonb, NOW(), NOW())`,
       [
         fixture.orderId,
         guest ? null : fixture.userId,
@@ -219,13 +219,13 @@ describe("PostgreSQL checkout payment initialization", () => {
         "https://checkout.paystack.test/authorize",
       );
       expect(result.payment.status).toBe("PENDING");
-      expect(result.payment.amount.toString()).toBe("2500.5");
+      expect(result.payment.amount.toString()).toBe("5001");
 
       expect(paystackMocks.initialize).toHaveBeenCalledOnce();
       expect(paystackMocks.initialize).toHaveBeenCalledWith(
         expect.objectContaining({
           email: `${fixture.userId}@payment-checkout.test`,
-          amountKobo: "250050",
+          amountKobo: "500100",
           currency: "NGN",
           reference: result.payment.reference,
         }),
