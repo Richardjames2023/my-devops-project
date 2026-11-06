@@ -113,6 +113,7 @@ export async function completeDelivery(
       packages: {
         select: {
           status: true,
+          delivery: { select: { status: true } },
           items: { select: { orderItemId: true, quantity: true } },
         },
       },
@@ -126,8 +127,11 @@ export async function completeDelivery(
     throw new AppError("Fulfillment not found for delivered package", 404);
   }
 
+  // A package counts as delivered only when both lifecycle records agree.
+  // This prevents stale or inconsistent package state from completing an order
+  // before its corresponding courier delivery is actually marked delivered.
   const deliveredPackageCount = fulfillment.packages.filter(
-    (pkg) => pkg.status === "DELIVERED",
+    (pkg) => pkg.status === "DELIVERED" && pkg.delivery?.status === "DELIVERED",
   ).length;
   const allPackagesDelivered =
     fulfillment.packages.length > 0 &&
