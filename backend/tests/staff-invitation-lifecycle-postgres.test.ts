@@ -24,7 +24,7 @@ const roleBName = `TEST_INVITATION_ROLE_B_${suffix.replaceAll("-", "").toUpperCa
 const invitationIds: string[] = [];
 const acceptedStaffIds: string[] = [];
 
-const [{ disconnectDatabase }, staffService] = await Promise.all([
+const [{ default: prisma, disconnectDatabase }, staffService] = await Promise.all([
   import("../src/infrastructure/prisma/client"),
   import("../src/modules/staff/staff.service"),
 ]);
@@ -277,7 +277,26 @@ describe("PostgreSQL staff invitation lifecycle", () => {
       new Date(expiryUpdate.rows[0].database_now).getTime(),
     );
 
+    const prismaBefore = await prisma.staffInvitation.findUnique({
+      where: { id: created.invitation.id },
+      select: { id: true, status: true, expiresAt: true },
+    });
+    const prismaDatabase = await prisma.$queryRaw<Array<{ database_name: string; database_now: Date }>>`
+      SELECT current_database() AS database_name, NOW() AS database_now
+    `;
+    console.log("[INVITATION EXPIRY DEBUG]", {
+      prismaDatabase: prismaDatabase[0]?.database_name,
+      prismaNow: prismaDatabase[0]?.database_now,
+      prismaBefore,
+      forcedExpiry,
+    });
+
     const listed = await listStaffInvitations();
+    const prismaAfter = await prisma.staffInvitation.findUnique({
+      where: { id: created.invitation.id },
+      select: { id: true, status: true, expiresAt: true },
+    });
+    console.log("[INVITATION EXPIRY AFTER LIST]", prismaAfter);
     const expired = listed.find(({ id }) => id === created.invitation.id);
     expect(expired?.status).toBe("EXPIRED");
 
