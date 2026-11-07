@@ -46,7 +46,7 @@ npx prisma generate
 
 Run the seed as a separately controlled deployment step if the target database still needs the application roles and permissions. Do not use `prisma migrate dev` against production.
 
-The follow-up migration `20261107130000_normalize_staff_account_emails` normalizes existing staff account email addresses and adds a database check constraint so future direct database writes cannot store non-canonical values. It stops rather than silently merging records if normalized duplicates or blank addresses are present.
+The follow-up migration `20261107130000_normalize_staff_account_emails` normalizes existing staff account email addresses and adds a database check constraint so future direct database writes cannot store non-canonical values. It stops rather than silently merging records if normalized duplicates or blank addresses are present. If it fails at this duplicate guard, resolve the reported records manually, confirm that no migration changes were applied, then mark that failed attempt rolled back with `npx prisma migrate resolve --rolled-back 20261107130000_normalize_staff_account_emails` before retrying `npx prisma migrate dev` locally or `npx prisma migrate deploy` in deployment. For any failure other than the initial duplicate guard, inspect the database and Prisma migration state before using `migrate resolve`.
 
 Application code also normalizes staff invitation and login email input by trimming surrounding whitespace and converting to lowercase. Customer and staff identities remain independent; the same canonical email may exist once in each identity table.
 
