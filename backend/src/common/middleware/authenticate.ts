@@ -1,4 +1,4 @@
-import type { NextFunction, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { JWT_ACCESS_SECRET } from "../../config/auth";
 import { AppError } from "../errors/AppError";
