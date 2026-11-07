@@ -78,7 +78,7 @@ describe("customer order history HTTP endpoint", () => {
       .set("Authorization", `Bearer ${customerToken}`)
       .expect(200);
 
-    expect(mocks.listCustomerOrders).toHaveBeenCalledWith("customer-one", {
+    expect(mocks.listCustomerOrders).toHaveBeenCalledWith(customerId, {
       page: 2,
       limit: 20,
       status: "FULFILLED",
@@ -100,7 +100,7 @@ describe("customer order history HTTP endpoint", () => {
       .set("Authorization", `Bearer ${customerToken}`)
       .expect(200);
 
-    expect(mocks.listCustomerOrders).toHaveBeenCalledWith("customer-one", {
+    expect(mocks.listCustomerOrders).toHaveBeenCalledWith(customerId, {
       page: 1,
       limit: 10,
     });
