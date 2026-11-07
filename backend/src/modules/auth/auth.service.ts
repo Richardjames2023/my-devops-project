@@ -157,7 +157,7 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
 
   if (storedToken.revokedAt) {
     await prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${storedToken.familyId}::text, 0))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${storedToken.familyId}::text, 0))`;
       await tx.refreshToken.updateMany({
         where: { userId: storedToken.userId, familyId: storedToken.familyId, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -182,7 +182,7 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
 
   const rotationSucceeded = await prisma.$transaction(async (tx) => {
     // Serialize all rotations and replay revocations within this session family.
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${storedToken.familyId}::text, 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${storedToken.familyId}::text, 0))`;
     const now = new Date();
     const claimed = await tx.refreshToken.updateMany({
       where: { id: storedToken.id, userId: storedToken.userId, familyId: storedToken.familyId, revokedAt: null, expiresAt: { gt: now } },
