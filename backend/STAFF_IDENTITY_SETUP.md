@@ -94,3 +94,13 @@ The backend generates a cryptographically random token and stores only its SHA-2
 ## Authorization behavior
 
 Access tokens include an explicit identityType claim. Legacy tokens without the claim are treated as customer tokens only. Customer-only routes reject staff identities; staff permission middleware rejects customer identities and reloads current staff roles and permissions from PostgreSQL on each protected request, so role revocation and account suspension take effect immediately.
+
+## Refresh-token session security
+
+Customer and staff refresh tokens are stored as hashes and grouped into independent session families. Each successful login creates a new family; rotating a token preserves that family identifier.
+
+If a previously consumed refresh token is presented again, the backend treats it as possible token theft and revokes every still-active refresh token in that family. Other login sessions for the same customer or staff account remain valid. A concurrent attempt to consume the same token follows the same strict policy: the winning rotation may be created briefly, but the losing request detects the consumed token and revokes the family.
+
+Existing refresh-token records receive independent family IDs during migration because their historical rotation relationships cannot be reconstructed. Users do not need to log in again solely because this migration runs.
+
+Clients should serialize refresh requests per session and, after a refresh request returns an authentication failure, discard the refresh token for that session and require a new login. Do not automatically retry a refresh token after an ambiguous network failure: the server may already have consumed it.
