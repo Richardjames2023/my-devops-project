@@ -264,11 +264,17 @@ describe("PostgreSQL staff invitation lifecycle", () => {
 
   it("marks expired invitations as EXPIRED and rejects acceptance", async () => {
     const created = await createInvitation(`expired-${suffix}@test.local`);
-    await pool.query(
+    const forcedExpiry = new Date(Date.now() - 60_000);
+    const expiryUpdate = await pool.query(
       `UPDATE staff_invitations
        SET "expiresAt" = $1
-       WHERE id = $2`,
-      [new Date(Date.now() - 60_000), created.invitation.id],
+       WHERE id = $2
+       RETURNING status, "expiresAt", NOW() AS database_now`,
+      [forcedExpiry, created.invitation.id],
+    );
+    expect(expiryUpdate.rowCount).toBe(1);
+    expect(new Date(expiryUpdate.rows[0].expiresAt).getTime()).toBeLessThan(
+      new Date(expiryUpdate.rows[0].database_now).getTime(),
     );
 
     const listed = await listStaffInvitations();
