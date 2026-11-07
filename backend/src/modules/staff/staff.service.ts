@@ -591,10 +591,10 @@ export async function updateStaffAccountStatus(
       include: { roles: { include: { role: { select: { name: true } } } } },
     });
     if (!target) throw new AppError("Staff account not found", 404);
+    if (target.status === "PENDING_SETUP") throw new AppError("Pending staff setup must be completed through an invitation", 409);
     if (status === "ACTIVE" && target.roles.length === 0) {
       throw new AppError("A staff account must have at least one role before activation", 409);
     }
-    if (target.status === "PENDING_SETUP") throw new AppError("Pending staff setup must be completed through an invitation", 409);
     if (target.status === "ACTIVE" && status !== "ACTIVE" && target.roles.some(({ role }) => role.name === "BUSINESS_OWNER")) {
       const otherActiveOwners = await tx.staffAccountRole.count({
         where: {
