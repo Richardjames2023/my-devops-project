@@ -156,9 +156,12 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
   if (!storedToken) throw new AppError("Invalid refresh token", 401);
 
   if (storedToken.revokedAt) {
-    await prisma.refreshToken.updateMany({
-      where: { userId: storedToken.userId, familyId: storedToken.familyId, revokedAt: null },
-      data: { revokedAt: new Date() },
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${storedToken.familyId}::text, 0))`;
+      await tx.refreshToken.updateMany({
+        where: { userId: storedToken.userId, familyId: storedToken.familyId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
     });
     throw new AppError("Refresh token reuse detected; session revoked", 401);
   }
@@ -178,6 +181,8 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
   newRefreshTokenExpiresAt.setDate(newRefreshTokenExpiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN_DAYS);
 
   const rotationSucceeded = await prisma.$transaction(async (tx) => {
+    // Serialize all rotations and replay revocations within this session family.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${storedToken.familyId}::text, 0))`;
     const now = new Date();
     const claimed = await tx.refreshToken.updateMany({
       where: { id: storedToken.id, userId: storedToken.userId, familyId: storedToken.familyId, revokedAt: null, expiresAt: { gt: now } },
