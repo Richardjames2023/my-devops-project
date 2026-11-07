@@ -24,10 +24,9 @@ const roleBName = `TEST_INVITATION_ROLE_B_${suffix.replaceAll("-", "").toUpperCa
 const invitationIds: string[] = [];
 const acceptedStaffIds: string[] = [];
 
-const [{ disconnectDatabase }, staffService, refreshTokenUtils] = await Promise.all([
+const [{ disconnectDatabase }, staffService] = await Promise.all([
   import("../src/infrastructure/prisma/client"),
   import("../src/modules/staff/staff.service"),
-  import("../src/common/utils/refreshToken"),
 ]);
 
 const {
