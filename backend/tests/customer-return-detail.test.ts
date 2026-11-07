@@ -4,6 +4,11 @@ import jwt from "jsonwebtoken";
 
 const mocks = vi.hoisted(() => ({
   getCustomerReturnRequest: vi.fn(),
+  findCustomer: vi.fn(),
+}));
+
+vi.mock("../src/infrastructure/prisma/client", () => ({
+  default: { user: { findUnique: mocks.findCustomer } },
 }));
 
 vi.mock("../src/modules/return/return.service", async (importOriginal) => {
@@ -26,12 +31,17 @@ function makeToken(subject: string) {
   );
 }
 
-const customerToken = makeToken("customer-one");
+const customerId = "9f3e3b6a-10c8-4b7d-8d2f-4a5c6e7f8091";
+const customerToken = makeToken(customerId);
 const returnRequestId = "a4e7e6d2-2b5f-4c55-9b30-3c9c4f3b2a11";
 
 describe("customer return detail HTTP endpoint", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.findCustomer.mockResolvedValue({
+      isActive: true,
+      userRoles: [{ role: { name: "CUSTOMER" } }],
+    });
     mocks.getCustomerReturnRequest.mockResolvedValue({
       id: returnRequestId,
       status: "INSPECTED",
@@ -60,7 +70,7 @@ describe("customer return detail HTTP endpoint", () => {
       evidence: [],
     });
     expect(mocks.getCustomerReturnRequest).toHaveBeenCalledWith(
-      "customer-one",
+      customerId,
       returnRequestId,
     );
   });
