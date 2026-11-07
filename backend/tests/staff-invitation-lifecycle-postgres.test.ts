@@ -84,9 +84,9 @@ describe("PostgreSQL staff invitation lifecycle", () => {
       [actorId, actorEmail],
     );
     await pool.query(
-      `INSERT INTO staff_account_roles ("staffAccountId", "roleId", "assignedAt")
-       VALUES ($1, $2, NOW())`,
-      [actorId, actorRoleId],
+      `INSERT INTO staff_account_roles (id, "staffAccountId", "roleId", "assignedAt")
+       VALUES ($1, $2, $3, NOW())`,
+      [randomUUID(), actorId, actorRoleId],
     );
   });
 
