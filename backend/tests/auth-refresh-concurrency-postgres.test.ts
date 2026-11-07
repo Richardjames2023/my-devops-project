@@ -48,6 +48,7 @@ describe("PostgreSQL refresh token rotation concurrency", () => {
     const userId = randomUUID();
     const originalToken = generateRefreshToken();
     const originalTokenHash = hashRefreshToken(originalToken);
+    const familyId = randomUUID();
 
     await pool.query(
       `INSERT INTO users
@@ -58,9 +59,9 @@ describe("PostgreSQL refresh token rotation concurrency", () => {
 
     await pool.query(
       `INSERT INTO refresh_tokens
-       (id, "userId", "tokenHash", "expiresAt", "createdAt")
-       VALUES ($1, $2, $3, $4, NOW())`,
-      [randomUUID(), userId, originalTokenHash, new Date(Date.now() + 60_000)],
+       (id, "userId", "familyId", "tokenHash", "expiresAt", "createdAt")
+       VALUES ($1, $2, $3, $4, $5, NOW())`,
+      [randomUUID(), userId, familyId, originalTokenHash, new Date(Date.now() + 60_000)],
     );
 
     try {
@@ -86,10 +87,10 @@ describe("PostgreSQL refresh token rotation concurrency", () => {
 
       const activeTokens = await pool.query(
         `SELECT id FROM refresh_tokens
-         WHERE "userId" = $1 AND "revokedAt" IS NULL AND "expiresAt" > NOW()`,
-        [userId],
+         WHERE "userId" = $1 AND "familyId" = $2 AND "revokedAt" IS NULL AND "expiresAt" > NOW()`,
+        [userId, familyId],
       );
-      expect(activeTokens.rows).toHaveLength(1);
+      expect(activeTokens.rows).toHaveLength(0);
       expect(
         hashRefreshToken(successful[0].value.refreshToken),
       ).not.toBe(originalTokenHash);
@@ -97,4 +98,57 @@ describe("PostgreSQL refresh token rotation concurrency", () => {
       await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
     }
   });
+  it("revokes only the reused token family and preserves independent sessions", async () => {
+    const userId = randomUUID();
+    const compromisedFamilyId = randomUUID();
+    const independentFamilyId = randomUUID();
+    const originalToken = generateRefreshToken();
+    const originalTokenHash = hashRefreshToken(originalToken);
+    const independentToken = generateRefreshToken();
+
+    await pool.query(
+      `INSERT INTO users
+       (id, email, "passwordHash", "firstName", "lastName", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+      [userId, `replay-${userId}@test.local`, "test-hash", "Replay", "Tester"],
+    );
+
+    await pool.query(
+      `INSERT INTO refresh_tokens
+       (id, "userId", "familyId", "tokenHash", "expiresAt", "createdAt")
+       VALUES ($1, $2, $3, $4, $5, NOW()), ($6, $2, $7, $8, $5, NOW())`,
+      [
+        randomUUID(), userId, compromisedFamilyId, originalTokenHash,
+        new Date(Date.now() + 60_000), randomUUID(), independentFamilyId,
+        hashRefreshToken(independentToken),
+      ],
+    );
+
+    try {
+      const rotated = await refreshAccessToken({ refreshToken: originalToken });
+      await expect(refreshAccessToken({ refreshToken: originalToken })).rejects.toMatchObject({
+        statusCode: 401,
+      });
+
+      const compromisedFamily = await pool.query(
+        `SELECT "revokedAt" FROM refresh_tokens
+         WHERE "userId" = $1 AND "familyId" = $2`,
+        [userId, compromisedFamilyId],
+      );
+      expect(compromisedFamily.rows.length).toBe(2);
+      expect(compromisedFamily.rows.every((row) => row.revokedAt !== null)).toBe(true);
+      expect(hashRefreshToken(rotated.refreshToken)).not.toBe(originalTokenHash);
+
+      const independentFamily = await pool.query(
+        `SELECT "revokedAt" FROM refresh_tokens
+         WHERE "userId" = $1 AND "familyId" = $2`,
+        [userId, independentFamilyId],
+      );
+      expect(independentFamily.rows).toHaveLength(1);
+      expect(independentFamily.rows[0].revokedAt).toBeNull();
+    } finally {
+      await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+    }
+  });
+
 });
