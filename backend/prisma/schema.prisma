@@ -59,6 +59,7 @@ model User {
 model RefreshToken {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @db.Uuid
+  familyId  String    @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
@@ -66,6 +67,7 @@ model RefreshToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([familyId, revokedAt])
   @@index([expiresAt])
   @@map("refresh_tokens")
 }
@@ -146,6 +148,7 @@ model StaffInvitationRole {
 model StaffRefreshToken {
   id             String       @id @default(uuid()) @db.Uuid
   staffAccountId String       @db.Uuid
+  familyId       String       @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tokenHash      String       @unique
   expiresAt      DateTime
   revokedAt      DateTime?
@@ -153,6 +156,7 @@ model StaffRefreshToken {
   staffAccount   StaffAccount @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
 
   @@index([staffAccountId])
+  @@index([familyId, revokedAt])
   @@index([expiresAt])
   @@map("staff_refresh_tokens")
 }
