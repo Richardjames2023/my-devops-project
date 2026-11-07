@@ -508,7 +508,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
       await expect(
         resolveReconciliationAsRefunded(
           fixture.reconciliationId,
-          fixture.userId,
+          fixture.staffAccountId,
           "Refund after inventory failure",
         ),
       ).rejects.toThrow(/uncertain Paystack outcome/i);
@@ -611,7 +611,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
       await expect(
         resolveReconciliationAsRefunded(
           fixture.reconciliationId,
-          fixture.userId,
+          fixture.staffAccountId,
           "Attempt another refund",
         ),
       ).rejects.toThrow(/active or completed refund already exists/i);
@@ -652,12 +652,12 @@ describe("PostgreSQL inventory refund reconciliation", () => {
       const attempts = await Promise.allSettled([
         resolveReconciliationAsRefunded(
           fixture.reconciliationId,
-          fixture.userId,
+          fixture.staffAccountId,
           "Concurrent refund attempt one",
         ),
         resolveReconciliationAsRefunded(
           fixture.reconciliationId,
-          fixture.userId,
+          fixture.staffAccountId,
           "Concurrent refund attempt two",
         ),
       ]);
@@ -707,7 +707,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
       await expect(
         resolveReconciliationAsRefunded(
           fixture.reconciliationId,
-          fixture.userId,
+          fixture.staffAccountId,
           "Refund after inventory failure",
         ),
       ).rejects.toThrow();
@@ -752,7 +752,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
       await expect(
         resolveReconciliationAsRefunded(
           fixture.reconciliationId,
-          fixture.userId,
+          fixture.staffAccountId,
           "Refund after inventory failure",
         ),
       ).rejects.toThrow();
