@@ -266,9 +266,9 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     const created = await createInvitation(`expired-${suffix}@test.local`);
     await pool.query(
       `UPDATE staff_invitations
-       SET "expiresAt" = NOW() - INTERVAL '1 minute'
-       WHERE id = $1`,
-      [created.invitation.id],
+       SET "expiresAt" = $1
+       WHERE id = $2`,
+      [new Date(Date.now() - 60_000), created.invitation.id],
     );
 
     const listed = await listStaffInvitations();
