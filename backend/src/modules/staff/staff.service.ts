@@ -477,7 +477,12 @@ export async function loginStaff(input: { email: string; password: string }) {
   const context = await staffAuthContext(staff.id);
   const tokens = createStaffTokens(staff.id, context.roles, context.permissions);
   await prisma.staffRefreshToken.create({
-    data: { staffAccountId: staff.id, tokenHash: tokens.refreshTokenHash, expiresAt: tokens.expiresAt },
+    data: {
+      staffAccountId: staff.id,
+      familyId: crypto.randomUUID(),
+      tokenHash: tokens.refreshTokenHash,
+      expiresAt: tokens.expiresAt,
+    },
   });
   return {
     accessToken: tokens.accessToken,
@@ -492,21 +497,41 @@ export async function loginStaff(input: { email: string; password: string }) {
 export async function refreshStaffAccessToken(input: { refreshToken: string }) {
   const tokenHash = hashRefreshToken(input.refreshToken);
   const stored = await prisma.staffRefreshToken.findUnique({ where: { tokenHash } });
-  if (!stored || stored.revokedAt || stored.expiresAt <= new Date()) {
-    throw new AppError("Invalid or expired staff refresh token", 401);
-  }
-  const context = await staffAuthContext(stored.staffAccountId);
-  const tokens = createStaffTokens(context.staff.id, context.roles, context.permissions);
-  await prisma.$transaction(async (tx) => {
-    const claimed = await tx.staffRefreshToken.updateMany({
-      where: { id: stored.id, revokedAt: null, expiresAt: { gt: new Date() } },
+  if (!stored) throw new AppError("Invalid or expired staff refresh token", 401);
+
+  if (stored.revokedAt) {
+    await prisma.staffRefreshToken.updateMany({
+      where: { staffAccountId: stored.staffAccountId, familyId: stored.familyId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
-    if (claimed.count !== 1) throw new AppError("Staff refresh token has already been used", 401);
-    await tx.staffRefreshToken.create({
-      data: { staffAccountId: context.staff.id, tokenHash: tokens.refreshTokenHash, expiresAt: tokens.expiresAt },
+    throw new AppError("Staff refresh token reuse detected; session revoked", 401);
+  }
+  if (stored.expiresAt <= new Date()) throw new AppError("Invalid or expired staff refresh token", 401);
+
+  const context = await staffAuthContext(stored.staffAccountId);
+  const tokens = createStaffTokens(context.staff.id, context.roles, context.permissions);
+  const rotationSucceeded = await prisma.$transaction(async (tx) => {
+    const now = new Date();
+    const claimed = await tx.staffRefreshToken.updateMany({
+      where: { id: stored.id, staffAccountId: stored.staffAccountId, familyId: stored.familyId, revokedAt: null, expiresAt: { gt: now } },
+      data: { revokedAt: now },
     });
+    if (claimed.count !== 1) {
+      const current = await tx.staffRefreshToken.findUnique({ where: { id: stored.id }, select: { revokedAt: true } });
+      if (current?.revokedAt) {
+        await tx.staffRefreshToken.updateMany({
+          where: { staffAccountId: stored.staffAccountId, familyId: stored.familyId, revokedAt: null },
+          data: { revokedAt: now },
+        });
+      }
+      return false;
+    }
+    await tx.staffRefreshToken.create({
+      data: { staffAccountId: context.staff.id, familyId: stored.familyId, tokenHash: tokens.refreshTokenHash, expiresAt: tokens.expiresAt },
+    });
+    return true;
   });
+  if (!rotationSucceeded) throw new AppError("Staff refresh token reuse detected; session revoked", 401);
   return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
 }
 
