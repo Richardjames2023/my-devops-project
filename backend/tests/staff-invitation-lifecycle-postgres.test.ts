@@ -171,7 +171,12 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     const resent = await resendStaffInvitation(actorId, created.invitation.id);
     expect(resent.invitationToken).not.toBe(originalToken);
     expect(resent.invitation).not.toHaveProperty("tokenHash");
-    expect(resent.invitation.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    const resendExpiry = await pool.query(
+      `SELECT "expiresAt" > NOW() AS is_future
+       FROM staff_invitations WHERE id = $1`,
+      [created.invitation.id],
+    );
+    expect(resendExpiry.rows[0]?.is_future).toBe(true);
 
     await expect(
       acceptStaffInvitation({
@@ -267,13 +272,12 @@ describe("PostgreSQL staff invitation lifecycle", () => {
 
   it("marks expired invitations as EXPIRED and rejects acceptance", async () => {
     const created = await createInvitation(`expired-${suffix}@test.local`);
-    const forcedExpiry = new Date(Date.now() - 60_000);
     const expiryUpdate = await pool.query(
       `UPDATE staff_invitations
-       SET "expiresAt" = $1
-       WHERE id = $2
+       SET "expiresAt" = NOW() - INTERVAL '1 minute'
+       WHERE id = $1
        RETURNING status, "expiresAt", NOW() AS database_now`,
-      [forcedExpiry, created.invitation.id],
+      [created.invitation.id],
     );
     expect(expiryUpdate.rowCount).toBe(1);
     expect(new Date(expiryUpdate.rows[0].expiresAt).getTime()).toBeLessThan(
