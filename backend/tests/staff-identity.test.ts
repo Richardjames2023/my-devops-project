@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Response } from "express";
 import type { AuthenticatedRequest } from "../src/common/middleware/authenticate";
+import prisma from "../src/infrastructure/prisma/client";
 import { requireCustomer, requireStaff } from "../src/common/middleware/identity";
 import {
   acceptStaffInvitationSchema,
@@ -15,17 +16,69 @@ function request(identityType: "CUSTOMER" | "STAFF"): AuthenticatedRequest {
 
 const response = {} as Response;
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe("separate customer and staff identity middleware", () => {
-  it("allows customer identity through customer-only routes", () => {
+  it("allows an active database-backed customer identity", async () => {
+    vi.spyOn(prisma.user, "findUnique").mockResolvedValue({
+      isActive: true,
+      userRoles: [{ role: { name: "CUSTOMER" } }],
+    } as never);
+    const req = request("CUSTOMER");
     const next = vi.fn();
-    requireCustomer(request("CUSTOMER"), response, next);
+
+    await requireCustomer(req, response, next);
+
     expect(next).toHaveBeenCalledOnce();
     expect(next).toHaveBeenCalledWith();
+    expect(req.user?.roles).toEqual(["CUSTOMER"]);
   });
 
-  it("rejects staff identity from customer-only routes", () => {
+  it("rejects staff identity from customer-only routes without querying customers", async () => {
+    const lookup = vi.spyOn(prisma.user, "findUnique");
     const next = vi.fn();
-    requireCustomer(request("STAFF"), response, next);
+
+    await requireCustomer(request("STAFF"), response, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(next.mock.calls[0]?.[0]).toMatchObject({ statusCode: 403 });
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it("rejects inactive customer accounts", async () => {
+    vi.spyOn(prisma.user, "findUnique").mockResolvedValue({
+      isActive: false,
+      userRoles: [{ role: { name: "CUSTOMER" } }],
+    } as never);
+    const next = vi.fn();
+
+    await requireCustomer(request("CUSTOMER"), response, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(next.mock.calls[0]?.[0]).toMatchObject({ statusCode: 403 });
+  });
+
+  it("rejects legacy staff-only accounts whose token has no current customer role", async () => {
+    vi.spyOn(prisma.user, "findUnique").mockResolvedValue({
+      isActive: true,
+      userRoles: [{ role: { name: "SUPPORT_STAFF" } }],
+    } as never);
+    const next = vi.fn();
+
+    await requireCustomer(request("CUSTOMER"), response, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(next.mock.calls[0]?.[0]).toMatchObject({ statusCode: 403 });
+  });
+
+  it("rejects missing customer records", async () => {
+    vi.spyOn(prisma.user, "findUnique").mockResolvedValue(null);
+    const next = vi.fn();
+
+    await requireCustomer(request("CUSTOMER"), response, next);
+
     expect(next).toHaveBeenCalledOnce();
     expect(next.mock.calls[0]?.[0]).toMatchObject({ statusCode: 403 });
   });
