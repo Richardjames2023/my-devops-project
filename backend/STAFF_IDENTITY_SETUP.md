@@ -2,17 +2,53 @@
 
 This feature separates customer authentication (User / RefreshToken) from staff authentication (StaffAccount / StaffRefreshToken). A customer and a staff member may use the same email address because the two identity tables have independent unique constraints, credentials, and sessions.
 
-## Apply the migration
+## Apply the migrations safely
 
-Back up the database before applying this migration. It converts legacy non-customer role assignments into StaffAccount and StaffAccountRole records. Legacy staff accounts are created with PENDING_SETUP status and no staff password hash. Their previous password remains on the customer User only when that user already had the CUSTOMER role. Legacy staff-only User records are disabled as customer logins. Historical audit, return-inspection, and payment-reconciliation actors are moved to the staff actor columns. The temporary migration mapping is dropped; no permanent customer-to-staff identity link is retained.
+Back up the database before applying these migrations.
 
-From the backend directory:
+The staff identity migration converts legacy non-customer role assignments into StaffAccount and StaffAccountRole records. Legacy staff accounts are created with PENDING_SETUP status and no staff password hash. Their previous password remains on the customer User only when that user already had the CUSTOMER role. Legacy staff-only User records are disabled as customer logins. Historical audit, return-inspection, and payment-reconciliation actors are moved to the staff actor columns. The temporary migration mapping is dropped; no permanent customer-to-staff identity link is retained.
+
+### 1. Preflight legacy staff email addresses
+
+Before the first application of `20261106230000_separate_staff_identity` to a database, run the preflight script. It checks only legacy users who have at least one non-CUSTOMER role and blocks migration if two or more addresses would become identical after trimming surrounding whitespace and converting to lowercase, or if an address becomes blank.
+
+From the backend directory, make the configured local environment variables available to the shell and run:
+
+```bash
+set -a
+source .env
+set +a
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f prisma/preflight-staff-identity-emails.sql
+```
+
+In production, provide `DATABASE_URL` through the deployment secret manager rather than copying credentials into a command or committing them.
+
+If the preflight fails, inspect the reported legacy user IDs and email addresses and resolve the records manually before proceeding. Do not automatically merge staff identities: determine which account and role assignments should be retained, then rerun the preflight.
+
+If the original staff identity migration has already been applied to a database, the legacy `user_roles` records have already been transformed. Do not expect the legacy preflight to find those original records on that database. The follow-up normalization migration independently checks the resulting `staff_accounts` table and aborts safely if collisions remain.
+
+### 2. Apply migrations
+
+For local development:
 
 ```bash
 npx prisma migrate dev
 npx prisma generate
 npx prisma db seed
 ```
+
+For staging and production deployments, after taking a backup and passing the preflight on databases that have not yet received the staff identity migration:
+
+```bash
+npx prisma migrate deploy
+npx prisma generate
+```
+
+Run the seed as a separately controlled deployment step if the target database still needs the application roles and permissions. Do not use `prisma migrate dev` against production.
+
+The follow-up migration `20261107130000_normalize_staff_account_emails` normalizes existing staff account email addresses and adds a database check constraint so future direct database writes cannot store non-canonical values. It stops rather than silently merging records if normalized duplicates or blank addresses are present.
+
+Application code also normalizes staff invitation and login email input by trimming surrounding whitespace and converting to lowercase. Customer and staff identities remain independent; the same canonical email may exist once in each identity table.
 
 ## Bootstrap the first business owner
 
