@@ -17,6 +17,7 @@ export function generateAccessToken(
   payload: AccessTokenPayload,
 ): string {
   return jwt.sign(payload, JWT_ACCESS_SECRET, {
+    algorithm: "HS256",
     expiresIn: ACCESS_TOKEN_EXPIRES_IN,
   });
 }
