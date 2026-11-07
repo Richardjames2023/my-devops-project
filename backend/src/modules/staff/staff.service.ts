@@ -34,19 +34,12 @@ async function invitationExpiryFromDays(
   return row.expiresAt;
 }
 
-async function getDelegableRoles(
+async function getStaffManagerContext(
   tx: Prisma.TransactionClient,
   actorId: string,
-  roleIds: string[],
   additionalStaffIds: string[] = [],
 ) {
-  if (new Set(roleIds).size !== roleIds.length) {
-    throw new AppError("Duplicate staff roles are not allowed", 400);
-  }
-
-  // Lock the acting account (and any target account) while reading its current
-  // permissions. Role/status mutations take the same row lock, preventing a
-  // stale delegation decision from racing with a revocation.
+  // Serialize permission-sensitive mutations with role and status changes.
   const lockIds = [...new Set([actorId, ...additionalStaffIds])].sort();
   await tx.$queryRaw`SELECT id FROM staff_accounts
     WHERE id = ANY(${lockIds}::uuid[])
@@ -78,10 +71,29 @@ async function getDelegableRoles(
   const actorPermissions = new Set(actor.roles.flatMap(({ role }) =>
     role.permissions.map(({ permission }) => permission.name),
   ));
-  const isBusinessOwner = actorRoleNames.includes("BUSINESS_OWNER");
   if (!actorPermissions.has("staff.manage")) {
     throw new AppError("You do not have permission to manage staff roles", 403);
   }
+
+  return { actorRoleNames, actorPermissions };
+}
+
+async function getDelegableRoles(
+  tx: Prisma.TransactionClient,
+  actorId: string,
+  roleIds: string[],
+  additionalStaffIds: string[] = [],
+) {
+  if (new Set(roleIds).size !== roleIds.length) {
+    throw new AppError("Duplicate staff roles are not allowed", 400);
+  }
+
+  const { actorRoleNames, actorPermissions } = await getStaffManagerContext(
+    tx,
+    actorId,
+    additionalStaffIds,
+  );
+  const isBusinessOwner = actorRoleNames.includes("BUSINESS_OWNER");
 
   const roles = await tx.role.findMany({
     where: { id: { in: roleIds } },
@@ -216,6 +228,7 @@ export async function resendStaffInvitation(
 ) {
   const token = crypto.randomBytes(32).toString("hex");
   const updated = await prisma.$transaction(async (tx) => {
+    await getStaffManagerContext(tx, actorId);
     const locked = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT id FROM staff_invitations
       WHERE id = ${invitationId}::uuid
@@ -312,6 +325,7 @@ export async function updateStaffInvitationRoles(
 
 export async function revokeStaffInvitation(actorId: string, invitationId: string, metadata: RequestMetadata = {}) {
   return prisma.$transaction(async (tx) => {
+    await getStaffManagerContext(tx, actorId);
     await tx.$queryRaw`SELECT id FROM staff_invitations WHERE id = ${invitationId}::uuid FOR UPDATE`;
     const invitation = await tx.staffInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation) throw new AppError("Staff invitation not found", 404);
@@ -585,7 +599,7 @@ export async function updateStaffAccountStatus(
 ) {
   if (actorId === staffId && status !== "ACTIVE") throw new AppError("You cannot suspend or deactivate your own account", 403);
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM staff_accounts WHERE id = ${staffId}::uuid FOR UPDATE`;
+    await getStaffManagerContext(tx, actorId, [staffId]);
     const target = await tx.staffAccount.findUnique({
       where: { id: staffId },
       include: { roles: { include: { role: { select: { name: true } } } } },
