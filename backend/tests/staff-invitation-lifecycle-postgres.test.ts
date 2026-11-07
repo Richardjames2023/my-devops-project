@@ -23,6 +23,7 @@ const roleAName = `TEST_INVITATION_ROLE_A_${suffix.replaceAll("-", "").toUpperCa
 const roleBName = `TEST_INVITATION_ROLE_B_${suffix.replaceAll("-", "").toUpperCase()}`;
 const invitationIds: string[] = [];
 const acceptedStaffIds: string[] = [];
+const auxiliaryStaffIds: string[] = [];
 
 const [{ default: prisma, disconnectDatabase }, staffService] = await Promise.all([
   import("../src/infrastructure/prisma/client"),
@@ -35,6 +36,8 @@ const {
   listStaffInvitations,
   resendStaffInvitation,
   revokeStaffInvitation,
+  updateStaffAccountRoles,
+  updateStaffAccountStatus,
   updateStaffInvitationRoles,
 } = staffService;
 
@@ -91,7 +94,7 @@ describe("PostgreSQL staff invitation lifecycle", () => {
   });
 
   afterAll(async () => {
-    const staffIds = [actorId, ...acceptedStaffIds];
+    const staffIds = [actorId, ...acceptedStaffIds, ...auxiliaryStaffIds];
     await pool.query(
       `DELETE FROM audit_logs
        WHERE "staffAccountId" = ANY($1::uuid[])
@@ -277,26 +280,12 @@ describe("PostgreSQL staff invitation lifecycle", () => {
       new Date(expiryUpdate.rows[0].database_now).getTime(),
     );
 
-    const prismaBefore = await prisma.staffInvitation.findUnique({
-      where: { id: created.invitation.id },
-      select: { id: true, status: true, expiresAt: true },
-    });
-    const prismaDatabase = await prisma.$queryRaw<Array<{ database_name: string; database_now: Date }>>`
-      SELECT current_database() AS database_name, NOW() AS database_now
-    `;
-    console.log("[INVITATION EXPIRY DEBUG]", {
-      prismaDatabase: prismaDatabase[0]?.database_name,
-      prismaNow: prismaDatabase[0]?.database_now,
-      prismaBefore,
-      forcedExpiry,
-    });
-
     const listed = await listStaffInvitations();
-    const prismaAfter = await prisma.staffInvitation.findUnique({
+    const storedAfterList = await prisma.staffInvitation.findUnique({
       where: { id: created.invitation.id },
-      select: { id: true, status: true, expiresAt: true },
+      select: { status: true, updatedAt: true },
     });
-    console.log("[INVITATION EXPIRY AFTER LIST]", prismaAfter);
+    expect(storedAfterList?.status).toBe("EXPIRED");
     const expired = listed.find(({ id }) => id === created.invitation.id);
     expect(expired?.status).toBe("EXPIRED");
 
@@ -349,4 +338,41 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     );
     expect(staffForEmail.rows).toHaveLength(1);
   });
+
+  it("does not reactivate a staff account without an assigned role", async () => {
+    const staffId = randomUUID();
+    auxiliaryStaffIds.push(staffId);
+    await pool.query(
+      `INSERT INTO staff_accounts
+       (id, email, "firstName", "lastName", status, "createdAt", "updatedAt")
+       VALUES ($1, $2, 'No', 'Roles', 'SUSPENDED', NOW(), NOW())`,
+      [staffId, `no-roles-${suffix}@test.local`],
+    );
+
+    await expect(
+      updateStaffAccountStatus(actorId, staffId, "ACTIVE"),
+    ).rejects.toMatchObject({ statusCode: 409 });
+
+    const persisted = await pool.query(
+      `SELECT status FROM staff_accounts WHERE id = $1`,
+      [staffId],
+    );
+    expect(persisted.rows[0]?.status).toBe("SUSPENDED");
+  });
+
+  it("rechecks current delegation permissions inside the staff-role transaction", async () => {
+    const staffId = auxiliaryStaffIds[0];
+    expect(staffId).toBeTruthy();
+
+    // Revoke the actor's staff.manage role immediately before the service call.
+    await pool.query(
+      `DELETE FROM staff_account_roles WHERE "staffAccountId" = $1`,
+      [actorId],
+    );
+
+    await expect(
+      updateStaffAccountRoles(actorId, staffId, [roleAId]),
+    ).rejects.toMatchObject({ statusCode: 403 });
+  });
+
 });
