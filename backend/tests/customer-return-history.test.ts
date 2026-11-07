@@ -79,7 +79,7 @@ describe("customer return history HTTP endpoint", () => {
       .expect(200);
 
     expect(mocks.listCustomerReturnRequests).toHaveBeenCalledWith(
-      "customer-one",
+      customerId,
       { page: 2, limit: 20, status: "INSPECTED" },
     );
   });
@@ -100,7 +100,7 @@ describe("customer return history HTTP endpoint", () => {
       .expect(200);
 
     expect(mocks.listCustomerReturnRequests).toHaveBeenCalledWith(
-      "customer-one",
+      customerId,
       { page: 1, limit: 10 },
     );
   });
