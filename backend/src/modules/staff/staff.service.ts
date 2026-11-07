@@ -23,8 +23,37 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-async function getDelegableRoles(actorId: string, roleIds: string[]) {
-  const actor = await prisma.staffAccount.findUnique({
+async function invitationExpiryFromDays(
+  tx: Prisma.TransactionClient,
+  days: number,
+): Promise<Date> {
+  const [row] = await tx.$queryRaw<Array<{ expiresAt: Date }>>`
+    SELECT NOW() + (${days} * INTERVAL '1 day') AS "expiresAt"
+  `;
+  if (!row?.expiresAt) throw new Error("Could not calculate invitation expiry");
+  return row.expiresAt;
+}
+
+async function getDelegableRoles(
+  tx: Prisma.TransactionClient,
+  actorId: string,
+  roleIds: string[],
+  additionalStaffIds: string[] = [],
+) {
+  if (new Set(roleIds).size !== roleIds.length) {
+    throw new AppError("Duplicate staff roles are not allowed", 400);
+  }
+
+  // Lock the acting account (and any target account) while reading its current
+  // permissions. Role/status mutations take the same row lock, preventing a
+  // stale delegation decision from racing with a revocation.
+  const lockIds = [...new Set([actorId, ...additionalStaffIds])].sort();
+  await tx.$queryRaw`SELECT id FROM staff_accounts
+    WHERE id = ANY(${lockIds}::uuid[])
+    ORDER BY id
+    FOR UPDATE`;
+
+  const actor = await tx.staffAccount.findUnique({
     where: { id: actorId },
     select: {
       status: true,
@@ -54,7 +83,7 @@ async function getDelegableRoles(actorId: string, roleIds: string[]) {
     throw new AppError("You do not have permission to manage staff roles", 403);
   }
 
-  const roles = await prisma.role.findMany({
+  const roles = await tx.role.findMany({
     where: { id: { in: roleIds } },
     select: {
       id: true,
@@ -94,29 +123,45 @@ export async function createStaffInvitation(
   }
   if (!input.roleIds.length) throw new AppError("At least one staff role is required", 400);
 
-  const { roles } = await getDelegableRoles(actorId, input.roleIds);
-  await prisma.staffInvitation.updateMany({
-    where: { email, status: "PENDING", expiresAt: { lte: new Date() } },
-    data: { status: "EXPIRED" },
-  });
-  const existingStaff = await prisma.staffAccount.findUnique({ where: { email }, select: { id: true, status: true } });
-  if (existingStaff && existingStaff.status !== "PENDING_SETUP") {
-    throw new AppError("A staff account already exists for this email address", 409);
-  }
-
-  const pending = await prisma.staffInvitation.findFirst({
-    where: { email, status: "PENDING", expiresAt: { gt: new Date() } },
-    select: { id: true },
-  });
-  if (pending) throw new AppError("A pending invitation already exists for this email address", 409);
-
   const token = crypto.randomBytes(32).toString("hex");
   const invitation = await prisma.$transaction(async (tx) => {
+    // Delegation permissions are checked inside this transaction against the
+    // current staff account and role assignments.
+    const { roles } = await getDelegableRoles(tx, actorId, input.roleIds);
+
+    await tx.$executeRaw`
+      UPDATE staff_invitations
+      SET status = 'EXPIRED', "updatedAt" = NOW()
+      WHERE email = ${email}
+        AND status = 'PENDING'
+        AND "expiresAt" <= NOW()
+    `;
+
+    const existingStaff = await tx.staffAccount.findUnique({
+      where: { email },
+      select: { id: true, status: true },
+    });
+    if (existingStaff && existingStaff.status !== "PENDING_SETUP") {
+      throw new AppError("A staff account already exists for this email address", 409);
+    }
+
+    const pending = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM staff_invitations
+      WHERE email = ${email}
+        AND status = 'PENDING'
+        AND "expiresAt" > NOW()
+      LIMIT 1
+    `;
+    if (pending.length) {
+      throw new AppError("A pending invitation already exists for this email address", 409);
+    }
+
+    const expiresAt = await invitationExpiryFromDays(tx, days);
     const createdBase = await tx.staffInvitation.create({
       data: {
         email,
         tokenHash: hashRefreshToken(token),
-        expiresAt: expiryFromDays(days),
+        expiresAt,
         createdByStaffAccountId: actorId,
       },
     });
@@ -151,7 +196,7 @@ export async function listStaffInvitations() {
   // clock skew or DateTime parameter precision.
   await prisma.$executeRaw`
     UPDATE staff_invitations
-    SET status = 'EXPIRED'
+    SET status = 'EXPIRED', "updatedAt" = NOW()
     WHERE status = 'PENDING'
       AND "expiresAt" <= NOW()
   `;
@@ -171,15 +216,28 @@ export async function resendStaffInvitation(
 ) {
   const token = crypto.randomBytes(32).toString("hex");
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM staff_invitations WHERE id = ${invitationId}::uuid FOR UPDATE`;
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM staff_invitations
+      WHERE id = ${invitationId}::uuid
+      FOR UPDATE
+    `;
+    if (!locked.length) throw new AppError("Staff invitation not found", 404);
+
     const invitation = await tx.staffInvitation.findUnique({ where: { id: invitationId } });
     if (!invitation) throw new AppError("Staff invitation not found", 404);
-    if (invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
+    const [expiryState] = await tx.$queryRaw<Array<{ isValid: boolean }>>`
+      SELECT "expiresAt" > NOW() AS "isValid"
+      FROM staff_invitations
+      WHERE id = ${invitationId}::uuid
+    `;
+    if (invitation.status !== "PENDING" || !expiryState?.isValid) {
       throw new AppError("Only unexpired pending invitations can be resent", 409);
     }
+
+    const expiresAt = await invitationExpiryFromDays(tx, invitationDaysDefault);
     const result = await tx.staffInvitation.update({
       where: { id: invitationId },
-      data: { tokenHash: hashRefreshToken(token), expiresAt: expiryFromDays(invitationDaysDefault) },
+      data: { tokenHash: hashRefreshToken(token), expiresAt },
     });
     await createAuditLog(tx, {
       staffAccountId: actorId,
@@ -204,16 +262,27 @@ export async function updateStaffInvitationRoles(
   metadata: RequestMetadata = {},
 ) {
   if (!roleIds.length) throw new AppError("An invitation must contain at least one role", 400);
-  const { roles } = await getDelegableRoles(actorId, roleIds);
 
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM staff_invitations WHERE id = ${invitationId}::uuid FOR UPDATE`;
+    const { roles } = await getDelegableRoles(tx, actorId, roleIds);
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM staff_invitations
+      WHERE id = ${invitationId}::uuid
+      FOR UPDATE
+    `;
+    if (!locked.length) throw new AppError("Staff invitation not found", 404);
+
     const invitation = await tx.staffInvitation.findUnique({
       where: { id: invitationId },
       include: { roles: { include: { role: { select: { name: true } } } } },
     });
     if (!invitation) throw new AppError("Staff invitation not found", 404);
-    if (invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
+    const [expiryState] = await tx.$queryRaw<Array<{ isValid: boolean }>>`
+      SELECT "expiresAt" > NOW() AS "isValid"
+      FROM staff_invitations
+      WHERE id = ${invitationId}::uuid
+    `;
+    if (invitation.status !== "PENDING" || !expiryState?.isValid) {
       throw new AppError("Only unexpired pending invitations can be edited", 409);
     }
 
@@ -272,21 +341,39 @@ export async function acceptStaffInvitation(input: {
 }) {
   const tokenHash = hashRefreshToken(input.token);
   return prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM staff_invitations WHERE "tokenHash" = ${tokenHash} FOR UPDATE`;
+    // The row lock and expiry predicate both use PostgreSQL's clock. A token
+    // cannot be accepted based on a skewed application-server clock.
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id FROM staff_invitations
+      WHERE "tokenHash" = ${tokenHash}
+        AND status = 'PENDING'
+        AND "expiresAt" > NOW()
+      FOR UPDATE
+    `;
+    if (!locked.length) {
+      throw new AppError("This staff invitation is invalid, expired, or already used", 400);
+    }
+
     const invitation = await tx.staffInvitation.findUnique({
       where: { tokenHash },
       include: { roles: { select: { roleId: true, role: { select: { name: true } } } } },
     });
-    if (!invitation || invitation.status !== "PENDING" || invitation.expiresAt <= new Date()) {
+    if (!invitation || invitation.status !== "PENDING") {
       throw new AppError("This staff invitation is invalid, expired, or already used", 400);
     }
     if (!invitation.roles.length) throw new AppError("This invitation has no assigned staff roles", 409);
 
-    const claimed = await tx.staffInvitation.updateMany({
-      where: { id: invitation.id, status: "PENDING", expiresAt: { gt: new Date() } },
-      data: { status: "ACCEPTED", acceptedAt: new Date() },
-    });
-    if (claimed.count !== 1) throw new AppError("This invitation has already been used", 409);
+    const claimed = await tx.$queryRaw<Array<{ id: string }>>`
+      UPDATE staff_invitations
+      SET status = 'ACCEPTED', "acceptedAt" = NOW(), "updatedAt" = NOW()
+      WHERE id = ${invitation.id}::uuid
+        AND status = 'PENDING'
+        AND "expiresAt" > NOW()
+      RETURNING id
+    `;
+    if (claimed.length !== 1) {
+      throw new AppError("This staff invitation has already been used", 409);
+    }
 
     const passwordHash = await hashPassword(input.password);
     const existing = await tx.staffAccount.findUnique({ where: { email: invitation.email } });
@@ -446,8 +533,8 @@ export async function updateStaffAccountRoles(
   actorId: string, staffId: string, roleIds: string[], metadata: RequestMetadata = {},
 ) {
   if (!roleIds.length) throw new AppError("An active staff account must have at least one role", 400);
-  const { roles } = await getDelegableRoles(actorId, roleIds);
   return prisma.$transaction(async (tx) => {
+    const { roles } = await getDelegableRoles(tx, actorId, roleIds, [staffId]);
     const target = await tx.staffAccount.findUnique({
       where: { id: staffId },
       include: { roles: { include: { role: { select: { name: true } } } } },
@@ -498,11 +585,15 @@ export async function updateStaffAccountStatus(
 ) {
   if (actorId === staffId && status !== "ACTIVE") throw new AppError("You cannot suspend or deactivate your own account", 403);
   return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM staff_accounts WHERE id = ${staffId}::uuid FOR UPDATE`;
     const target = await tx.staffAccount.findUnique({
       where: { id: staffId },
       include: { roles: { include: { role: { select: { name: true } } } } },
     });
     if (!target) throw new AppError("Staff account not found", 404);
+    if (status === "ACTIVE" && target.roles.length === 0) {
+      throw new AppError("A staff account must have at least one role before activation", 409);
+    }
     if (target.status === "PENDING_SETUP") throw new AppError("Pending staff setup must be completed through an invitation", 409);
     if (target.status === "ACTIVE" && status !== "ACTIVE" && target.roles.some(({ role }) => role.name === "BUSINESS_OWNER")) {
       const otherActiveOwners = await tx.staffAccountRole.count({
