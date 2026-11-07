@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 
@@ -112,6 +113,7 @@ export async function loginUser(input: LoginInput) {
   await prisma.refreshToken.create({
     data: {
       userId: user.id,
+      familyId: crypto.randomUUID(),
       tokenHash: refreshTokenHash,
       expiresAt: refreshTokenExpiresAt,
     },
@@ -143,11 +145,7 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
         include: {
           userRoles: {
             include: {
-              role: {
-                include: {
-                  permissions: { include: { permission: true } },
-                },
-              },
+              role: { include: { permissions: { include: { permission: true } } } },
             },
           },
         },
@@ -155,75 +153,51 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
     },
   });
 
-  if (!storedToken) {
-    throw new AppError("Invalid refresh token", 401);
-  }
+  if (!storedToken) throw new AppError("Invalid refresh token", 401);
 
   if (storedToken.revokedAt) {
-    throw new AppError("Refresh token has been revoked", 401);
+    await prisma.refreshToken.updateMany({
+      where: { userId: storedToken.userId, familyId: storedToken.familyId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    throw new AppError("Refresh token reuse detected; session revoked", 401);
   }
-
-  if (storedToken.expiresAt <= new Date()) {
-    throw new AppError("Refresh token has expired", 401);
-  }
+  if (storedToken.expiresAt <= new Date()) throw new AppError("Refresh token has expired", 401);
 
   const user = storedToken.user;
-  if (!user.isActive) {
-    throw new AppError("Account is inactive", 403);
-  }
+  if (!user.isActive) throw new AppError("Account is inactive", 403);
 
   const roles = user.userRoles.map((userRole) => userRole.role.name);
-  const permissions = [
-    ...new Set(
-      user.userRoles.flatMap((userRole) =>
-        userRole.role.permissions.map((rolePermission) =>
-          rolePermission.permission.name,
-        ),
-      ),
-    ),
-  ];
-
-  const accessToken = generateAccessToken({
-    sub: user.id,
-    identityType: "CUSTOMER",
-    roles,
-    permissions,
-  });
-
+  const permissions = [...new Set(user.userRoles.flatMap((userRole) =>
+    userRole.role.permissions.map((rolePermission) => rolePermission.permission.name),
+  ))];
+  const accessToken = generateAccessToken({ sub: user.id, identityType: "CUSTOMER", roles, permissions });
   const newRefreshToken = generateRefreshToken();
   const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
   const newRefreshTokenExpiresAt = new Date();
-  newRefreshTokenExpiresAt.setDate(
-    newRefreshTokenExpiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN_DAYS,
-  );
+  newRefreshTokenExpiresAt.setDate(newRefreshTokenExpiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN_DAYS);
 
-  await prisma.$transaction(async (tx) => {
-    // The conditional update is the single-use claim. Only one concurrent
-    // request can change this token from active to revoked.
+  const rotationSucceeded = await prisma.$transaction(async (tx) => {
+    const now = new Date();
     const claimed = await tx.refreshToken.updateMany({
-      where: {
-        id: storedToken.id,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      data: { revokedAt: new Date() },
+      where: { id: storedToken.id, userId: storedToken.userId, familyId: storedToken.familyId, revokedAt: null, expiresAt: { gt: now } },
+      data: { revokedAt: now },
     });
-
     if (claimed.count !== 1) {
-      throw new AppError("Refresh token is invalid or has already been used", 401);
+      const current = await tx.refreshToken.findUnique({ where: { id: storedToken.id }, select: { revokedAt: true } });
+      if (current?.revokedAt) {
+        await tx.refreshToken.updateMany({
+          where: { userId: storedToken.userId, familyId: storedToken.familyId, revokedAt: null },
+          data: { revokedAt: now },
+        });
+      }
+      return false;
     }
-
     await tx.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: newRefreshTokenHash,
-        expiresAt: newRefreshTokenExpiresAt,
-      },
+      data: { userId: user.id, familyId: storedToken.familyId, tokenHash: newRefreshTokenHash, expiresAt: newRefreshTokenExpiresAt },
     });
+    return true;
   });
-
-  return {
-    accessToken,
-    refreshToken: newRefreshToken,
-  };
+  if (!rotationSucceeded) throw new AppError("Refresh token reuse detected; session revoked", 401);
+  return { accessToken, refreshToken: newRefreshToken };
 }
