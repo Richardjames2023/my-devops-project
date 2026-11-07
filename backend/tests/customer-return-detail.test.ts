@@ -91,7 +91,7 @@ describe("customer return detail HTTP endpoint", () => {
       .expect(200);
 
     expect(mocks.getCustomerReturnRequest).toHaveBeenCalledWith(
-      "customer-one",
+      customerId,
       returnRequestId,
     );
   });
