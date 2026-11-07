@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 const mocks = vi.hoisted(() => ({
   allocatePackage: vi.fn(),
   listReadyOrders: vi.fn(),
+  findStaffAccount: vi.fn(),
 }));
 
 vi.mock("../src/modules/fulfillment/fulfillment.service", async (importOriginal) => {
@@ -12,14 +13,24 @@ vi.mock("../src/modules/fulfillment/fulfillment.service", async (importOriginal)
   return { ...actual, allocatePackage: mocks.allocatePackage, listReadyOrders: mocks.listReadyOrders };
 });
 
+vi.mock("../src/infrastructure/prisma/client", () => ({
+  default: {
+    staffAccount: { findUnique: mocks.findStaffAccount },
+  },
+}));
+
 import app from "../src/app.ts";
 import { JWT_ACCESS_SECRET } from "../src/config/auth";
 
 function makeToken(permissions: string[] = ["orders.manage"]) {
+  const subject = permissions.includes("orders.manage")
+    ? "warehouse-user"
+    : "warehouse-user-without-orders-manage";
+
   return jwt.sign(
-    { roles: [], permissions },
+    { identityType: "STAFF", roles: [], permissions },
     JWT_ACCESS_SECRET,
-    { subject: "warehouse-user", expiresIn: "5m" },
+    { subject, expiresIn: "5m" },
   );
 }
 
@@ -30,6 +41,22 @@ describe("package allocation HTTP endpoint", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.listReadyOrders.mockResolvedValue([]);
+    mocks.findStaffAccount.mockImplementation(async ({ where }) => ({
+      status: "ACTIVE",
+      roles:
+        where.id === "warehouse-user"
+          ? [
+              {
+                role: {
+                  name: "WAREHOUSE",
+                  permissions: [
+                    { permission: { name: "orders.manage" } },
+                  ],
+                },
+              },
+            ]
+          : [],
+    }));
     mocks.allocatePackage.mockResolvedValue({
       id: "c4e7e6d2-2b5f-4c55-9b30-3c9c4f3b2a33",
       fulfillmentId,
