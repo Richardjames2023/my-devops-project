@@ -362,7 +362,7 @@ describe("PostgreSQL staff invitation lifecycle", () => {
 
   it("rechecks current delegation permissions inside the staff-role transaction", async () => {
     const staffId = auxiliaryStaffIds[0];
-    expect(staffId).toBeTruthy();
+    if (!staffId) throw new Error("The no-role staff fixture was not created");
 
     // Revoke the actor's staff.manage role immediately before the service call.
     await pool.query(
