@@ -146,10 +146,15 @@ export async function createStaffInvitation(
 }
 
 export async function listStaffInvitations() {
-  await prisma.staffInvitation.updateMany({
-    where: { status: "PENDING", expiresAt: { lte: new Date() } },
-    data: { status: "EXPIRED" },
-  });
+  // Use the database clock for expiry decisions so the transition is
+  // consistent with PostgreSQL timestamps and is not affected by app-server
+  // clock skew or DateTime parameter precision.
+  await prisma.$executeRaw`
+    UPDATE staff_invitations
+    SET status = 'EXPIRED'
+    WHERE status = 'PENDING'
+      AND "expiresAt" <= NOW()
+  `;
   return prisma.staffInvitation.findMany({
     select: {
       id: true, email: true, status: true, expiresAt: true, acceptedAt: true,
