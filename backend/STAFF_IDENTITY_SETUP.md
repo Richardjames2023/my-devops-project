@@ -99,7 +99,7 @@ Access tokens include an explicit identityType claim. Legacy tokens without the 
 
 Customer and staff refresh tokens are stored as hashes and grouped into independent session families. Each successful login creates a new family; rotating a token preserves that family identifier.
 
-If a previously consumed refresh token is presented again, the backend treats it as possible token theft and revokes every still-active refresh token in that family. Other login sessions for the same customer or staff account remain valid. A concurrent attempt to consume the same token follows the same strict policy: the winning rotation may be created briefly, but the losing request detects the consumed token and revokes the family.
+If a previously consumed refresh token is presented again, the backend treats it as possible token theft and revokes every still-active refresh token in that family. Other login sessions for the same customer or staff account remain valid. Rotations and replay revocations are serialized with PostgreSQL transaction-scoped advisory locks per family, including across application workers. A concurrent attempt to consume the same token follows the same strict policy: the winning rotation may be created, but the losing request detects the consumed token and revokes the family.
 
 Existing refresh-token records receive independent family IDs during migration because their historical rotation relationships cannot be reconstructed. Users do not need to log in again solely because this migration runs.
 
