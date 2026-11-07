@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   findPayment: vi.fn(),
   findRefunds: vi.fn(),
   reconcileRefund: vi.fn(),
+  findStaffAccount: vi.fn(),
 }));
 
 vi.mock("../src/infrastructure/prisma/client", () => ({
@@ -22,6 +23,9 @@ vi.mock("../src/infrastructure/prisma/client", () => ({
     },
     refund: {
       findMany: mocks.findRefunds,
+    },
+    staffAccount: {
+      findUnique: mocks.findStaffAccount,
     },
   },
 }));
@@ -53,10 +57,14 @@ const fakeEvent = {
 };
 
 function makeToken(permissions: string[] = ["orders.manage"]) {
+  const subject = permissions.includes("orders.manage")
+    ? "test-admin"
+    : "test-admin-without-orders-manage";
+
   return jwt.sign(
-    { roles: [], permissions },
+    { identityType: "STAFF", roles: [], permissions },
     JWT_ACCESS_SECRET,
-    { subject: "test-admin", expiresIn: "5m" },
+    { subject, expiresIn: "5m" },
   );
 }
 
@@ -71,6 +79,22 @@ describe("stale webhook recovery endpoint", () => {
     // Simulate an atomic database claim and its subsequent release.
     mocks.updateEvent.mockResolvedValue({ count: 1 });
     mocks.findRefunds.mockResolvedValue([]);
+    mocks.findStaffAccount.mockImplementation(async ({ where }) => ({
+      status: "ACTIVE",
+      roles:
+        where.id === "test-admin"
+          ? [
+              {
+                role: {
+                  name: "ADMIN",
+                  permissions: [
+                    { permission: { name: "orders.manage" } },
+                  ],
+                },
+              },
+            ]
+          : [],
+    }));
   });
 
   it("rejects unauthenticated recovery requests", async () => {
