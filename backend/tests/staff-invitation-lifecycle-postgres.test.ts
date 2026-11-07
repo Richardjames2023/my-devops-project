@@ -73,9 +73,9 @@ describe("PostgreSQL staff invitation lifecycle", () => {
       [actorRoleId, actorRoleName, roleAId, roleAName, roleBId, roleBName],
     );
     await pool.query(
-      `INSERT INTO role_permissions ("roleId", "permissionId", "createdAt")
-       VALUES ($1, $2, NOW())`,
-      [actorRoleId, permissionId],
+      `INSERT INTO role_permissions (id, "roleId", "permissionId", "createdAt")
+       VALUES ($1, $2, $3, NOW())`,
+      [randomUUID(), actorRoleId, permissionId],
     );
     await pool.query(
       `INSERT INTO staff_accounts
