@@ -59,6 +59,7 @@ const { resolveReconciliationAsRefunded, reconcileInventoryRefund } =
   await import("../src/modules/inventory-reconciliation/inventory-reconciliation.service");
 interface TestFixture {
   userId: string;
+  staffAccountId: string;
   orderId: string;
   paymentId: string;
   reconciliationId: string;
@@ -67,6 +68,7 @@ interface TestFixture {
 async function createFixture(): Promise<TestFixture> {
   const fixture: TestFixture = {
     userId: randomUUID(),
+    staffAccountId: randomUUID(),
     orderId: randomUUID(),
     paymentId: randomUUID(),
     reconciliationId: randomUUID(),
@@ -86,6 +88,18 @@ async function createFixture(): Promise<TestFixture> {
         "test-password-hash",
         "Refund",
         "Tester",
+      ],
+    );
+
+    await pool.query(
+      `INSERT INTO staff_accounts
+        (id, email, "firstName", "lastName", status, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, 'ACTIVE', NOW(), NOW())`,
+      [
+        fixture.staffAccountId,
+        `${suffix}@staff-refund-test.local`,
+        "Refund",
+        "Administrator",
       ],
     );
 
@@ -202,6 +216,7 @@ async function cleanupFixture(fixture: TestFixture): Promise<void> {
   await pool.query(`DELETE FROM orders WHERE id = $1`, [fixture.orderId]);
 
   await pool.query(`DELETE FROM users WHERE id = $1`, [fixture.userId]);
+  await pool.query(`DELETE FROM staff_accounts WHERE id = $1`, [fixture.staffAccountId]);
 }
 
 function successfulPaystackRefund() {
@@ -254,7 +269,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
 
       const result = await reconcileInventoryRefund(
         fixture.reconciliationId,
-        fixture.userId,
+        fixture.staffAccountId,
       );
 
       expect(result.reconciled).toBe(true);
@@ -302,7 +317,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
 
       const firstResult = await reconcileInventoryRefund(
         fixture.reconciliationId,
-        fixture.userId,
+        fixture.staffAccountId,
       );
 
       expect(firstResult.reconciled).toBe(true);
@@ -310,7 +325,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
 
       const secondResult = await reconcileInventoryRefund(
         fixture.reconciliationId,
-        fixture.userId,
+        fixture.staffAccountId,
       );
 
       expect(secondResult.reconciliation.status).toBe("RESOLVED_REFUNDED");
@@ -349,7 +364,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
 
       const result = await reconcileInventoryRefund(
         fixture.reconciliationId,
-        fixture.userId,
+        fixture.staffAccountId,
       );
 
       expect(result.reconciled).toBe(false);
@@ -386,7 +401,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
 
       const result = await reconcileInventoryRefund(
         fixture.reconciliationId,
-        fixture.userId,
+        fixture.staffAccountId,
       );
 
       expect(result.reconciled).toBe(true);
@@ -433,7 +448,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
 
       const result = await resolveReconciliationAsRefunded(
         fixture.reconciliationId,
-        fixture.userId,
+        fixture.staffAccountId,
         "Refund customer due to inventory finalization failure",
       );
 
@@ -545,7 +560,7 @@ describe("PostgreSQL inventory refund reconciliation", () => {
 
       const result = await reconcileInventoryRefund(
         fixture.reconciliationId,
-        fixture.userId,
+        fixture.staffAccountId,
       );
 
       expect(result.reconciled).toBe(true);
