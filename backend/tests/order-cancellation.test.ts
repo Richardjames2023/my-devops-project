@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   cancelOrder: vi.fn(),
   adminCancelOrder: vi.fn(),
   findStaffAccount: vi.fn(),
+  findCustomer: vi.fn(),
 }));
 
 vi.mock("../src/modules/orders/order.service", () => ({
@@ -17,6 +18,7 @@ vi.mock("../src/modules/orders/order.service", () => ({
 vi.mock("../src/infrastructure/prisma/client", () => ({
   default: {
     staffAccount: { findUnique: mocks.findStaffAccount },
+    user: { findUnique: mocks.findCustomer },
   },
 }));
 
@@ -37,7 +39,8 @@ function makeToken(
   );
 }
 
-const customerToken = makeToken("test-customer");
+const customerId = "2eb258a2-8574-46c9-a4d1-e86b8c8fe23e";
+const customerToken = makeToken(customerId);
 const adminToken = makeToken("test-admin", ["orders.manage"], "STAFF");
 const unauthorizedAdminToken = makeToken(
   "test-admin-without-permission",
@@ -57,6 +60,10 @@ describe("order cancellation HTTP endpoints", () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
+    mocks.findCustomer.mockResolvedValue({
+      isActive: true,
+      userRoles: [{ role: { name: "CUSTOMER" } }],
+    });
     mocks.cancelOrder.mockResolvedValue(successfulCancellation);
     mocks.adminCancelOrder.mockResolvedValue(successfulCancellation);
     mocks.findStaffAccount.mockImplementation(async ({ where }) => ({
@@ -94,7 +101,7 @@ describe("order cancellation HTTP endpoints", () => {
 
     expect(mocks.cancelOrder).toHaveBeenCalledWith(
       orderId,
-      "test-customer",
+      customerId,
       expect.any(Object),
     );
 
