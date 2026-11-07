@@ -44,7 +44,7 @@ describe("PostgreSQL refresh token rotation concurrency", () => {
     await pool.end();
   });
 
-  it("allows only one concurrent request to consume a refresh token", async () => {
+  it("revokes the session family when concurrent requests reuse a refresh token", async () => {
     const userId = randomUUID();
     const originalToken = generateRefreshToken();
     const originalTokenHash = hashRefreshToken(originalToken);
@@ -98,6 +98,7 @@ describe("PostgreSQL refresh token rotation concurrency", () => {
       await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
     }
   });
+
   it("revokes only the reused token family and preserves independent sessions", async () => {
     const userId = randomUUID();
     const compromisedFamilyId = randomUUID();
@@ -150,5 +151,4 @@ describe("PostgreSQL refresh token rotation concurrency", () => {
       await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
     }
   });
-
 });
