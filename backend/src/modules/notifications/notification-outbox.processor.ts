@@ -266,9 +266,11 @@ export async function processNotificationOutboxBatch(options: { eventId?: string
   const events = await prisma.$queryRaw<OutboxEvent[]>`
     WITH candidates AS (
       SELECT id FROM notification_outbox
-      WHERE (status = 'PENDING' AND "availableAt" <= NOW())
-         OR (status = 'PROCESSING' AND "lockedAt" <= NOW() - (${LEASE_MS} * INTERVAL '1 millisecond'))
-        ${eventFilter}
+      WHERE (
+        (status = 'PENDING' AND "availableAt" <= NOW())
+        OR (status = 'PROCESSING' AND "lockedAt" <= NOW() - (${LEASE_MS} * INTERVAL '1 millisecond'))
+      )
+      ${eventFilter}
       ORDER BY "availableAt" ASC, "createdAt" ASC
       FOR UPDATE SKIP LOCKED
       LIMIT ${BATCH_SIZE}
