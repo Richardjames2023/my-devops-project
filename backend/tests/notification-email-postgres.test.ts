@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { EmailProvider } from "../src/modules/notifications/email/email-provider";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) throw new Error("TEST_DATABASE_URL is required");
@@ -126,7 +127,7 @@ describe("PostgreSQL notification email delivery worker", () => {
 
   it("leaves queued messages untouched while email delivery is disabled", async () => {
     const fixture = await createFixture();
-    const send = vi.fn();
+    const send = vi.fn<EmailProvider["send"]>();
 
     const result = await processNotificationEmailBatch({ deliveryId: fixture.deliveryId, provider: { send }, enabled: false });
 
@@ -142,7 +143,7 @@ describe("PostgreSQL notification email delivery worker", () => {
 
   it("sends through the injected provider and records provider acceptance", async () => {
     const fixture = await createFixture();
-    const send = vi.fn().mockResolvedValue({ messageId: "resend-test-message-100" });
+    const send = vi.fn<EmailProvider["send"]>().mockResolvedValue({ messageId: "resend-test-message-100" });
 
     const result = await processNotificationEmailBatch({
       deliveryId: fixture.deliveryId,
@@ -169,7 +170,7 @@ describe("PostgreSQL notification email delivery worker", () => {
 
   it("schedules a retry after a transient provider failure", async () => {
     const fixture = await createFixture();
-    const send = vi.fn().mockRejectedValue(new EmailProviderError("Rate limited", true, 429));
+    const send = vi.fn<EmailProvider["send"]>().mockRejectedValue(new EmailProviderError("Rate limited", true, 429));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     try {
@@ -241,7 +242,7 @@ describe("PostgreSQL notification email delivery worker", () => {
 
   it("does not allow two workers to claim the same queued delivery", async () => {
     const fixture = await createFixture();
-    const send = vi.fn().mockImplementation(async () => {
+    const send = vi.fn<EmailProvider["send"]>().mockImplementation(async () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       return { messageId: "resend-concurrent-message" };
     });
