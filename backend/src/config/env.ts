@@ -30,8 +30,9 @@ const envSchema = z.object({
     .transform((value) => value === "true"),
   RESEND_API_KEY: z.string().min(1).optional(),
   EMAIL_FROM: z.string().min(3).refine((value) => {
-    const match = value.match(/<([^<>]+)>\\s*$/);
-    const address = match?.[1] ?? value;
+    const normalized = value.trim();
+    const match = normalized.match(/<([^<>]+)>$/);
+    const address = match?.[1] ?? normalized;
     return z.string().email().safeParse(address.trim()).success;
   }).optional(),
   APP_BASE_URL: z.string().url().optional(),
