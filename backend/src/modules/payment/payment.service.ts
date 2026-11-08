@@ -13,6 +13,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type { CreatePaymentInput } from "./payment.validation";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
 const MAX_TRANSACTION_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
@@ -822,6 +823,19 @@ async function markPaymentSuccessfulWithAccess(
             },
           });
 
+          await publishNotificationEvent(tx, {
+            eventType: "payment.succeeded",
+            aggregateType: "PAYMENT",
+            aggregateId: updatedPayment.id,
+            payload: {
+              paymentId: updatedPayment.id,
+              orderId: updatedOrder.id,
+              orderNumber: updatedOrder.orderNumber,
+              amount: updatedPayment.amount.toString(),
+              currency: updatedPayment.currency,
+            },
+          });
+
           return {
             payment: updatedPayment,
             order: updatedOrder,
@@ -979,7 +993,7 @@ async function markPaymentSuccessfulWithAccess(
 
           // Create the reconciliation record in the same transaction
           // that marks the payment as successful.
-          await tx.paymentInventoryReconciliation.upsert({
+          const reconciliation = await tx.paymentInventoryReconciliation.upsert({
             where: {
               paymentId: currentPayment.id,
             },
@@ -989,6 +1003,30 @@ async function markPaymentSuccessfulWithAccess(
               reason: error.message,
             },
             update: {},
+          });
+
+          await publishNotificationEvent(tx, {
+            eventType: "payment.succeeded",
+            aggregateType: "PAYMENT",
+            aggregateId: currentPayment.id,
+            payload: {
+              paymentId: currentPayment.id,
+              orderId: currentPayment.orderId,
+              orderNumber: currentPayment.order.orderNumber,
+              amount: currentPayment.amount.toString(),
+              currency: currentPayment.currency,
+            },
+          });
+
+          await publishNotificationEvent(tx, {
+            eventType: "payment.reconciliation_required",
+            aggregateType: "PAYMENT",
+            aggregateId: currentPayment.id,
+            payload: {
+              paymentId: currentPayment.id,
+              orderId: currentPayment.orderId,
+              reconciliationId: reconciliation.id,
+            },
           });
 
           const updatedPayment = await tx.payment.findUnique({
