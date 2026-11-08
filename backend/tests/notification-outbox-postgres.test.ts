@@ -215,7 +215,7 @@ describe("PostgreSQL notification outbox processing", () => {
   it("fans a successful payment out to the registered customer and queues one email", async () => {
     const fixture = await createPaymentEvent();
 
-    const result = await processNotificationOutboxBatch();
+    const result = await processNotificationOutboxBatch({ eventId: fixture.outboxId });
     expect(result).toEqual({ claimed: 1, processed: 1, failed: 0 });
 
     const notifications = await pool.query(
@@ -268,7 +268,7 @@ describe("PostgreSQL notification outbox processing", () => {
     await createStaff({ active: true, canManagePayments: false });
     await createStaff({ active: false, canManagePayments: true });
 
-    const result = await processNotificationOutboxBatch();
+    const result = await processNotificationOutboxBatch({ eventId: fixture.outboxId });
     expect(result).toEqual({ claimed: 1, processed: 1, failed: 0 });
 
     const notifications = await pool.query(
@@ -303,7 +303,7 @@ describe("PostgreSQL notification outbox processing", () => {
   it("marks guest payment events processed without inventing a customer inbox identity", async () => {
     const fixture = await createPaymentEvent({ guest: true });
 
-    const result = await processNotificationOutboxBatch();
+    const result = await processNotificationOutboxBatch({ eventId: fixture.outboxId });
     expect(result).toEqual({ claimed: 1, processed: 1, failed: 0 });
 
     const notifications = await pool.query(
@@ -340,7 +340,7 @@ describe("PostgreSQL notification outbox processing", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     try {
-      const result = await processNotificationOutboxBatch();
+      const result = await processNotificationOutboxBatch({ eventId: outboxId });
       expect(result).toEqual({ claimed: 1, processed: 0, failed: 1 });
 
       const outbox = await pool.query(
@@ -375,7 +375,7 @@ describe("PostgreSQL notification outbox processing", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
     try {
-      const result = await processNotificationOutboxBatch();
+      const result = await processNotificationOutboxBatch({ eventId: outboxId });
       expect(result).toEqual({ claimed: 1, processed: 0, failed: 1 });
 
       const outbox = await pool.query(
@@ -399,8 +399,8 @@ describe("PostgreSQL notification outbox processing", () => {
     const fixture = await createPaymentEvent();
 
     const results = await Promise.all([
-      processNotificationOutboxBatch(),
-      processNotificationOutboxBatch(),
+      processNotificationOutboxBatch({ eventId: fixture.outboxId }),
+      processNotificationOutboxBatch({ eventId: fixture.outboxId }),
     ]);
     expect(results.reduce((total, result) => total + result.claimed, 0)).toBe(1);
     expect(results.reduce((total, result) => total + result.processed, 0)).toBe(1);
@@ -424,8 +424,8 @@ describe("PostgreSQL notification outbox processing", () => {
   it("does not create duplicate notifications or email rows when an event is processed again", async () => {
     const fixture = await createPaymentEvent();
 
-    const first = await processNotificationOutboxBatch();
-    const second = await processNotificationOutboxBatch();
+    const first = await processNotificationOutboxBatch({ eventId: fixture.outboxId });
+    const second = await processNotificationOutboxBatch({ eventId: fixture.outboxId });
     expect(first.processed).toBe(1);
     expect(second.claimed).toBe(0);
 
