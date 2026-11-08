@@ -91,7 +91,21 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       where: { status: "ACTIVE" },
       select: {
         id: true, email: true,
-        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+        roles: {
+        select: {
+          role: {
+            select: {
+              permissions: {
+                select: {
+                  permission: {
+                    select: { name: true },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       },
     });
     const title = "Payment requires manual review";
@@ -112,9 +126,21 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
     const deliveryId = payloadString(event.payload, "deliveryId") ?? event.aggregateId;
     const delivery = await tx.delivery.findUnique({
       where: { id: deliveryId },
-      include: { package: { include: { fulfillment: { include: {
-        order: { include: { user: { select: { id: true, email: true } } } },
-      } } } },
+      include: {
+        package: {
+          include: {
+            fulfillment: {
+              include: {
+                order: {
+                  include: {
+                    user: { select: { id: true, email: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
     if (!delivery) throw new Error("Delivery not found for notification event: " + deliveryId);
     const order = delivery.package.fulfillment.order;
