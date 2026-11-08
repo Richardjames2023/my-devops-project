@@ -28,7 +28,6 @@ const paymentFixtures: PaymentFixture[] = [];
 const staffFixtures: StaffFixture[] = [];
 const outboxIds: string[] = [];
 const roleIds: string[] = [];
-const permissionIds: string[] = [];
 
 async function createPaymentEvent(options: { guest?: boolean; eventType?: string } = {}): Promise<PaymentFixture> {
   const userId = options.guest ? null : randomUUID();
