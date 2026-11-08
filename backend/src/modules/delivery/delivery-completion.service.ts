@@ -2,6 +2,7 @@
 import { Prisma } from "@prisma/client";
 import type { Prisma as PrismaTypes } from "@prisma/client";
 import { AppError } from "../../common/errors/AppError";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
 function addMonthsClamped(date: Date, months: number): Date {
   const result = new Date(date);
@@ -179,6 +180,20 @@ export async function completeDelivery(
       status: fulfillmentComplete ? "FULFILLED" : "PARTIALLY_FULFILLED",
     },
   });
+
+  if (delivery.status !== "DELIVERED") {
+    await publishNotificationEvent(tx, {
+      eventType: "delivery.delivered",
+      aggregateType: "DELIVERY",
+      aggregateId: delivery.id,
+      payload: {
+        deliveryId: delivery.id,
+        packageId: delivery.package.id,
+        orderId: fulfillment.orderId,
+        fulfillmentId: fulfillment.id,
+      },
+    });
+  }
 
   const orderItemIds = [
     ...new Set(delivery.package.items.map((item) => item.orderItemId)),
