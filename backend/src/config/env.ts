@@ -29,7 +29,11 @@ const envSchema = z.object({
     .default("false")
     .transform((value) => value === "true"),
   RESEND_API_KEY: z.string().min(1).optional(),
-  EMAIL_FROM: z.string().email().optional(),
+  EMAIL_FROM: z.string().min(3).refine((value) => {
+    const match = value.match(/<([^<>]+)>\\s*$/);
+    const address = match?.[1] ?? value;
+    return z.string().email().safeParse(address.trim()).success;
+  }).optional(),
   APP_BASE_URL: z.string().url().optional(),
 }).superRefine((value, context) => {
   if (value.EMAIL_DELIVERY_ENABLED && !value.RESEND_API_KEY) {
