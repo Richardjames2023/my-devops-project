@@ -128,3 +128,17 @@ Apply the migration with the same environment-specific commands described above:
 - Staging/production: `npx prisma migrate deploy` followed by `npx prisma generate`.
 
 Back up the database before applying migrations. Do not use `prisma migrate dev` in production.
+
+## Notification event publishing
+
+Phase 2 introduces a transaction-scoped notification outbox publisher at `src/modules/notifications/notification-outbox.publisher.ts`. Domain services pass their existing Prisma transaction client to the publisher; it does not open a separate transaction, call an email provider, or perform network I/O.
+
+The publisher uses a deterministic event key (`v1:<eventType>:<aggregateType>:<aggregateId>`) and an idempotent upsert. Repeated publication of the same event/aggregate leaves the first event payload unchanged. Event payloads currently contain identifiers and transaction snapshots only; they must not contain passwords, access tokens, refresh tokens, invitation tokens, or other credentials.
+
+The first integrated events are:
+
+- `payment.succeeded`: committed with successful payment, inventory finalization, and order confirmation.
+- `payment.reconciliation_required`: committed with the verified successful payment and its inventory-reconciliation record, for later urgent staff routing.
+- `delivery.delivered`: committed with delivery/package/fulfillment/order completion updates, and emitted only on the transition into DELIVERED.
+
+These events are durable records only. Recipient resolution, notification fan-out, email policy enforcement, retries, workers, and APIs remain later phases. Guest orders currently have no customer identity row for an in-app notification; the later recipient-routing phase must explicitly handle guest email delivery rather than inventing a customer inbox identity.
