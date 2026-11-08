@@ -20,6 +20,7 @@ type ClaimedDelivery = {
   templateKey: string;
   templateData: Prisma.JsonValue;
   attemptCount: number;
+  lockedBy: string;
 };
 
 export interface ProcessEmailBatchOptions {
@@ -40,6 +41,7 @@ function retryDelay(attemptCount: number): number {
 }
 
 async function claimBatch(deliveryId?: string): Promise<ClaimedDelivery[]> {
+  const workerId = randomUUID();
   const idFilter = deliveryId
     ? Prisma.sql`AND id = ${deliveryId}::uuid`
     : Prisma.empty;
@@ -61,12 +63,12 @@ async function claimBatch(deliveryId?: string): Promise<ClaimedDelivery[]> {
     SET status = 'PROCESSING',
         "attemptCount" = delivery."attemptCount" + 1,
         "lockedAt" = NOW(),
-        "lockedBy" = ${randomUUID()},
+        "lockedBy" = ${workerId},
         "updatedAt" = NOW()
     FROM candidates
     WHERE delivery.id = candidates.id
     RETURNING delivery.id, delivery."recipientEmail", delivery."templateKey",
-              delivery."templateData", delivery."attemptCount"
+              delivery."templateData", delivery."attemptCount", delivery."lockedBy"
   `;
 }
 
@@ -75,7 +77,7 @@ async function markAccepted(
   messageId: string,
 ): Promise<void> {
   await prisma.notificationEmailDelivery.updateMany({
-    where: { id: delivery.id, status: "PROCESSING" },
+    where: { id: delivery.id, status: "PROCESSING", lockedBy: delivery.lockedBy },
     data: {
       status: "ACCEPTED",
       providerMessageId: messageId,
@@ -88,7 +90,7 @@ async function markAccepted(
 }
 
 async function markFailed(delivery: ClaimedDelivery, error: unknown): Promise<void> {
-  const retryable = error instanceof EmailProviderError ? error.retryable : true;
+  const retryable = error instanceof EmailProviderError ? error.retryable : false;
   const terminal = !retryable || delivery.attemptCount >= MAX_ATTEMPTS;
   const message = (error instanceof Error ? error.message : String(error)).slice(0, 2000);
 
