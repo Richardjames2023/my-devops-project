@@ -49,6 +49,8 @@ model User {
   returnItemInspections                   ReturnItemInspection[]           @relation("ReturnItemInspections")
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("PaymentInventoryReconciliationResolver")
   productReviews                          ProductReview[]
+  notifications                            Notification[]
+  notificationPreferences                  NotificationPreference[]
 
   @@index([email])
   @@index([phone])
@@ -89,6 +91,8 @@ model StaffAccount {
   assignedRoleRecords                     StaffAccountRole[]                @relation("StaffRoleAssigner")
   inspectedReturnItems                    ReturnItemInspection[]            @relation("StaffReturnItemInspections")
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("StaffPaymentInventoryReconciliationResolver")
+  notifications                            Notification[]
+  notificationPreferences                  NotificationPreference[]
 
   @@index([status])
   @@map("staff_accounts")
@@ -770,6 +774,134 @@ model PaymentInventoryReconciliation {
   @@index([resolvedByUserId])
   @@index([resolvedByStaffAccountId])
   @@map("payment_inventory_reconciliations")
+}
+
+
+
+model NotificationOutbox {
+  id           String                  @id @default(uuid()) @db.Uuid
+  eventKey     String                  @unique
+  eventType    String
+  aggregateType String
+  aggregateId  String
+  payload      Json
+  status       NotificationOutboxStatus @default(PENDING)
+  attemptCount Int                     @default(0)
+  availableAt  DateTime                @default(now())
+  lockedAt     DateTime?
+  lockedBy     String?
+  processedAt  DateTime?
+  lastError    String?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  notifications Notification[]
+
+  @@index([status, availableAt, createdAt])
+  @@index([status, lockedAt])
+  @@index([aggregateType, aggregateId, createdAt])
+  @@map("notification_outbox")
+}
+
+model Notification {
+  id             String                     @id @default(uuid()) @db.Uuid
+  outboxEventId  String                     @db.Uuid
+  recipientType  NotificationRecipientType
+  customerUserId String?                    @db.Uuid
+  staffAccountId String?                    @db.Uuid
+  category       NotificationCategory
+  title          String
+  body           String
+  actionUrl      String?
+  metadata       Json?
+  readAt         DateTime?
+  createdAt      DateTime                   @default(now())
+  outboxEvent    NotificationOutbox         @relation(fields: [outboxEventId], references: [id], onDelete: Restrict)
+  customerUser   User?                      @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  staffAccount   StaffAccount?              @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
+  emailDelivery  NotificationEmailDelivery?
+
+  @@index([customerUserId, createdAt])
+  @@index([customerUserId, readAt, createdAt])
+  @@index([staffAccountId, createdAt])
+  @@index([staffAccountId, readAt, createdAt])
+  @@index([outboxEventId])
+  @@index([category, createdAt])
+  @@map("notifications")
+}
+
+model NotificationEmailDelivery {
+  id                String                         @id @default(uuid()) @db.Uuid
+  notificationId    String                         @unique @db.Uuid
+  recipientEmail    String
+  templateKey       String
+  templateData      Json
+  status            NotificationEmailDeliveryStatus @default(QUEUED)
+  attemptCount      Int                            @default(0)
+  nextAttemptAt     DateTime                       @default(now())
+  lockedAt          DateTime?
+  lockedBy          String?
+  providerMessageId String?
+  acceptedAt        DateTime?
+  lastError         String?
+  createdAt         DateTime                       @default(now())
+  updatedAt         DateTime                       @updatedAt
+  notification      Notification                   @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([status, lockedAt])
+  @@index([providerMessageId])
+  @@map("notification_email_deliveries")
+}
+
+model NotificationPreference {
+  id             String                     @id @default(uuid()) @db.Uuid
+  recipientType  NotificationRecipientType
+  customerUserId String?                    @db.Uuid
+  staffAccountId String?                    @db.Uuid
+  category       NotificationCategory
+  inAppEnabled   Boolean                    @default(true)
+  emailEnabled   Boolean                    @default(true)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  customerUser   User?                      @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  staffAccount   StaffAccount?              @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
+
+  @@index([customerUserId, category])
+  @@index([staffAccountId, category])
+  @@map("notification_preferences")
+}
+
+enum NotificationRecipientType {
+  CUSTOMER
+  STAFF
+}
+
+enum NotificationCategory {
+  ACCOUNT
+  ORDER
+  PAYMENT
+  DELIVERY
+  RETURN
+  REFUND
+  WARRANTY
+  SECURITY
+  INVENTORY
+  STAFF
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  DEAD
+}
+
+enum NotificationEmailDeliveryStatus {
+  QUEUED
+  PROCESSING
+  RETRYING
+  ACCEPTED
+  DEAD
 }
 
 enum StaffAccountStatus {
