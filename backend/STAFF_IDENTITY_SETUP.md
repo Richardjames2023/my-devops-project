@@ -120,7 +120,7 @@ Customer and staff notification ownership is deliberately separate even when bot
 
 The first-release channel policy is enforced by application logic in a later phase: customer transactional events use in-app and email; staff events use in-app, with email reserved for urgent/actionable events. Mandatory transactional and security notices must not be disabled by user preferences. Staff invitations remain a separate secure delivery flow; raw invitation tokens must never be placed in generic outbox payloads or notification metadata.
 
-The outbox and email-delivery tables include database lease fields and indexes to support multiple workers using PostgreSQL row locking and stale-lease recovery. Worker claim/acknowledgement behavior, retry policy, event publishers, recipient resolution, APIs, and email provider integration are intentionally deferred to later implementation phases.
+The outbox and email-delivery tables include database lease fields and indexes to support multiple workers using PostgreSQL row locking and stale-lease recovery. Worker claim/acknowledgement behavior, retry policy, recipient resolution, notification APIs, and email provider integration are intentionally deferred to later implementation phases. Transactional event publishing is introduced in Phase 2 below.
 
 Apply the migration with the same environment-specific commands described above:
 
