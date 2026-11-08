@@ -28,14 +28,14 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
-  RESEND_API_KEY: z.string().min(1).optional(),
-  EMAIL_FROM: z.string().min(3).refine((value) => {
+  RESEND_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  EMAIL_FROM: z.preprocess((value) => value === "" ? undefined : value, z.string().min(3).refine((value) => {
     const normalized = value.trim();
     const match = normalized.match(/<([^<>]+)>$/);
     const address = match?.[1] ?? normalized;
     return z.string().email().safeParse(address.trim()).success;
-  }).optional(),
-  APP_BASE_URL: z.string().url().optional(),
+  }).optional()),
+  APP_BASE_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
 }).superRefine((value, context) => {
   if (value.EMAIL_DELIVERY_ENABLED && !value.RESEND_API_KEY) {
     context.addIssue({
