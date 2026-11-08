@@ -76,7 +76,7 @@ async function markAccepted(
   delivery: ClaimedDelivery,
   messageId: string,
 ): Promise<void> {
-  await prisma.notificationEmailDelivery.updateMany({
+  const result = await prisma.notificationEmailDelivery.updateMany({
     where: { id: delivery.id, status: "PROCESSING", lockedBy: delivery.lockedBy },
     data: {
       status: "ACCEPTED",
@@ -87,6 +87,7 @@ async function markAccepted(
       lastError: null,
     },
   });
+  if (result.count !== 1) throw new Error("Notification email delivery lease was lost");
 }
 
 async function markFailed(delivery: ClaimedDelivery, error: unknown): Promise<void> {
@@ -95,7 +96,7 @@ async function markFailed(delivery: ClaimedDelivery, error: unknown): Promise<vo
   const message = (error instanceof Error ? error.message : String(error)).slice(0, 2000);
 
   await prisma.notificationEmailDelivery.updateMany({
-    where: { id: delivery.id, status: "PROCESSING" },
+    where: { id: delivery.id, status: "PROCESSING", lockedBy: delivery.lockedBy },
     data: {
       status: terminal ? "DEAD" : "RETRYING",
       nextAttemptAt: new Date(Date.now() + retryDelay(delivery.attemptCount)),
