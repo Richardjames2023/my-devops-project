@@ -219,7 +219,7 @@ describe("PostgreSQL notification outbox processing", () => {
     expect(result).toEqual({ claimed: 1, processed: 1, failed: 0 });
 
     const notifications = await pool.query(
-      `SELECT recipientType, "customerUserId", "staffAccountId", category, title, "actionUrl"
+      `SELECT "recipientType", "customerUserId", "staffAccountId", category, title, "actionUrl"
        FROM notifications WHERE "outboxEventId" = $1`,
       [fixture.outboxId],
     );
@@ -272,7 +272,7 @@ describe("PostgreSQL notification outbox processing", () => {
     expect(result).toEqual({ claimed: 1, processed: 1, failed: 0 });
 
     const notifications = await pool.query(
-      `SELECT "staffAccountId", recipientType, category, title
+      `SELECT "staffAccountId", "recipientType", category, title
        FROM notifications WHERE "outboxEventId" = $1`,
       [fixture.outboxId],
     );
@@ -344,7 +344,10 @@ describe("PostgreSQL notification outbox processing", () => {
       expect(result).toEqual({ claimed: 1, processed: 0, failed: 1 });
 
       const outbox = await pool.query(
-        `SELECT status, "attemptCount", "availableAt", "lockedAt", "lockedBy", "lastError"
+        `SELECT status, "attemptCount", "availableAt",
+                ("availableAt" > (NOW() AT TIME ZONE 'UTC') + INTERVAL '20 seconds'
+                 AND "availableAt" < (NOW() AT TIME ZONE 'UTC') + INTERVAL '40 seconds') AS "retryScheduledInFuture",
+                "lockedAt", "lockedBy", "lastError"
          FROM notification_outbox WHERE id = $1`,
         [outboxId],
       );
@@ -354,7 +357,9 @@ describe("PostgreSQL notification outbox processing", () => {
         lockedAt: null,
         lockedBy: null,
       });
-      expect(new Date(outbox.rows[0].availableAt).getTime()).toBeGreaterThan(Date.now());
+      // Compare timestamps using PostgreSQL's UTC clock to avoid node-postgres
+      // interpreting TIMESTAMP WITHOUT TIME ZONE in the machine's local timezone.
+      expect(outbox.rows[0].retryScheduledInFuture).toBe(true);
       expect(outbox.rows[0].lastError).toContain("Payment not found");
     } finally {
       errorSpy.mockRestore();
