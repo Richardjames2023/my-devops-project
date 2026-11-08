@@ -87,9 +87,9 @@ async function createNotification(input: {
     `INSERT INTO notification_outbox
      (id, "eventKey", "eventType", "aggregateType", "aggregateId", payload,
       status, "attemptCount", "availableAt", "createdAt", "updatedAt", "processedAt")
-     VALUES ($1, $2, 'test.notification', 'TEST', $1, '{}'::jsonb,
+     VALUES ($1, $2, 'test.notification', 'TEST', $3, '{}'::jsonb,
              'PROCESSED', 1, NOW(), NOW(), NOW(), NOW())`,
-    [outboxId, `inbox-test:${outboxId}`],
+    [outboxId, `inbox-test:${outboxId}`, outboxId],
   );
   await pool.query(
     `INSERT INTO notifications
