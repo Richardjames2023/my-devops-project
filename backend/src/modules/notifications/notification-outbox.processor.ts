@@ -258,13 +258,17 @@ async function recordFailure(event: OutboxEvent, workerId: string, error: unknow
   });
 }
 
-export async function processNotificationOutboxBatch(): Promise<{ claimed: number; processed: number; failed: number }> {
+export async function processNotificationOutboxBatch(options: { eventId?: string } = {}): Promise<{ claimed: number; processed: number; failed: number }> {
   const workerId = randomUUID();
+  const eventFilter = options.eventId
+    ? Prisma.sql`AND id = ${options.eventId}::uuid`
+    : Prisma.empty;
   const events = await prisma.$queryRaw<OutboxEvent[]>`
     WITH candidates AS (
       SELECT id FROM notification_outbox
       WHERE (status = 'PENDING' AND "availableAt" <= NOW())
          OR (status = 'PROCESSING' AND "lockedAt" <= NOW() - (${LEASE_MS} * INTERVAL '1 millisecond'))
+        ${eventFilter}
       ORDER BY "availableAt" ASC, "createdAt" ASC
       FOR UPDATE SKIP LOCKED
       LIMIT ${BATCH_SIZE}
