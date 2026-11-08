@@ -50,7 +50,9 @@ const publicProductSelect = {
   },
 } satisfies Prisma.ProductSelect;
 
-function presentProduct(product: Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>) {
+function presentProduct(
+  product: Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>,
+) {
   const variants = product.variants.map((variant) => {
     const inventory = variant.inventory;
     const availableQuantity = inventory
@@ -235,7 +237,8 @@ export async function listCatalogProducts(query: ProductCatalogQuery) {
       );
     }
 
-    const direction = query.sort === "price_asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+    const direction =
+      query.sort === "price_asc" ? Prisma.sql`ASC` : Prisma.sql`DESC`;
     const offset = (query.page - 1) * query.limit;
 
     const [sortedIds, total] = await prisma.$transaction(async (tx) => {
@@ -267,12 +270,17 @@ export async function listCatalogProducts(query: ProductCatalogQuery) {
             select: publicProductSelect,
           })
         : [];
-      const productsById = new Map(pageProducts.map((product) => [product.id, product]));
+      const productsById = new Map(
+        pageProducts.map((product) => [product.id, product]),
+      );
 
-      return [pageIds.flatMap((id) => {
-        const product = productsById.get(id);
-        return product ? [product] : [];
-      }), count] as const;
+      return [
+        pageIds.flatMap((id) => {
+          const product = productsById.get(id);
+          return product ? [product] : [];
+        }),
+        count,
+      ] as const;
     });
 
     return {
@@ -289,9 +297,7 @@ export async function listCatalogProducts(query: ProductCatalogQuery) {
   }
 
   const orderBy: Prisma.ProductOrderByWithRelationInput =
-    query.sort === "name_asc"
-      ? { name: "asc" }
-      : { createdAt: "desc" };
+    query.sort === "name_asc" ? { name: "asc" } : { createdAt: "desc" };
 
   const [products, total] = await prisma.$transaction([
     prisma.product.findMany({

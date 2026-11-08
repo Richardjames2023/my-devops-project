@@ -20,19 +20,28 @@ process.env.DATABASE_URL = databaseUrl;
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
 
-const { listCatalogProducts, getCatalogProductBySlug, listActiveCategories, disconnectDatabase } =
-  await import("../src/modules/products/product.service").then(async (service) => {
+const {
+  listCatalogProducts,
+  getCatalogProductBySlug,
+  listActiveCategories,
+  disconnectDatabase,
+} = await import("../src/modules/products/product.service").then(
+  async (service) => {
     const database = await import("../src/infrastructure/prisma/client");
     return {
       listCatalogProducts: service.listCatalogProducts,
       getCatalogProductBySlug: service.getCatalogProductBySlug,
-      listActiveCategories: (await import("../src/modules/products/category.service")).listActiveCategories,
+      listActiveCategories: (
+        await import("../src/modules/products/category.service")
+      ).listActiveCategories,
       disconnectDatabase: database.disconnectDatabase,
     };
-  });
+  },
+);
 
 interface Fixture {
   categoryId: string;
+  categorySlug: string;
   productIds: string[];
   variantIds: string[];
   inventoryIds: string[];
@@ -40,22 +49,23 @@ interface Fixture {
 }
 
 async function createFixture(): Promise<Fixture> {
+  const suffix = randomUUID();
+
   const fixture: Fixture = {
     categoryId: randomUUID(),
+    categorySlug: `catalog-test-${suffix}`,
     productIds: [randomUUID(), randomUUID(), randomUUID()],
     variantIds: [randomUUID(), randomUUID()],
     inventoryIds: [randomUUID(), randomUUID()],
     imageIds: [randomUUID(), randomUUID()],
   };
 
-  const suffix = randomUUID();
-
   try {
     await pool.query(
       `INSERT INTO categories
        (id, name, slug, "createdAt", "updatedAt")
        VALUES ($1, $2, $3, NOW(), NOW())`,
-      [fixture.categoryId, `Catalog Test ${suffix}`, `catalog-test-${suffix}`],
+      [fixture.categoryId, `Catalog Test ${suffix}`, fixture.categorySlug],
     );
 
     // This product deliberately has two variant prices with a gap between them.
@@ -134,11 +144,7 @@ async function createFixture(): Promise<Fixture> {
        VALUES
        ($1, $2, 'https://example.test/secondary.jpg', 'Secondary', 0, false, NOW()),
        ($3, $2, 'https://example.test/primary.jpg', 'Primary', 5, true, NOW())`,
-      [
-        fixture.imageIds[0],
-        fixture.productIds[0],
-        fixture.imageIds[1],
-      ],
+      [fixture.imageIds[0], fixture.productIds[0], fixture.imageIds[1]],
     );
 
     return fixture;
@@ -278,16 +284,18 @@ describe("PostgreSQL product catalog queries", () => {
 
     try {
       const ascending = await listCatalogProducts({
+        category: fixture.categorySlug,
         sort: "price_asc",
         page: 1,
         limit: 12,
       });
+
       const descending = await listCatalogProducts({
+        category: fixture.categorySlug,
         sort: "price_desc",
         page: 1,
         limit: 12,
       });
-
       const ascendingIds = ascending.items
         .filter((item) => fixture.productIds.slice(0, 2).includes(item.id))
         .map((item) => item.id);
@@ -345,9 +353,11 @@ describe("PostgreSQL product catalog queries", () => {
       expect(product.id).toBe(fixture.productIds[0]);
       expect(product.slug).toBe(activeSlug);
 
-      await expect(getCatalogProductBySlug(inactiveSlug)).rejects.toMatchObject({
-        statusCode: 404,
-      });
+      await expect(getCatalogProductBySlug(inactiveSlug)).rejects.toMatchObject(
+        {
+          statusCode: 404,
+        },
+      );
     } finally {
       await cleanupFixture(fixture);
     }

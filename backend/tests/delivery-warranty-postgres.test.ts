@@ -233,11 +233,11 @@ async function createFixture(
 }
 
 async function cleanupFixture(fixture: TestFixture): Promise<void> {
-  // Outbox aggregate IDs are intentionally not foreign keys; clean test events explicitly.
+   // Outbox aggregate IDs are intentionally not foreign keys; clean test events explicitly.
   await pool.query(
     `DELETE FROM notification_outbox
-     WHERE aggregateType = 'DELIVERY'
-       AND aggregateId IN (
+     WHERE "aggregateType" = 'DELIVERY'
+       AND "aggregateId" IN (
          SELECT d.id::text FROM deliveries d
          JOIN packages p ON p.id = d."packageId"
          WHERE p."fulfillmentId" = $1
@@ -447,7 +447,7 @@ describe("PostgreSQL delivery and warranty activation", () => {
 
       const outboxEvents = await pool.query(
         `SELECT "aggregateId" FROM notification_outbox
-         WHERE eventType = 'delivery.delivered'
+         WHERE "eventType" = 'delivery.delivered'
            AND "aggregateId" = ANY($1::text[])`,
         [fixture.deliveryIds],
       );

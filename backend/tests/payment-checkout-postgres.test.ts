@@ -197,8 +197,8 @@ async function cleanupFixture(fixture: Fixture): Promise<void> {
   // Outbox aggregate IDs are intentionally not foreign keys; clean test events explicitly.
   await pool.query(
     `DELETE FROM notification_outbox
-     WHERE aggregateType = 'PAYMENT'
-       AND aggregateId IN (
+     WHERE "aggregateType" = 'PAYMENT'
+       AND "aggregateId" IN (
          SELECT id::text FROM payments WHERE "orderId" = $1
        )`,
     [fixture.orderId],
@@ -336,7 +336,7 @@ describe("PostgreSQL checkout payment initialization", () => {
       expect(result.order.status).toBe("CONFIRMED");
 
       const outboxEvents = await pool.query(
-        `SELECT payload FROM notification_outbox WHERE eventKey = $1`,
+        `SELECT payload FROM notification_outbox WHERE "eventKey" = $1`,
         [`v1:payment.succeeded:PAYMENT:${initialized.payment.id}`],
       );
       expect(outboxEvents.rows).toHaveLength(1);
