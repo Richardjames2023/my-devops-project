@@ -104,3 +104,27 @@ If a previously consumed refresh token is presented again, the backend treats it
 Existing refresh-token records receive independent family IDs during migration because their historical rotation relationships cannot be reconstructed. Users do not need to log in again solely because this migration runs.
 
 Clients should serialize refresh requests per session and, after a refresh request returns an authentication failure, discard the refresh token for that session and require a new login. Do not automatically retry a refresh token after an ambiguous network failure: the server may already have consumed it.
+
+## Notification persistence foundation
+
+The notification foundation migration creates durable storage for future in-app and email delivery. It does not yet publish business events, send email, run workers, or expose notification APIs.
+
+The persistence layer contains:
+
+- `notification_outbox`: idempotent business-event records with availability, processing lease, attempt count, and terminal status fields. Business transactions will write these records in the same database transaction as the state change they describe.
+- `notifications`: identity-owned in-app inbox entries. Each row belongs to exactly one customer `User` or one `StaffAccount`; the database enforces this with a check constraint. Partial unique indexes prevent the same outbox event from creating duplicate inbox entries for the same recipient.
+- `notification_email_deliveries`: one durable email-delivery record per in-app notification, including a recipient-address snapshot, template key/data, retry scheduling, lease fields, and provider acceptance metadata. `ACCEPTED` means the provider accepted the request; it does not mean the message reached the recipient's inbox.
+- `notification_preferences`: category preferences scoped independently to a customer or staff identity. The database prevents a preference from belonging to both identity types and partial unique indexes enforce one preference per identity/category.
+
+Customer and staff notification ownership is deliberately separate even when both identities share the same email address. The recipient identity, not the email address, determines inbox ownership and preference scope.
+
+The first-release channel policy is enforced by application logic in a later phase: customer transactional events use in-app and email; staff events use in-app, with email reserved for urgent/actionable events. Mandatory transactional and security notices must not be disabled by user preferences. Staff invitations remain a separate secure delivery flow; raw invitation tokens must never be placed in generic outbox payloads or notification metadata.
+
+The outbox and email-delivery tables include database lease fields and indexes to support multiple workers using PostgreSQL row locking and stale-lease recovery. Worker claim/acknowledgement behavior, retry policy, event publishers, recipient resolution, APIs, and email provider integration are intentionally deferred to later implementation phases.
+
+Apply the migration with the same environment-specific commands described above:
+
+- Local development: `npx prisma migrate dev` followed by `npx prisma generate`.
+- Staging/production: `npx prisma migrate deploy` followed by `npx prisma generate`.
+
+Back up the database before applying migrations. Do not use `prisma migrate dev` in production.
