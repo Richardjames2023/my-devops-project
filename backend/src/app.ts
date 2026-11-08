@@ -24,6 +24,8 @@ import guestCartRoutes from "./modules/cart/guest-cart.routes";
 import inventoryReconciliationRoutes from "./modules/inventory-reconciliation/inventory-reconciliation.routes";
 import warrantyClaimRoutes from "./modules/warranty-claims/warranty-claim.routes";
 import productReviewRoutes from "./modules/product-reviews/product-review.routes";
+import notificationInboxRoutes from "./modules/notifications/notification-inbox.routes";
+import staffNotificationInboxRoutes from "./modules/notifications/staff-notification-inbox.routes";
 import { errorHandler } from "./common/errors/errorHandler";
 import cookieParser from "cookie-parser";
 
@@ -63,6 +65,8 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/notifications", notificationInboxRoutes);
+app.use("/api/v1/staff/notifications", staffNotificationInboxRoutes);
 app.use("/api/v1/staff-auth", staffAuthRoutes);
 app.use("/api/v1/staff", staffRoutes);
 app.use("/api/v1/products", productRoutes);
