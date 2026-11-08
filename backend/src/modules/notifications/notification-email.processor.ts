@@ -119,6 +119,7 @@ export async function processNotificationEmailBatch(
   let failed = 0;
 
   for (const delivery of deliveries) {
+    let messageId: string;
     try {
       const rendered = renderNotificationEmail(
         delivery.templateKey,
@@ -130,11 +131,10 @@ export async function processNotificationEmailBatch(
         subject: rendered.subject,
         html: rendered.html,
         text: rendered.text,
-        // Stable across retries. Resend deduplicates repeated requests with this key.
-        idempotencyKey: `notification-email:${delivery.id}`,
+        // Stable across retries so provider-side idempotency can prevent duplicates.
+        idempotencyKey: "notification-email:" + delivery.id,
       });
-      await markAccepted(delivery, result.messageId);
-      accepted += 1;
+      messageId = result.messageId;
     } catch (error) {
       failed += 1;
       try {
@@ -143,6 +143,17 @@ export async function processNotificationEmailBatch(
         console.error("[NOTIFICATION EMAIL] Failed to record delivery failure", delivery.id, recordError);
       }
       console.error("[NOTIFICATION EMAIL] Delivery failed", delivery.id, error);
+      continue;
+    }
+
+    try {
+      await markAccepted(delivery, messageId);
+      accepted += 1;
+    } catch (error) {
+      // The provider may already have accepted this email. Leave the lease for
+      // recovery and retry with the same idempotency key; do not mark it DEAD.
+      failed += 1;
+      console.error("[NOTIFICATION EMAIL] Provider accepted email but acceptance could not be recorded", delivery.id, error);
     }
   }
 
