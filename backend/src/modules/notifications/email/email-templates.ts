@@ -16,7 +16,7 @@ function asTemplateData(value: unknown): TemplateData {
 function requiredString(data: TemplateData, key: string): string {
   const value = data[key];
   if (typeof value !== "string" || !value.trim()) {
-    throw new Error(\`Email template is missing required field: \${key}\`);
+    throw new Error("Email template is missing required field: " + key);
   }
   return value.trim();
 }
@@ -36,8 +36,6 @@ export function escapeHtml(value: string): string {
 }
 
 function safeActionUrl(value: string, appBaseUrl?: string): string | null {
-  // Only application-relative paths are accepted from queued JSON. This prevents
-  // template data from injecting arbitrary external links or javascript URLs.
   if (!value.startsWith("/") || value.startsWith("//") ||
       value.includes("\\") || /[\u0000-\u001f\u007f]/.test(value)) return null;
   try {
@@ -56,10 +54,13 @@ function layout(title: string, body: string, actionUrl: string | null, appBaseUr
   const safeBody = escapeHtml(body);
   const link = actionUrl ? safeActionUrl(actionUrl, appBaseUrl) : null;
   const button = link
-    ? \`<p><a href="\${escapeHtml(link)}" style="display:inline-block;padding:12px 20px;background:#082f63;color:#ffffff;text-decoration:none;border-radius:6px">View details</a></p>\`
+    ? "<p><a href=\"" + escapeHtml(link) + "\" style=\"display:inline-block;padding:12px 20px;background:#082f63;color:#ffffff;text-decoration:none;border-radius:6px\">View details</a></p>"
     : "";
-  const html = \`<!doctype html><html><body style="margin:0;padding:24px;background:#f5f7fa;font-family:Arial,sans-serif;color:#172033"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center"><table role="presentation" width="100%" style="max-width:600px;background:#ffffff;border-radius:10px;padding:32px"><tr><td><h1 style="font-size:22px">\${safeTitle}</h1><p style="font-size:15px;line-height:1.6">\${safeBody}</p>\${button}<p style="font-size:12px;color:#667085">This is an automated transactional message.</p></td></tr></table></td></tr></table></body></html>\`;
-  const text = \`\${title}\n\n\${body}\${link ? \`\n\nView details: \${link}\` : ""}\n\nThis is an automated transactional message.\`;
+  const html = "<!doctype html><html><body style=\"margin:0;padding:24px;background:#f5f7fa;font-family:Arial,sans-serif;color:#172033\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr><td align=\"center\"><table role=\"presentation\" width=\"100%\" style=\"max-width:600px;background:#ffffff;border-radius:10px;padding:32px\"><tr><td><h1 style=\"font-size:22px\">" +
+    safeTitle + "</h1><p style=\"font-size:15px;line-height:1.6\">" + safeBody +
+    "</p>" + button + "<p style=\"font-size:12px;color:#667085\">This is an automated transactional message.</p></td></tr></table></td></tr></table></body></html>";
+  const text = title + "\n\n" + body + (link ? "\n\nView details: " + link : "") +
+    "\n\nThis is an automated transactional message.";
   return { html, text };
 }
 
@@ -77,10 +78,10 @@ export function renderNotificationEmail(
       const amount = requiredString(data, "amount");
       const currency = requiredString(data, "currency");
       return {
-        subject: subjectPart(\`Payment received for order \${orderNumber}\`),
+        subject: subjectPart("Payment received for order " + orderNumber),
         ...layout(
           "Payment successful",
-          \`We received your payment of \${currency} \${amount} for order \${orderNumber}.\`,
+          "We received your payment of " + currency + " " + amount + " for order " + orderNumber + ".",
           actionUrl,
           appBaseUrl,
         ),
@@ -89,10 +90,10 @@ export function renderNotificationEmail(
     case "customer.delivery-delivered": {
       const orderNumber = requiredString(data, "orderNumber");
       return {
-        subject: subjectPart(\`Your order \${orderNumber} has been delivered\`),
+        subject: subjectPart("Your order " + orderNumber + " has been delivered"),
         ...layout(
           "Your order has been delivered",
-          \`Your order \${orderNumber} has been delivered successfully.\`,
+          "Your order " + orderNumber + " has been delivered successfully.",
           actionUrl,
           appBaseUrl,
         ),
@@ -101,10 +102,10 @@ export function renderNotificationEmail(
     case "staff.payment-reconciliation-required": {
       const orderNumber = requiredString(data, "orderNumber");
       return {
-        subject: subjectPart(\`Payment review required for order \${orderNumber}\`),
+        subject: subjectPart("Payment review required for order " + orderNumber),
         ...layout(
           "Payment requires manual review",
-          \`The payment associated with order \${orderNumber} requires reconciliation. Please review it in the staff dashboard.\`,
+          "The payment associated with order " + orderNumber + " requires reconciliation. Please review it in the staff dashboard.",
           actionUrl,
           appBaseUrl,
         ),
