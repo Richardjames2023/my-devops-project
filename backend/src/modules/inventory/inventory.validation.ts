@@ -8,7 +8,7 @@ export const createInventorySchema = z.object({
     .int("Quantity must be a whole number")
     .min(0, "Quantity cannot be negative"),
 
-  lowStockThreshold: z.number().int().min(0).default(5),
+  lowStockThreshold: z.number().int().min(0).optional(),
 });
 
 export type CreateInventoryInput = z.infer<
