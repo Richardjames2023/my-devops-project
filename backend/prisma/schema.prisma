@@ -37,6 +37,7 @@ model User {
   phone                                   String?                          @unique
   isActive                                Boolean                          @default(true)
   emailVerified                           Boolean                          @default(false)
+  sessionVersion                          Int                              @default(0)
   createdAt                               DateTime                         @default(now())
   updatedAt                               DateTime                         @updatedAt
   auditLogs                               AuditLog[]
