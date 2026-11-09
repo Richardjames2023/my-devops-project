@@ -77,11 +77,11 @@ export async function processResendEmailEvent(input: ResendEmailEventInput) {
     }
 
     const protectedStatuses: NotificationEmailDeliveryStatus[] = input.eventType === "email.complained"
-      ? ["BOUNCED", "FAILED", "DEAD"]
+      ? ["BOUNCED", "FAILED", "SUPPRESSED", "DEAD"]
       : input.eventType === "email.bounced"
-        ? ["COMPLAINED", "FAILED", "DEAD", "DELIVERED"]
+        ? ["COMPLAINED", "FAILED", "SUPPRESSED", "DEAD", "DELIVERED"]
         : input.eventType === "email.failed"
-          ? ["COMPLAINED", "DEAD", "DELIVERED", "BOUNCED"]
+          ? ["COMPLAINED", "SUPPRESSED", "DEAD", "DELIVERED", "BOUNCED"]
           : input.eventType === "email.suppressed"
             ? ["DELIVERED", "BOUNCED", "COMPLAINED", "FAILED", "DEAD"]
             : input.eventType === "email.delivery_delayed"
