@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type NotificationEmailDeliveryStatus } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 
 export type ResendEmailEventType =
@@ -71,7 +71,7 @@ export async function processResendEmailEvent(input: ResendEmailEventInput) {
         break;
     }
 
-    const protectedStatuses = input.eventType === "email.complained"
+    const protectedStatuses: NotificationEmailDeliveryStatus[] = input.eventType === "email.complained"
       ? ["BOUNCED", "FAILED", "DEAD"]
       : input.eventType === "email.bounced"
         ? ["COMPLAINED", "FAILED", "DEAD", "DELIVERED"]
@@ -82,7 +82,7 @@ export async function processResendEmailEvent(input: ResendEmailEventInput) {
             : [...terminalStatuses];
 
     await tx.notificationEmailDelivery.updateMany({
-      where: { id: delivery.id, status: { notIn: protectedStatuses as never[] } },
+      where: { id: delivery.id, status: { notIn: protectedStatuses } },
       data: { ...data, status },
     });
 
