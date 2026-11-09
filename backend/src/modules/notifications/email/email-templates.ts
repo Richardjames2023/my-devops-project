@@ -156,6 +156,19 @@ export function renderNotificationEmail(
         ...layout("Warranty claim requires review", "Claim " + claimNumber + " for " + productName + " is awaiting review.", actionUrl, appBaseUrl),
       };
     }
+    case "staff.refund-needs-attention": {
+      const refundReference = requiredString(data, "refundReference");
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("Refund requires manual attention: " + refundReference),
+        ...layout(
+          "Refund requires manual attention",
+          "Refund " + refundReference + " for order " + orderNumber + " requires manual review.",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
     default:
       throw new Error("Unsupported notification email template: " + templateKey);
   }
