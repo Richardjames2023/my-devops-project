@@ -188,8 +188,30 @@ async function createOrderFromCart(
     });
 
     const discountAmount = new Prisma.Decimal(0);
-    const deliveryFee = new Prisma.Decimal(0);
+    const normalizedState = input.shippingAddress.state.trim().toUpperCase();
+    const normalizedCity = input.shippingAddress.city.trim().toUpperCase();
 
+    const deliveryZone = await tx.deliveryZone.findFirst({
+      where: {
+        isActive: true,
+        locations: {
+          some: {
+            state: normalizedState,
+            city: normalizedCity,
+          },
+        },
+      },
+      select: { id: true, name: true, deliveryFee: true },
+    });
+
+    if (!deliveryZone) {
+      throw new AppError(
+        `We do not currently deliver to ${input.shippingAddress.city}, ${input.shippingAddress.state}`,
+        422,
+      );
+    }
+
+    const deliveryFee = deliveryZone.deliveryFee;
     const totalAmount = subtotal.minus(discountAmount).plus(deliveryFee);
 
     const isGuestOrder = Boolean(guestAccessToken);
@@ -218,6 +240,8 @@ async function createOrderFromCart(
         subtotal,
         discountAmount,
         deliveryFee,
+        deliveryZoneId: deliveryZone.id,
+        deliveryZoneName: deliveryZone.name,
         totalAmount,
         currency: "NGN",
         shippingAddress: input.shippingAddress,
