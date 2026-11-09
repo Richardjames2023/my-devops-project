@@ -74,6 +74,19 @@ export function renderNotificationEmail(
   const actionUrl = typeof data.actionUrl === "string" ? data.actionUrl : "";
 
   switch (templateKey) {
+    case "customer.email-verification": {
+      const firstName = requiredString(data, "firstName");
+      if (!actionUrl) throw new Error("Email verification template requires an action URL");
+      return {
+        subject: "Verify your email address",
+        ...layout(
+          "Verify your email address",
+          "Hello " + firstName + ", please verify your email address to activate your customer account. This link expires in 24 hours.",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
     case "customer.payment-succeeded": {
       const orderNumber = requiredString(data, "orderNumber");
       const amount = requiredString(data, "amount");
