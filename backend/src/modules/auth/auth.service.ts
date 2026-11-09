@@ -9,23 +9,16 @@ import { REFRESH_TOKEN_EXPIRES_IN_DAYS } from "../../config/auth";
 import type { RegisterInput, LoginInput, RefreshTokenInput } from "./auth.validation";
 
 export async function registerUser(input: RegisterInput) {
-  const existingUser = await prisma.user.findUnique({
-    where: { email: input.email },
-  });
+  const existingUser = await prisma.user.findUnique({ where: { email: input.email } });
+  if (existingUser) throw new AppError("Unable to create account", 409);
 
-  if (existingUser) {
-    throw new AppError("Unable to create account", 409);
-  }
-
-  const customerRole = await prisma.role.findUnique({
-    where: { name: "CUSTOMER" },
-  });
-
-  if (!customerRole) {
-    throw new AppError("Customer role is not configured", 500, false);
-  }
+  const customerRole = await prisma.role.findUnique({ where: { name: "CUSTOMER" } });
+  if (!customerRole) throw new AppError("Customer role is not configured", 500, false);
 
   const passwordHash = await hashPassword(input.password);
+  const verificationToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashRefreshToken(verificationToken);
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const user = await prisma.$transaction(async (tx) => {
     const createdUser = await tx.user.create({
@@ -37,11 +30,20 @@ export async function registerUser(input: RegisterInput) {
         phone: input.phone ?? null,
       },
     });
-
-    await tx.userRole.create({
-      data: { userId: createdUser.id, roleId: customerRole.id },
+    await tx.userRole.create({ data: { userId: createdUser.id, roleId: customerRole.id } });
+    await tx.customerEmailVerificationToken.create({
+      data: { userId: createdUser.id, tokenHash, expiresAt },
     });
-
+    await tx.notificationEmailDelivery.create({
+      data: {
+        recipientEmail: createdUser.email,
+        templateKey: "customer.email-verification",
+        templateData: {
+          firstName: createdUser.firstName,
+          actionUrl: "/verify-email?token=" + encodeURIComponent(verificationToken),
+        },
+      },
+    });
     return createdUser;
   });
 
@@ -54,6 +56,36 @@ export async function registerUser(input: RegisterInput) {
     emailVerified: user.emailVerified,
     createdAt: user.createdAt,
   };
+}
+
+export async function verifyCustomerEmail(token: string): Promise<void> {
+  const tokenHash = hashRefreshToken(token);
+  await prisma.$transaction(async (tx) => {
+    const stored = await tx.customerEmailVerificationToken.findUnique({
+      where: { tokenHash },
+      select: { id: true, userId: true, expiresAt: true, consumedAt: true },
+    });
+    if (!stored || stored.consumedAt || stored.expiresAt <= new Date()) {
+      throw new AppError("This email verification link is invalid or expired", 400);
+    }
+
+    const claimed = await tx.customerEmailVerificationToken.updateMany({
+      where: { id: stored.id, consumedAt: null, expiresAt: { gt: new Date() } },
+      data: { consumedAt: new Date() },
+    });
+    if (claimed.count !== 1) {
+      throw new AppError("This email verification link is invalid or expired", 400);
+    }
+
+    await tx.user.update({
+      where: { id: stored.userId },
+      data: { emailVerified: true },
+    });
+    await tx.customerEmailVerificationToken.updateMany({
+      where: { userId: stored.userId, id: { not: stored.id }, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+  });
 }
 
 export async function loginUser(input: LoginInput) {
@@ -83,6 +115,10 @@ export async function loginUser(input: LoginInput) {
 
   if (!user.isActive) {
     throw new AppError("Account is inactive", 403);
+  }
+
+  if (!user.emailVerified) {
+    throw new AppError("Please verify your email address before logging in", 403);
   }
 
   const roles = user.userRoles.map((userRole) => userRole.role.name);
@@ -169,6 +205,7 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
 
   const user = storedToken.user;
   if (!user.isActive) throw new AppError("Account is inactive", 403);
+  if (!user.emailVerified) throw new AppError("Please verify your email address before logging in", 403);
 
   const roles = user.userRoles.map((userRole) => userRole.role.name);
   const permissions = [...new Set(user.userRoles.flatMap((userRole) =>
