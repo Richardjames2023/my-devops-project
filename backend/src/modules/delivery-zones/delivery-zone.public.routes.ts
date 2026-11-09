@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { authenticate } from "../../common/middleware/authenticate";
 import { listActive, quote } from "./delivery-zone.controller";
 
 const router = Router();
