@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
+import { publishInventoryLowStockIfCrossed } from "../inventory/inventory-low-stock.notification";
 
 import type {
   CreateReturnRequestInput,
@@ -102,12 +103,13 @@ async function receiveReturnTransaction(
           },
         });
 
-        await tx.inventory.update({
+        const updatedInventory = await tx.inventory.update({
           where: { id: inventory.id },
           data: {
             quarantineQuantity: { increment: inputItem.receivedQuantity },
           },
         });
+        await publishInventoryLowStockIfCrossed(tx, inventory, updatedInventory);
 
         await tx.stockMovement.create({
           data: {
