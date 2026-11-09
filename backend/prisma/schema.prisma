@@ -841,6 +841,7 @@ model NotificationEmailDelivery {
   lockedBy          String?
   providerMessageId String?
   acceptedAt        DateTime?
+  sentAt             DateTime?
   deliveredAt       DateTime?
   bouncedAt         DateTime?
   complainedAt      DateTime?
@@ -922,6 +923,7 @@ enum NotificationEmailDeliveryStatus {
   PROCESSING
   RETRYING
   ACCEPTED
+  SENT
   DELAYED
   DELIVERED
   BOUNCED
