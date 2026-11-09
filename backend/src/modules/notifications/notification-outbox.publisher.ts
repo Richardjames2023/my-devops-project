@@ -3,9 +3,12 @@ import { Prisma } from "@prisma/client";
 export type NotificationEventType =
   | "payment.succeeded"
   | "payment.reconciliation_required"
-  | "delivery.delivered";
+  | "delivery.delivered"
+  | "order.created"
+  | "return.requested"
+  | "warranty.claim.created";
 
-export type NotificationAggregateType = "PAYMENT" | "DELIVERY";
+export type NotificationAggregateType = "PAYMENT" | "DELIVERY" | "ORDER" | "RETURN" | "WARRANTY";
 
 export interface PublishNotificationEventInput {
   eventType: NotificationEventType;
