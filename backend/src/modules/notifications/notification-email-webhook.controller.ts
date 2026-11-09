@@ -8,6 +8,7 @@ import {
 } from "./notification-email-webhook.service";
 
 const supportedEvents = new Set<ResendEmailEventType>([
+  "email.sent",
   "email.delivered",
   "email.delivery_delayed",
   "email.bounced",
