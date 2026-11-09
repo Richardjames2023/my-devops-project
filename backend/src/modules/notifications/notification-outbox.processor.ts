@@ -162,7 +162,9 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
 }
 
 function identity(draft: Draft): string {
-  return draft.customerUserId ? "CUSTOMER:" + draft.customerUserId : "STAFF:" + draft.staffAccountId;
+  if (draft.customerUserId) return "CUSTOMER:" + draft.customerUserId;
+  if (draft.staffAccountId) return "STAFF:" + draft.staffAccountId;
+  return "GUEST:" + draft.recipientEmail;
 }
 
 async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
@@ -192,6 +194,7 @@ async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
         preference,
       ]));
       const inAppDrafts = drafts.filter((draft) => {
+        if (!draft.customerUserId && !draft.staffAccountId) return false;
         const preference = preferenceMap.get(identity(draft));
         return policy.inAppMandatory || preference?.inAppEnabled !== false;
       });
@@ -232,7 +235,8 @@ async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
       // An email-only preference therefore does not create an inbox item.
       const emailDrafts = drafts.filter((draft) => {
         const preference = preferenceMap.get(identity(draft));
-        return policy.emailMandatory || preference?.emailEnabled !== false;
+        const defaultEnabled = draft.recipientType === "CUSTOMER";
+        return policy.emailMandatory || (preference?.emailEnabled ?? defaultEnabled);
       });
       if (emailDrafts.length) {
         await tx.notificationEmailDelivery.createMany({
