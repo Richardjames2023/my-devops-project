@@ -1,9 +1,9 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import prisma from "../../infrastructure/prisma/client";
 
 const router = Router();
 
-function reportLiveness(_req: express.Request, res: express.Response): void {
+function reportLiveness(_req: Request, res: Response): void {
   res.setHeader("Cache-Control", "no-store");
   res.status(200).json({ status: "UP" });
 }
