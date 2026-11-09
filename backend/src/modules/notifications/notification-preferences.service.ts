@@ -27,9 +27,6 @@ function mandatoryChannels(category: NotificationCategory) {
   if (category === "PAYMENT" || category === "SECURITY") {
     return { inApp: true, email: true };
   }
-  if (category === "DELIVERY") {
-    return { inApp: true, email: false };
-  }
   return { inApp: false, email: false };
 }
 
