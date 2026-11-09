@@ -302,7 +302,7 @@ export async function listPaystackRefunds(input: {
     perPage: String(perPage),
   });
 
-  const result = await paystackRequest<PaystackRefundListItem>(
+  const result = await paystackRequest<PaystackRefundListItem[]>(
     `/refund?${params.toString()}`,
     { method: "GET" },
   );
