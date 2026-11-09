@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import request from "supertest";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 const webhookSecret = "whsec_" + Buffer.from("resend-route-test-secret").toString("base64");
 process.env.NODE_ENV = "test";
