@@ -19,7 +19,7 @@ function identityWhere(identity: NotificationPreferenceIdentity) {
 }
 
 /**
- * Payment and security notifications are mandatory on both channels.
+ * Payment, security, and refund-intervention notifications are mandatory on both channels.
  * Other categories are configurable by the recipient.
  */
 function mandatoryChannels(category: NotificationCategory) {
