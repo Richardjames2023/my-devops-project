@@ -46,6 +46,7 @@ model User {
   userRoles                               UserRole[]
   warrantyClaims                          WarrantyClaim[]
   refreshTokens                           RefreshToken[]
+  emailVerificationTokens                 CustomerEmailVerificationToken[]
   returnItemInspections                   ReturnItemInspection[]           @relation("ReturnItemInspections")
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("PaymentInventoryReconciliationResolver")
   productReviews                          ProductReview[]
@@ -72,6 +73,19 @@ model RefreshToken {
   @@index([familyId, revokedAt])
   @@index([expiresAt])
   @@map("refresh_tokens")
+}
+
+model CustomerEmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("customer_email_verification_tokens")
 }
 
 model StaffAccount {

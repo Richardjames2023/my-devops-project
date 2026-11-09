@@ -53,3 +53,6 @@ export const refreshTokenSchema = z.object({
 });
 
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;   
+export const resendVerificationSchema = z.object({
+  email: z.string().trim().email("Invalid email address").transform((value) => value.toLowerCase()),
+});

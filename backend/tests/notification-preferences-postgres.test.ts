@@ -41,8 +41,8 @@ async function createCustomer(roleId: string): Promise<Fixture> {
   const id = randomUUID();
   await pool.query(
     `INSERT INTO users
-     (id, email, "passwordHash", "firstName", "lastName", "createdAt", "updatedAt")
-     VALUES ($1, $2, 'test-password-hash', 'Preference', 'Customer', NOW(), NOW())`,
+     (id, email, "passwordHash", "firstName", "lastName", "emailVerified", "createdAt", "updatedAt")
+     VALUES ($1, $2, 'test-password-hash', 'Preference', 'Customer', TRUE, NOW(), NOW())`,
     [id, `${id}@notification-preference.test`],
   );
   await pool.query(

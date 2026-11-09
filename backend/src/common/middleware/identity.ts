@@ -24,12 +24,13 @@ export async function requireCustomer(
       where: { id: req.user.id },
       select: {
         isActive: true,
+        emailVerified: true,
         userRoles: { select: { role: { select: { name: true } } } },
       },
     });
 
-    if (!user || !user.isActive) {
-      next(new AppError("Customer account is inactive or unavailable", 403));
+    if (!user || !user.isActive || !user.emailVerified) {
+      next(new AppError("Customer account is inactive, unverified, or unavailable", 403));
       return;
     }
 

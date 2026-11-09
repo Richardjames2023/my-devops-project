@@ -24,6 +24,7 @@ describe("separate customer and staff identity middleware", () => {
   it("allows an active database-backed customer identity", async () => {
     vi.spyOn(prisma.user, "findUnique").mockResolvedValue({
       isActive: true,
+      emailVerified: true,
       userRoles: [{ role: { name: "CUSTOMER" } }],
     } as never);
     const req = request("CUSTOMER");
@@ -60,9 +61,24 @@ describe("separate customer and staff identity middleware", () => {
     expect(next.mock.calls[0]?.[0]).toMatchObject({ statusCode: 403 });
   });
 
+  it("rejects unverified customer accounts from protected routes", async () => {
+    vi.spyOn(prisma.user, "findUnique").mockResolvedValue({
+      isActive: true,
+      emailVerified: false,
+      userRoles: [{ role: { name: "CUSTOMER" } }],
+    } as never);
+    const next = vi.fn();
+
+    await requireCustomer(request("CUSTOMER"), response, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(next.mock.calls[0]?.[0]).toMatchObject({ statusCode: 403 });
+  });
+
   it("rejects legacy staff-only accounts whose token has no current customer role", async () => {
     vi.spyOn(prisma.user, "findUnique").mockResolvedValue({
       isActive: true,
+      emailVerified: true,
       userRoles: [{ role: { name: "SUPPORT_STAFF" } }],
     } as never);
     const next = vi.fn();
