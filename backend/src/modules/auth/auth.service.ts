@@ -7,6 +7,7 @@ import { generateAccessToken } from "../../common/utils/jwt";
 import { generateRefreshToken, hashRefreshToken } from "../../common/utils/refreshToken";
 import { REFRESH_TOKEN_EXPIRES_IN_DAYS } from "../../config/auth";
 import type { RegisterInput, LoginInput, RefreshTokenInput } from "./auth.validation";
+import type { ResetPasswordInput } from "./auth.validation";
 
 export async function registerUser(input: RegisterInput) {
   const existingUser = await prisma.user.findUnique({ where: { email: input.email } });
@@ -117,6 +118,95 @@ export async function verifyCustomerEmail(token: string): Promise<void> {
     await tx.customerEmailVerificationToken.updateMany({
       where: { userId: stored.userId, id: { not: stored.id }, consumedAt: null },
       data: { consumedAt: new Date() },
+    });
+  });
+}
+
+export async function requestCustomerPasswordReset(email: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, firstName: true, emailVerified: true, isActive: true },
+  });
+
+  // Keep the response identical for unknown, inactive, and unverified accounts.
+  if (!user || !user.isActive || !user.emailVerified) return;
+
+  const resetToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashRefreshToken(resetToken);
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  await prisma.$transaction(async (tx) => {
+    // Serialize reset requests so only the newest outstanding link remains valid.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}::text, 0))`;
+    await tx.customerPasswordResetToken.updateMany({
+      where: { userId: user.id, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+    await tx.customerPasswordResetToken.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+    await tx.notificationEmailDelivery.create({
+      data: {
+        recipientEmail: user.email,
+        templateKey: "customer.password-reset",
+        templateData: {
+          firstName: user.firstName,
+          actionUrl: "/reset-password?token=" + encodeURIComponent(resetToken),
+        },
+      },
+    });
+  });
+}
+
+export async function resetCustomerPassword(input: ResetPasswordInput): Promise<void> {
+  const tokenHash = hashRefreshToken(input.token);
+  // Hash outside the transaction to avoid holding database locks during Argon2 work.
+  const passwordHash = await hashPassword(input.newPassword);
+
+  await prisma.$transaction(async (tx) => {
+    const stored = await tx.customerPasswordResetToken.findUnique({
+      where: { tokenHash },
+      select: { id: true, userId: true, expiresAt: true, consumedAt: true },
+    });
+    if (!stored || stored.consumedAt || stored.expiresAt <= new Date()) {
+      throw new AppError("This password reset link is invalid or expired", 400);
+    }
+
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${stored.userId}::text, 0))`;
+    const current = await tx.customerPasswordResetToken.findUnique({
+      where: { id: stored.id },
+      select: { id: true, userId: true, expiresAt: true, consumedAt: true },
+    });
+    if (!current || current.consumedAt || current.expiresAt <= new Date()) {
+      throw new AppError("This password reset link is invalid or expired", 400);
+    }
+
+    const now = new Date();
+    const claimed = await tx.customerPasswordResetToken.updateMany({
+      where: { id: current.id, userId: current.userId, consumedAt: null, expiresAt: { gt: now } },
+      data: { consumedAt: now },
+    });
+    if (claimed.count !== 1) {
+      throw new AppError("This password reset link is invalid or expired", 400);
+    }
+
+    const updated = await tx.user.updateMany({
+      where: { id: current.userId, isActive: true, emailVerified: true },
+      data: { passwordHash },
+    });
+    if (updated.count !== 1) {
+      throw new AppError("This password reset link is invalid or expired", 400);
+    }
+
+    // Revoke every outstanding refresh-token family for this customer.
+    await tx.refreshToken.updateMany({
+      where: { userId: current.userId, revokedAt: null },
+      data: { revokedAt: now },
+    });
+    // Consume any other outstanding reset links for the same account.
+    await tx.customerPasswordResetToken.updateMany({
+      where: { userId: current.userId, id: { not: current.id }, consumedAt: null },
+      data: { consumedAt: now },
     });
   });
 }
