@@ -34,9 +34,9 @@ export async function resendEmailWebhook(req: Request, res: Response): Promise<v
   const valid = verifyResendWebhookSignature(
     req.body,
     {
-      id: req.header("svix-id") ?? undefined,
-      timestamp: req.header("svix-timestamp") ?? undefined,
-      signature: req.header("svix-signature") ?? undefined,
+      ...(req.header("svix-id") ? { id: req.header("svix-id")! } : {}),
+      ...(req.header("svix-timestamp") ? { timestamp: req.header("svix-timestamp")! } : {}),
+      ...(req.header("svix-signature") ? { signature: req.header("svix-signature")! } : {}),
     },
     env.RESEND_WEBHOOK_SECRET,
   );
