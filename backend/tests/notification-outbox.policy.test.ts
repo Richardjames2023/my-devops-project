@@ -16,7 +16,22 @@ describe("notification event policy", () => {
 
   it("uses the delivery category for delivered orders", () => {
     expect(getNotificationEventPolicy("delivery.delivered")).toEqual({
-      category: "DELIVERY", inAppMandatory: true, emailMandatory: true,
+      category: "DELIVERY", inAppMandatory: false, emailMandatory: false,
+    });
+  });
+
+  it("allows recipient preferences to control order, return, and warranty alerts", () => {
+    for (const eventType of ["order.created", "return.requested", "return.received", "warranty.claim.created", "inventory.low_stock"]) {
+      expect(getNotificationEventPolicy(eventType)).toMatchObject({
+        inAppMandatory: false,
+        emailMandatory: false,
+      });
+    }
+  });
+
+  it("requires both channels for refund intervention alerts", () => {
+    expect(getNotificationEventPolicy("refund.needs_attention")).toEqual({
+      category: "REFUND", inAppMandatory: true, emailMandatory: true,
     });
   });
 

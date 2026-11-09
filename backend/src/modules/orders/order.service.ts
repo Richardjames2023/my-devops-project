@@ -7,6 +7,7 @@ import type {
   CreateGuestOrderInput,
 } from "./order.validation";
 import { createAuditLog } from "../../common/utils/audit-log";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
 const MAX_TRANSACTION_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
@@ -228,6 +229,13 @@ async function createOrderFromCart(
         items: true,
       },
     });
+    await publishNotificationEvent(tx, {
+      eventType: "order.created",
+      aggregateType: "ORDER",
+      aggregateId: order.id,
+      payload: { orderId: order.id },
+    });
+
     // Clear the cart only after the order has been created successfully.
     await tx.cartItem.deleteMany({
       where: {

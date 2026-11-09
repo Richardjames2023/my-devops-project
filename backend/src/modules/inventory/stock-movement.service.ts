@@ -1,6 +1,7 @@
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type { CreateStockMovementInput } from "./stock-movement.validation";
+import { publishInventoryLowStockIfCrossed } from "./inventory-low-stock.notification";
 
 export async function createStockMovement(
   input: CreateStockMovementInput,
@@ -64,6 +65,8 @@ export async function createStockMovement(
     if (!updatedInventory) {
       throw new AppError("Inventory not found after stock movement", 404);
     }
+
+    await publishInventoryLowStockIfCrossed(tx, inventory, updatedInventory);
 
     const movement = await tx.stockMovement.create({
       data: {

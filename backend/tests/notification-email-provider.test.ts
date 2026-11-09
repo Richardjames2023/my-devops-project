@@ -27,6 +27,28 @@ describe("transactional email templates", () => {
     expect(email.html).not.toContain("<a href=");
   });
 
+  it("renders the new order, return, and warranty email templates", () => {
+    expect(renderNotificationEmail("customer.order-created", {
+      orderNumber: "ORD-200", actionUrl: "/account/orders/200",
+    }, "https://shop.example.com").subject).toContain("ORD-200");
+
+    expect(renderNotificationEmail("staff.return-request-received", {
+      orderNumber: "ORD-201", actionUrl: "/staff/returns/201",
+    }, "https://shop.example.com").html).toContain("ORD-201");
+
+    expect(renderNotificationEmail("customer.warranty-claim-received", {
+      claimNumber: "WAR-202", productName: "Laptop",
+    }).text).toContain("Laptop");
+
+    expect(renderNotificationEmail("staff.return-received-for-inspection", {
+      orderNumber: "ORD-204", actionUrl: "/staff/returns/204/inspection",
+    }).text).toContain("ORD-204");
+
+    expect(renderNotificationEmail("staff.refund-needs-attention", {
+      refundReference: "REF-203", orderNumber: "ORD-203",
+    }).text).toContain("REF-203");
+  });
+
   it("rejects unsupported template keys and malformed template data", () => {
     expect(() => renderNotificationEmail("unknown.template", {})).toThrow("Unsupported notification email template");
     expect(() => renderNotificationEmail("customer.delivery-delivered", null)).toThrow("must be an object");

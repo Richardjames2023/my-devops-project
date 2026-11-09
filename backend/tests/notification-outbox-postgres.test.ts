@@ -20,6 +20,7 @@ type PaymentFixture = {
   orderId: string;
   paymentId: string;
   outboxId: string;
+  customerEmail: string;
 };
 
 type StaffFixture = { staffId: string; roleId: string };
@@ -35,6 +36,7 @@ async function createPaymentEvent(options: { guest?: boolean; eventType?: string
   const paymentId = randomUUID();
   const outboxId = randomUUID();
   const suffix = randomUUID();
+  const customerEmail = userId ? `${userId}@notification.test` : `guest-${suffix}@notification.test`;
   const eventType = options.eventType ?? "payment.succeeded";
 
   if (userId) {
@@ -56,7 +58,7 @@ async function createPaymentEvent(options: { guest?: boolean; eventType?: string
     [
       orderId,
       userId,
-      userId ? `${userId}@notification.test` : `guest-${suffix}@notification.test`,
+      customerEmail,
       `NOTIFY-${suffix}`,
       JSON.stringify({ address: "Integration Test Address", city: "Abuja" }),
     ],
@@ -77,7 +79,7 @@ async function createPaymentEvent(options: { guest?: boolean; eventType?: string
     payload: { paymentId, orderId },
   });
 
-  const fixture = { userId, orderId, paymentId, outboxId };
+  const fixture = { userId, orderId, paymentId, outboxId, customerEmail };
   paymentFixtures.push(fixture);
   return fixture;
 }
@@ -161,8 +163,9 @@ async function cleanupFixtures() {
     `DELETE FROM notification_email_deliveries
      WHERE "notificationId" IN (
        SELECT id FROM notifications WHERE "outboxEventId" = ANY($1::uuid[])
-     )`,
-    [outboxIds],
+     )
+        OR "recipientEmail" = ANY($2::text[])`,
+    [outboxIds, paymentFixtures.map((item) => item.customerEmail)],
   );
   await pool.query(
     `DELETE FROM notification_email_deliveries
@@ -311,14 +314,17 @@ describe("PostgreSQL notification outbox processing", () => {
       [fixture.outboxId],
     );
     const emails = await pool.query(
-      `SELECT id FROM notification_email_deliveries
-       WHERE "notificationId" IN (
-         SELECT id FROM notifications WHERE "outboxEventId" = $1
-       )`,
-      [fixture.outboxId],
+      `SELECT "notificationId", "recipientEmail", "templateKey"
+       FROM notification_email_deliveries WHERE "recipientEmail" = $1`,
+      [fixture.customerEmail],
     );
     expect(notifications.rows).toHaveLength(0);
-    expect(emails.rows).toHaveLength(0);
+    expect(emails.rows).toHaveLength(1);
+    expect(emails.rows[0]).toMatchObject({
+      notificationId: null,
+      recipientEmail: fixture.customerEmail,
+      templateKey: "customer.payment-succeeded",
+    });
 
     const outbox = await pool.query(
       `SELECT status FROM notification_outbox WHERE id = $1`,

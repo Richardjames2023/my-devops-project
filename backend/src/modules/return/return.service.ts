@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
+import { publishInventoryLowStockIfCrossed } from "../inventory/inventory-low-stock.notification";
 
 import type {
   CreateReturnRequestInput,
@@ -101,12 +103,13 @@ async function receiveReturnTransaction(
           },
         });
 
-        await tx.inventory.update({
+        const updatedInventory = await tx.inventory.update({
           where: { id: inventory.id },
           data: {
             quarantineQuantity: { increment: inputItem.receivedQuantity },
           },
         });
+        await publishInventoryLowStockIfCrossed(tx, inventory, updatedInventory);
 
         await tx.stockMovement.create({
           data: {
@@ -130,7 +133,7 @@ async function receiveReturnTransaction(
 
       const nextStatus = allItemsReceived ? "RECEIVED" : "APPROVED";
 
-      return tx.returnRequest.update({
+      const updatedReturnRequest = await tx.returnRequest.update({
         where: { id: returnRequest.id },
         data: { status: nextStatus },
         include: {
@@ -139,6 +142,15 @@ async function receiveReturnTransaction(
           order: true,
         },
       });
+      if (nextStatus === "RECEIVED") {
+        await publishNotificationEvent(tx, {
+          eventType: "return.received",
+          aggregateType: "RETURN",
+          aggregateId: returnRequest.id,
+          payload: { returnRequestId: returnRequest.id },
+        });
+      }
+      return updatedReturnRequest;
     },
     { isolationLevel: "Serializable" },
   );
@@ -298,7 +310,7 @@ export async function createReturnRequest(
         }
       }
 
-      return tx.returnRequest.create({
+      const returnRequest = await tx.returnRequest.create({
         data: {
           orderId: order.id,
           userId,
@@ -321,6 +333,13 @@ export async function createReturnRequest(
           evidence: true,
         },
       });
+      await publishNotificationEvent(tx, {
+        eventType: "return.requested",
+        aggregateType: "RETURN",
+        aggregateId: returnRequest.id,
+        payload: { returnRequestId: returnRequest.id },
+      });
+      return returnRequest;
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );

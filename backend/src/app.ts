@@ -26,6 +26,10 @@ import warrantyClaimRoutes from "./modules/warranty-claims/warranty-claim.routes
 import productReviewRoutes from "./modules/product-reviews/product-review.routes";
 import notificationInboxRoutes from "./modules/notifications/notification-inbox.routes";
 import staffNotificationInboxRoutes from "./modules/notifications/staff-notification-inbox.routes";
+import notificationPreferenceRoutes from "./modules/notifications/notification-preferences.routes";
+import staffNotificationPreferenceRoutes from "./modules/notifications/staff-notification-preferences.routes";
+import notificationOperationsRoutes from "./modules/notifications/notification-operations.routes";
+import { resendEmailWebhook } from "./modules/notifications/notification-email-webhook.controller";
 import { errorHandler } from "./common/errors/errorHandler";
 import cookieParser from "cookie-parser";
 
@@ -58,6 +62,12 @@ app.post(
   paystackWebhook,
 );
 
+app.post(
+  "/api/v1/notifications/webhooks/resend",
+  express.raw({ type: "application/json", limit: "100kb" }),
+  resendEmailWebhook,
+);
+
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
@@ -67,6 +77,9 @@ app.get("/health", (_req, res) => {
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/notifications", notificationInboxRoutes);
 app.use("/api/v1/staff/notifications", staffNotificationInboxRoutes);
+app.use("/api/v1/notifications/preferences", notificationPreferenceRoutes);
+app.use("/api/v1/staff/notifications/preferences", staffNotificationPreferenceRoutes);
+app.use("/api/v1/staff/notifications/operations", notificationOperationsRoutes);
 app.use("/api/v1/staff-auth", staffAuthRoutes);
 app.use("/api/v1/staff", staffRoutes);
 app.use("/api/v1/products", productRoutes);

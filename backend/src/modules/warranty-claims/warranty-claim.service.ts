@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma, WarrantyStatus } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 import type {
   CreateWarrantyClaimInput,
   ReviewWarrantyClaimInput,
@@ -76,7 +77,7 @@ export async function createWarrantyClaim(
       );
     }
 
-    return tx.warrantyClaim.create({
+    const claim = await tx.warrantyClaim.create({
       data: {
         orderItemId: item.id,
         userId,
@@ -98,6 +99,13 @@ export async function createWarrantyClaim(
         },
       },
     });
+    await publishNotificationEvent(tx, {
+      eventType: "warranty.claim.created",
+      aggregateType: "WARRANTY",
+      aggregateId: claim.id,
+      payload: { warrantyClaimId: claim.id },
+    });
+    return claim;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 

@@ -28,6 +28,7 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
+  RESEND_WEBHOOK_SECRET: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   RESEND_API_KEY: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   EMAIL_FROM: z.preprocess((value) => value === "" ? undefined : value, z.string().min(3).refine((value) => {
     const normalized = value.trim();
@@ -42,6 +43,20 @@ const envSchema = z.object({
       code: "custom",
       path: ["RESEND_API_KEY"],
       message: "RESEND_API_KEY is required when email delivery is enabled",
+    });
+  }
+  if (value.EMAIL_DELIVERY_ENABLED && !value.RESEND_WEBHOOK_SECRET) {
+    context.addIssue({
+      code: "custom",
+      path: ["RESEND_WEBHOOK_SECRET"],
+      message: "RESEND_WEBHOOK_SECRET is required when email delivery is enabled",
+    });
+  }
+  if (value.EMAIL_DELIVERY_ENABLED && !value.APP_BASE_URL) {
+    context.addIssue({
+      code: "custom",
+      path: ["APP_BASE_URL"],
+      message: "APP_BASE_URL is required when email delivery is enabled",
     });
   }
   if (value.EMAIL_DELIVERY_ENABLED && !value.EMAIL_FROM) {

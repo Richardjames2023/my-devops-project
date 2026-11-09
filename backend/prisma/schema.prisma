@@ -335,6 +335,7 @@ model Inventory {
   quantity              Int                    @default(0)
   reservedQuantity      Int                    @default(0)
   quarantineQuantity    Int                    @default(0)
+  lowStockThreshold     Int                    @default(5)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   productVariant        ProductVariant         @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
@@ -828,7 +829,8 @@ model Notification {
 
 model NotificationEmailDelivery {
   id                String                          @id @default(uuid()) @db.Uuid
-  notificationId    String                          @unique @db.Uuid
+  notificationId    String?                         @unique @db.Uuid
+  eventRecipientKey String?                         @unique
   recipientEmail    String
   templateKey       String
   templateData      Json
@@ -839,15 +841,38 @@ model NotificationEmailDelivery {
   lockedBy          String?
   providerMessageId String?
   acceptedAt        DateTime?
+  sentAt             DateTime?
+  deliveredAt       DateTime?
+  bouncedAt         DateTime?
+  complainedAt      DateTime?
+  failedAt          DateTime?
+  suppressedAt      DateTime?
+  lastProviderEventType String?
   lastError         String?
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
-  notification      Notification                    @relation(fields: [notificationId], references: [id], onDelete: Restrict)
+  notification      Notification?                   @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  providerEvents    NotificationEmailEvent[]
 
   @@index([status, nextAttemptAt, createdAt])
   @@index([status, lockedAt])
-  @@index([providerMessageId])
+  @@unique([providerMessageId])
   @@map("notification_email_deliveries")
+}
+
+model NotificationEmailEvent {
+  id                String                     @id @default(uuid()) @db.Uuid
+  providerEventId   String                     @unique
+  providerMessageId String
+  eventType         String
+  payload           Json
+  deliveryId        String?                    @db.Uuid
+  receivedAt        DateTime                   @default(now())
+  delivery          NotificationEmailDelivery? @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+
+  @@index([providerMessageId, receivedAt])
+  @@index([eventType, receivedAt])
+  @@map("notification_email_events")
 }
 
 model NotificationPreference {
@@ -898,6 +923,13 @@ enum NotificationEmailDeliveryStatus {
   PROCESSING
   RETRYING
   ACCEPTED
+  SENT
+  DELAYED
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+  SUPPRESSED
   DEAD
 }
 

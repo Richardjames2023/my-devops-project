@@ -112,6 +112,90 @@ export function renderNotificationEmail(
         ),
       };
     }
+    case "customer.order-created": {
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("Order " + orderNumber + " confirmed"),
+        ...layout("Your order has been placed", "We received your order " + orderNumber + ".", actionUrl, appBaseUrl),
+      };
+    }
+    case "staff.new-order-received": {
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("New order received: " + orderNumber),
+        ...layout("New order received", "Order " + orderNumber + " is awaiting processing.", actionUrl, appBaseUrl),
+      };
+    }
+    case "customer.return-request-received": {
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("Return request received for order " + orderNumber),
+        ...layout("We received your return request", "Your return request for order " + orderNumber + " is now in our review queue.", actionUrl, appBaseUrl),
+      };
+    }
+    case "staff.return-request-received": {
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("Return request requires review: " + orderNumber),
+        ...layout("Return request requires review", "A return request for order " + orderNumber + " is awaiting review.", actionUrl, appBaseUrl),
+      };
+    }
+    case "customer.warranty-claim-received": {
+      const claimNumber = requiredString(data, "claimNumber");
+      const productName = requiredString(data, "productName");
+      return {
+        subject: subjectPart("Warranty claim received: " + claimNumber),
+        ...layout("We received your warranty claim", "Your warranty claim " + claimNumber + " for " + productName + " has been received.", actionUrl, appBaseUrl),
+      };
+    }
+    case "staff.warranty-claim-received": {
+      const claimNumber = requiredString(data, "claimNumber");
+      const productName = requiredString(data, "productName");
+      return {
+        subject: subjectPart("Warranty claim requires review: " + claimNumber),
+        ...layout("Warranty claim requires review", "Claim " + claimNumber + " for " + productName + " is awaiting review.", actionUrl, appBaseUrl),
+      };
+    }
+    case "staff.refund-needs-attention": {
+      const refundReference = requiredString(data, "refundReference");
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("Refund requires manual attention: " + refundReference),
+        ...layout(
+          "Refund requires manual attention",
+          "Refund " + refundReference + " for order " + orderNumber + " requires manual review.",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
+    case "staff.inventory-low-stock": {
+      const productName = requiredString(data, "productName");
+      const sku = requiredString(data, "sku");
+      const availableQuantity = requiredString(data, "availableQuantity");
+      const lowStockThreshold = requiredString(data, "lowStockThreshold");
+      return {
+        subject: subjectPart("Low stock alert: " + productName),
+        ...layout(
+          "Low stock alert",
+          productName + " (" + sku + ") has " + availableQuantity + " available units. Replenishment threshold: " + lowStockThreshold + ".",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
+    case "staff.return-received-for-inspection": {
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("Return received for inspection: " + orderNumber),
+        ...layout(
+          "Returned items ready for inspection",
+          "The return for order " + orderNumber + " has been received and is awaiting inspection.",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
     default:
       throw new Error("Unsupported notification email template: " + templateKey);
   }
