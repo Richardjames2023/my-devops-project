@@ -34,6 +34,7 @@ import { errorHandler } from "./common/errors/errorHandler";
 import cookieParser from "cookie-parser";
 import healthRoutes from "./modules/health/health.routes";
 import deliveryZoneRoutes from "./modules/delivery-zones/delivery-zone.routes";
+import deliveryZonePublicRoutes from "./modules/delivery-zones/delivery-zone.public.routes";
 
 const app = express();
 const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
@@ -93,6 +94,8 @@ app.use("/api/v1/orders", orderRoutes);
 app.use("/api/v1/fulfillments", fulfillmentRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/deliveries", deliveryRoutes);
+app.use("/api/v1/delivery-zones", deliveryZonePublicRoutes);
+app.use("/api/v1/staff/delivery-zones", deliveryZoneRoutes);
 app.use("/api/v1/returns", returnRoutes);
 app.use("/api/v1/warranty-claims", warrantyClaimRoutes);
 app.use("/api/v1/reviews", productReviewRoutes);
