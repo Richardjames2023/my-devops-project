@@ -136,9 +136,9 @@ async function createFixture(
     );
 
     await pool.query(
-      `INSERT INTO delivery_zone_locations ("zoneId", state, city, "createdAt")
-       VALUES ($1, $2, $3, NOW())`,
-      [fixture.deliveryZoneId, fixture.shippingAddress.state.toUpperCase(), fixture.shippingAddress.city.toUpperCase()],
+      `INSERT INTO delivery_zone_locations (id, "zoneId", state, city, "createdAt")
+       VALUES ($1, $2, $3, $4, NOW())`,
+      [randomUUID(), fixture.deliveryZoneId, fixture.shippingAddress.state.toUpperCase(), fixture.shippingAddress.city.toUpperCase()],
     );
 
     await pool.query(
