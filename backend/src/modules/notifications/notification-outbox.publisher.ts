@@ -6,6 +6,7 @@ export type NotificationEventType =
   | "delivery.delivered"
   | "order.created"
   | "return.requested"
+  | "return.received"
   | "warranty.claim.created"
   | "refund.needs_attention"
   | "inventory.low_stock";
