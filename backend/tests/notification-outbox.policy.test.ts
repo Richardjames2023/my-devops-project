@@ -20,6 +20,21 @@ describe("notification event policy", () => {
     });
   });
 
+  it("allows recipient preferences to control order, return, and warranty alerts", () => {
+    for (const eventType of ["order.created", "return.requested", "warranty.claim.created"]) {
+      expect(getNotificationEventPolicy(eventType)).toMatchObject({
+        inAppMandatory: false,
+        emailMandatory: false,
+      });
+    }
+  });
+
+  it("requires both channels for refund intervention alerts", () => {
+    expect(getNotificationEventPolicy("refund.needs_attention")).toEqual({
+      category: "REFUND", inAppMandatory: true, emailMandatory: true,
+    });
+  });
+
   it("rejects event types without an explicit policy", () => {
     expect(() => getNotificationEventPolicy("unknown.event")).toThrow(
       "Unsupported notification event type: unknown.event",
