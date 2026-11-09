@@ -28,6 +28,7 @@ import notificationInboxRoutes from "./modules/notifications/notification-inbox.
 import staffNotificationInboxRoutes from "./modules/notifications/staff-notification-inbox.routes";
 import notificationPreferenceRoutes from "./modules/notifications/notification-preferences.routes";
 import staffNotificationPreferenceRoutes from "./modules/notifications/staff-notification-preferences.routes";
+import { resendEmailWebhook } from "./modules/notifications/notification-email-webhook.controller";
 import { errorHandler } from "./common/errors/errorHandler";
 import cookieParser from "cookie-parser";
 
@@ -58,6 +59,12 @@ app.post(
     limit: "100kb",
   }),
   paystackWebhook,
+);
+
+app.post(
+  "/api/v1/notifications/webhooks/resend",
+  express.raw({ type: "application/json", limit: "100kb" }),
+  resendEmailWebhook,
 );
 
 app.use(express.json());
