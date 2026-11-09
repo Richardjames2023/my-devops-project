@@ -4,6 +4,7 @@ import { connectToDatabase, disconnectDatabase } from "./infrastructure/prisma/c
 import { startInventoryReservationExpirationJob } from "./infrastructure/jobs/inventory-reservation-expiration.job";
 import { startPaymentInitializationReconciliationJob } from "./infrastructure/jobs/payment-initialization-reconciliation.job";
 import { startNotificationOutboxJob } from "./infrastructure/jobs/notification-outbox.job";
+import { startNotificationEmailJob } from "./infrastructure/jobs/notification-email.job";
 
 async function startServer(): Promise<void> {
   try {
@@ -12,6 +13,7 @@ async function startServer(): Promise<void> {
     startInventoryReservationExpirationJob();
     startPaymentInitializationReconciliationJob();
     startNotificationOutboxJob();
+    startNotificationEmailJob();
 
     const server = app.listen(env.PORT, () => {
       console.log(`Server is running on port ${env.PORT}`);
