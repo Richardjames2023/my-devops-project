@@ -148,7 +148,7 @@ describe("PostgreSQL notification preference APIs", () => {
       .expect(400);
 
     await request(app)
-      .put("/api/v1/notifications/preferences/DELIVERY")
+      .put("/api/v1/notifications/preferences/REFUND")
       .set("Authorization", `Bearer ${customer.token}`)
       .send({ inAppEnabled: false })
       .expect(400);
@@ -168,7 +168,7 @@ describe("PostgreSQL notification preference APIs", () => {
 
   it("isolates customer preferences and staff preferences by identity", async () => {
     await request(app)
-      .put("/api/v1/staff/notifications/preferences/REFUND")
+      .put("/api/v1/staff/notifications/preferences/ORDER")
       .set("Authorization", `Bearer ${staff.token}`)
       .send({ emailEnabled: false })
       .expect(200);
@@ -177,15 +177,15 @@ describe("PostgreSQL notification preference APIs", () => {
       .get("/api/v1/staff/notifications/preferences")
       .set("Authorization", `Bearer ${staff.token}`)
       .expect(200);
-    expect(staffSettings.body.preferences.find((item: { category: string }) => item.category === "REFUND"))
+    expect(staffSettings.body.preferences.find((item: { category: string }) => item.category === "ORDER"))
       .toMatchObject({ inAppEnabled: true, emailEnabled: false });
 
     const otherCustomerSettings = await request(app)
       .get("/api/v1/notifications/preferences")
       .set("Authorization", `Bearer ${otherCustomer.token}`)
       .expect(200);
-    expect(otherCustomerSettings.body.preferences.find((item: { category: string }) => item.category === "REFUND"))
-      .toMatchObject({ inAppEnabled: true, emailEnabled: false });
+    expect(otherCustomerSettings.body.preferences.find((item: { category: string }) => item.category === "ORDER"))
+      .toMatchObject({ inAppEnabled: true, emailEnabled: true });
   });
 
   it("rejects unauthenticated, cross-identity, and inactive staff access", async () => {
