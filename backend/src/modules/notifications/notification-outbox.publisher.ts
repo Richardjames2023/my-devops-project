@@ -7,9 +7,10 @@ export type NotificationEventType =
   | "order.created"
   | "return.requested"
   | "warranty.claim.created"
-  | "refund.needs_attention";
+  | "refund.needs_attention"
+  | "inventory.low_stock";
 
-export type NotificationAggregateType = "PAYMENT" | "DELIVERY" | "ORDER" | "RETURN" | "WARRANTY" | "REFUND";
+export type NotificationAggregateType = "PAYMENT" | "DELIVERY" | "ORDER" | "RETURN" | "WARRANTY" | "REFUND" | "INVENTORY";
 
 export interface PublishNotificationEventInput {
   eventType: NotificationEventType;
