@@ -122,6 +122,23 @@ describe("PostgreSQL Resend email webhook reconciliation", () => {
     expect(complaintRow.rows[0].complainedAt).toBeTruthy();
   });
 
+
+  it("records provider suppressions as a terminal email outcome", async () => {
+    const fixture = await createDelivery();
+    await processResendEmailEvent({
+      providerEventId: "svix-suppressed-" + randomUUID(),
+      providerMessageId: fixture.messageId,
+      eventType: "email.suppressed",
+      payload: { type: "email.suppressed", data: { email_id: fixture.messageId } },
+    });
+    const row = await pool.query(
+      `SELECT status, "suppressedAt" FROM notification_email_deliveries WHERE id = $1`,
+      [fixture.id],
+    );
+    expect(row.rows[0].status).toBe("SUPPRESSED");
+    expect(row.rows[0].suppressedAt).toBeTruthy();
+  });
+
   it("does not let a delayed event downgrade a confirmed delivery", async () => {
     const fixture = await createDelivery();
     await processResendEmailEvent({
