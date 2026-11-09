@@ -169,6 +169,21 @@ export function renderNotificationEmail(
         ),
       };
     }
+    case "staff.inventory-low-stock": {
+      const productName = requiredString(data, "productName");
+      const sku = requiredString(data, "sku");
+      const availableQuantity = requiredString(data, "availableQuantity");
+      const lowStockThreshold = requiredString(data, "lowStockThreshold");
+      return {
+        subject: subjectPart("Low stock alert: " + productName),
+        ...layout(
+          "Low stock alert",
+          productName + " (" + sku + ") has " + availableQuantity + " available units. Replenishment threshold: " + lowStockThreshold + ".",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
     default:
       throw new Error("Unsupported notification email template: " + templateKey);
   }
