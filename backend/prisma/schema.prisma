@@ -830,6 +830,7 @@ model Notification {
 model NotificationEmailDelivery {
   id                String                          @id @default(uuid()) @db.Uuid
   notificationId    String?                         @unique @db.Uuid
+  eventRecipientKey String?                         @unique
   recipientEmail    String
   templateKey       String
   templateData      Json
