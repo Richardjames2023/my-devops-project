@@ -101,7 +101,19 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       where: { status: "ACTIVE" },
       select: {
         id: true, email: true,
-        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: {
+                    permission: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     const title = "New order received";
