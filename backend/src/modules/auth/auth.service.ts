@@ -58,6 +58,38 @@ export async function registerUser(input: RegisterInput) {
   };
 }
 
+export async function resendCustomerEmailVerification(email: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, firstName: true, emailVerified: true, isActive: true },
+  });
+  if (!user || user.emailVerified || !user.isActive) return;
+
+  const verificationToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashRefreshToken(verificationToken);
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.customerEmailVerificationToken.updateMany({
+      where: { userId: user.id, consumedAt: null },
+      data: { consumedAt: new Date() },
+    });
+    await tx.customerEmailVerificationToken.create({
+      data: { userId: user.id, tokenHash, expiresAt },
+    });
+    await tx.notificationEmailDelivery.create({
+      data: {
+        recipientEmail: user.email,
+        templateKey: "customer.email-verification",
+        templateData: {
+          firstName: user.firstName,
+          actionUrl: "/verify-email?token=" + encodeURIComponent(verificationToken),
+        },
+      },
+    });
+  });
+}
+
 export async function verifyCustomerEmail(token: string): Promise<void> {
   const tokenHash = hashRefreshToken(token);
   await prisma.$transaction(async (tx) => {
