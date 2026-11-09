@@ -37,7 +37,6 @@
 
 //   "deliveries.read",
 //   "deliveries.manage",
-  "delivery_zones.manage",
 
 //   "returns.read",
 //   "returns.manage",
