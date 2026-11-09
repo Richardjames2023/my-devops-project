@@ -9,6 +9,7 @@ export interface AuthenticatedUser {
   identityType: AuthIdentityType;
   roles: string[];
   permissions: string[];
+  sessionVersion?: number;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -56,7 +57,8 @@ export function authenticate(
       typeof payload.iat !== "number" ||
       !Number.isFinite(payload.iat) ||
       typeof payload.exp !== "number" ||
-      !Number.isFinite(payload.exp)
+      !Number.isFinite(payload.exp) ||
+      (payload.sessionVersion !== undefined && (!Number.isInteger(payload.sessionVersion) || payload.sessionVersion < 0))
     ) {
       next(new AppError("Invalid access token", 401));
       return;
@@ -70,6 +72,7 @@ export function authenticate(
       identityType: payload.identityType ?? "CUSTOMER",
       roles: payload.roles,
       permissions: payload.permissions,
+      sessionVersion: typeof payload.sessionVersion === "number" ? payload.sessionVersion : 0,
     };
 
     next();
