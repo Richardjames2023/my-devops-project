@@ -23,7 +23,7 @@ function identityWhere(identity: NotificationPreferenceIdentity) {
  * Other categories are configurable by the recipient.
  */
 function mandatoryChannels(category: NotificationCategory) {
-  if (category === "PAYMENT" || category === "SECURITY") {
+  if (category === "PAYMENT" || category === "SECURITY" || category === "REFUND") {
     return { inApp: true, email: true };
   }
   return { inApp: false, email: false };
