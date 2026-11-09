@@ -25,7 +25,7 @@ export async function processResendEmailEvent(input: ResendEmailEventInput) {
     });
     if (existing) return { processed: false, duplicate: true };
 
-    const delivery = await tx.notificationEmailDelivery.findFirst({
+    const delivery = await tx.notificationEmailDelivery.findUnique({
       where: { providerMessageId: input.providerMessageId },
       select: { id: true, status: true },
     });
