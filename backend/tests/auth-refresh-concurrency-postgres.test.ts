@@ -52,8 +52,8 @@ describe("PostgreSQL refresh token rotation concurrency", () => {
 
     await pool.query(
       `INSERT INTO users
-       (id, email, "passwordHash", "firstName", "lastName", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+       (id, email, "passwordHash", "firstName", "lastName", "emailVerified", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, TRUE, NOW(), NOW())`,
       [userId, `refresh-${userId}@test.local`, "test-hash", "Refresh", "Tester"],
     );
 
@@ -109,8 +109,8 @@ describe("PostgreSQL refresh token rotation concurrency", () => {
 
     await pool.query(
       `INSERT INTO users
-       (id, email, "passwordHash", "firstName", "lastName", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+       (id, email, "passwordHash", "firstName", "lastName", "emailVerified", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, TRUE, NOW(), NOW())`,
       [userId, `replay-${userId}@test.local`, "test-hash", "Replay", "Tester"],
     );
 
