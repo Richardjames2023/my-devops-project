@@ -162,7 +162,19 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       where: { status: "ACTIVE" },
       select: {
         id: true, email: true,
-        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: {
+                    permission: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     const title = "Return request requires review";
@@ -194,7 +206,19 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       where: { status: "ACTIVE" },
       select: {
         id: true, email: true,
-        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: {
+                    permission: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     const title = "Returned items ready for inspection";
@@ -246,7 +270,19 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       where: { status: "ACTIVE" },
       select: {
         id: true, email: true,
-        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: {
+                    permission: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     const title = "Warranty claim requires review";
@@ -282,7 +318,19 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       where: { status: "ACTIVE" },
       select: {
         id: true, email: true,
-        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: {
+                    permission: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     const productName = inventory.productVariant.product.name;
@@ -316,7 +364,19 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       where: { status: "ACTIVE" },
       select: {
         id: true, email: true,
-        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: {
+                    permission: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
     const title = "Refund requires manual attention";
