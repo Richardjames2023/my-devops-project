@@ -839,15 +839,36 @@ model NotificationEmailDelivery {
   lockedBy          String?
   providerMessageId String?
   acceptedAt        DateTime?
+  deliveredAt       DateTime?
+  bouncedAt         DateTime?
+  complainedAt      DateTime?
+  failedAt          DateTime?
+  lastProviderEventType String?
   lastError         String?
   createdAt         DateTime                        @default(now())
   updatedAt         DateTime                        @updatedAt
   notification      Notification?                   @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  providerEvents    NotificationEmailEvent[]
 
   @@index([status, nextAttemptAt, createdAt])
   @@index([status, lockedAt])
   @@index([providerMessageId])
   @@map("notification_email_deliveries")
+}
+
+model NotificationEmailEvent {
+  id                String                     @id @default(uuid()) @db.Uuid
+  providerEventId   String                     @unique
+  providerMessageId String
+  eventType         String
+  payload           Json
+  deliveryId        String?                    @db.Uuid
+  receivedAt        DateTime                   @default(now())
+  delivery          NotificationEmailDelivery? @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+
+  @@index([providerMessageId, receivedAt])
+  @@index([eventType, receivedAt])
+  @@map("notification_email_events")
 }
 
 model NotificationPreference {
@@ -898,6 +919,11 @@ enum NotificationEmailDeliveryStatus {
   PROCESSING
   RETRYING
   ACCEPTED
+  DELAYED
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
   DEAD
 }
 
