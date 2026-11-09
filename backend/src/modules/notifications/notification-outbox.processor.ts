@@ -329,13 +329,14 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
     });
     if (!payment) throw new Error("Payment not found for notification event: " + paymentId);
     const user = payment.order.user;
-    if (!user) return []; // Guest checkouts have no customer inbox identity.
+    const recipientEmail = user?.email ?? payment.order.customerEmail;
+    if (!recipientEmail) return [];
     const title = "Payment successful";
     const body = "Payment for order " + payment.order.orderNumber + " was received successfully.";
-    const actionUrl = "/account/orders/" + payment.orderId;
+    const actionUrl = user ? "/account/orders/" + payment.orderId : "/orders/guest";
     return [{
-      recipientType: "CUSTOMER", customerUserId: user.id, staffAccountId: null,
-      recipientEmail: user.email, category: policy.category, title, body, actionUrl,
+      recipientType: "CUSTOMER", customerUserId: user?.id ?? null, staffAccountId: null,
+      recipientEmail, category: policy.category, title, body, actionUrl,
       metadata: { paymentId: payment.id, orderId: payment.orderId, orderNumber: payment.order.orderNumber },
       templateKey: "customer.payment-succeeded",
       templateData: {
@@ -410,13 +411,14 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
     if (!delivery) throw new Error("Delivery not found for notification event: " + deliveryId);
     const order = delivery.package.fulfillment.order;
     const user = order.user;
-    if (!user) return []; // Guest checkouts have no customer inbox identity.
+    const recipientEmail = user?.email ?? order.customerEmail;
+    if (!recipientEmail) return [];
     const title = "Your order has been delivered";
     const body = "Your order " + order.orderNumber + " has been delivered successfully.";
-    const actionUrl = "/account/orders/" + order.id;
+    const actionUrl = user ? "/account/orders/" + order.id : "/orders/guest";
     return [{
-      recipientType: "CUSTOMER", customerUserId: user.id, staffAccountId: null,
-      recipientEmail: user.email, category: policy.category, title, body, actionUrl,
+      recipientType: "CUSTOMER", customerUserId: user?.id ?? null, staffAccountId: null,
+      recipientEmail, category: policy.category, title, body, actionUrl,
       metadata: { deliveryId: delivery.id, orderId: order.id, orderNumber: order.orderNumber },
       templateKey: "customer.delivery-delivered",
       templateData: { title, body, actionUrl, deliveryId: delivery.id, orderId: order.id, orderNumber: order.orderNumber },
