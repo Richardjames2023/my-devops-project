@@ -33,6 +33,7 @@ import { resendEmailWebhook } from "./modules/notifications/notification-email-w
 import { errorHandler } from "./common/errors/errorHandler";
 import cookieParser from "cookie-parser";
 import healthRoutes from "./modules/health/health.routes";
+import deliveryZoneRoutes from "./modules/delivery-zones/delivery-zone.routes";
 
 const app = express();
 const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
