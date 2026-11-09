@@ -191,14 +191,15 @@ async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
           : "STAFF:" + preference.staffAccountId,
         preference,
       ]));
-      const eligible = drafts.filter((draft) => {
+      const inAppDrafts = drafts.filter((draft) => {
         const preference = preferenceMap.get(identity(draft));
         return policy.inAppMandatory || preference?.inAppEnabled !== false;
       });
+      const notificationByIdentity = new Map<string, { id: string }>();
 
-      if (eligible.length) {
+      if (inAppDrafts.length) {
         await tx.notification.createMany({
-          data: eligible.map((draft) => ({
+          data: inAppDrafts.map((draft) => ({
             outboxEventId: event.id, recipientType: draft.recipientType,
             customerUserId: draft.customerUserId, staffAccountId: draft.staffAccountId,
             category: draft.category, title: draft.title, body: draft.body,
@@ -206,33 +207,43 @@ async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
           })),
           skipDuplicates: true,
         });
+
+        const inAppCustomerIds = inAppDrafts.flatMap((draft) => draft.customerUserId ? [draft.customerUserId] : []);
+        const inAppStaffIds = inAppDrafts.flatMap((draft) => draft.staffAccountId ? [draft.staffAccountId] : []);
         const notificationRows = await tx.notification.findMany({
           where: {
             outboxEventId: event.id,
             OR: [
-              ...(customerIds.length ? [{ customerUserId: { in: customerIds } }] : []),
-              ...(staffIds.length ? [{ staffAccountId: { in: staffIds } }] : []),
+              ...(inAppCustomerIds.length ? [{ customerUserId: { in: inAppCustomerIds } }] : []),
+              ...(inAppStaffIds.length ? [{ staffAccountId: { in: inAppStaffIds } }] : []),
             ],
           },
           select: { id: true, customerUserId: true, staffAccountId: true },
         });
-        const draftMap = new Map(eligible.map((draft) => [identity(draft), draft]));
-        const emailRows = notificationRows.flatMap((notification) => {
+        for (const notification of notificationRows) {
           const key = notification.customerUserId
             ? "CUSTOMER:" + notification.customerUserId
             : "STAFF:" + notification.staffAccountId;
-          const draft = draftMap.get(key);
-          if (!draft) return [];
-          const preference = preferenceMap.get(key);
-          if (!policy.emailMandatory && preference?.emailEnabled === false) return [];
-          return [{
-            notificationId: notification.id, recipientEmail: draft.recipientEmail,
-            templateKey: draft.templateKey, templateData: draft.templateData,
-          }];
-        });
-        if (emailRows.length) {
-          await tx.notificationEmailDelivery.createMany({ data: emailRows, skipDuplicates: true });
+          notificationByIdentity.set(key, { id: notification.id });
         }
+      }
+
+      // Email delivery is evaluated independently from in-app visibility.
+      // An email-only preference therefore does not create an inbox item.
+      const emailDrafts = drafts.filter((draft) => {
+        const preference = preferenceMap.get(identity(draft));
+        return policy.emailMandatory || preference?.emailEnabled !== false;
+      });
+      if (emailDrafts.length) {
+        await tx.notificationEmailDelivery.createMany({
+          data: emailDrafts.map((draft) => ({
+            notificationId: notificationByIdentity.get(identity(draft))?.id ?? null,
+            recipientEmail: draft.recipientEmail,
+            templateKey: draft.templateKey,
+            templateData: draft.templateData,
+          })),
+          skipDuplicates: true,
+        });
       }
     }
 
