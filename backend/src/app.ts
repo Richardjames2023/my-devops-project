@@ -28,6 +28,7 @@ import notificationInboxRoutes from "./modules/notifications/notification-inbox.
 import staffNotificationInboxRoutes from "./modules/notifications/staff-notification-inbox.routes";
 import notificationPreferenceRoutes from "./modules/notifications/notification-preferences.routes";
 import staffNotificationPreferenceRoutes from "./modules/notifications/staff-notification-preferences.routes";
+import notificationOperationsRoutes from "./modules/notifications/notification-operations.routes";
 import { resendEmailWebhook } from "./modules/notifications/notification-email-webhook.controller";
 import { errorHandler } from "./common/errors/errorHandler";
 import cookieParser from "cookie-parser";
@@ -78,6 +79,7 @@ app.use("/api/v1/notifications", notificationInboxRoutes);
 app.use("/api/v1/staff/notifications", staffNotificationInboxRoutes);
 app.use("/api/v1/notifications/preferences", notificationPreferenceRoutes);
 app.use("/api/v1/staff/notifications/preferences", staffNotificationPreferenceRoutes);
+app.use("/api/v1/staff/notifications/operations", notificationOperationsRoutes);
 app.use("/api/v1/staff-auth", staffAuthRoutes);
 app.use("/api/v1/staff", staffRoutes);
 app.use("/api/v1/products", productRoutes);
