@@ -265,4 +265,179 @@ describe("PostgreSQL customer password reset", () => {
       }
     },
   );
+
+  it("rejects expired reset tokens without changing the customer's password", async () => {
+    const email = `password-reset-expired-${randomUUID()}@test.local`;
+    let userId: string | undefined;
+    const expiredToken = randomUUID() + randomUUID();
+
+    try {
+      const user = await registerUser({
+        email,
+        password: "Original-Password-2026!",
+        firstName: "Expired",
+        lastName: "Tester",
+      });
+      userId = user.id;
+
+      await pool.query(
+        'UPDATE users SET "emailVerified" = TRUE WHERE id = $1',
+        [userId],
+      );
+
+      const { hashRefreshToken } = await import("../src/common/utils/refreshToken");
+      await pool.query(
+        `INSERT INTO customer_password_reset_tokens
+          (id, "userId", "tokenHash", "expiresAt", "createdAt")
+         VALUES ($1, $2, $3, NOW() - INTERVAL '1 minute', NOW())`,
+        [randomUUID(), userId, hashRefreshToken(expiredToken)],
+      );
+
+      await expect(
+        resetCustomerPassword({
+          token: expiredToken,
+          newPassword: "New-Strong-Password-2026!",
+        }),
+      ).rejects.toMatchObject({ statusCode: 400 });
+
+      await expect(
+        loginUser({ email, password: "Original-Password-2026!" }),
+      ).resolves.toMatchObject({ user: { email } });
+
+      await expect(
+        loginUser({ email, password: "New-Strong-Password-2026!" }),
+      ).rejects.toMatchObject({ statusCode: 401 });
+    } finally {
+      if (userId) {
+        await pool.query("DELETE FROM users WHERE id = $1", [userId]);
+      }
+    }
+  });
+
+  it("does not queue reset emails for unverified or inactive customers", async () => {
+    const unverifiedEmail = `password-reset-unverified-${randomUUID()}@test.local`;
+    const inactiveEmail = `password-reset-inactive-${randomUUID()}@test.local`;
+    const userIds: string[] = [];
+
+    try {
+      const unverifiedUser = await registerUser({
+        email: unverifiedEmail,
+        password: "Original-Password-2026!",
+        firstName: "Unverified",
+        lastName: "Tester",
+      });
+      userIds.push(unverifiedUser.id);
+
+      const inactiveUser = await registerUser({
+        email: inactiveEmail,
+        password: "Original-Password-2026!",
+        firstName: "Inactive",
+        lastName: "Tester",
+      });
+      userIds.push(inactiveUser.id);
+
+      await pool.query(
+        'UPDATE users SET "emailVerified" = TRUE, "isActive" = FALSE WHERE id = $1',
+        [inactiveUser.id],
+      );
+
+      await expect(requestCustomerPasswordReset(unverifiedEmail)).resolves.toBeUndefined();
+      await expect(requestCustomerPasswordReset(inactiveEmail)).resolves.toBeUndefined();
+
+      const deliveries = await pool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM notification_email_deliveries
+         WHERE "recipientEmail" = ANY($1::text[])
+           AND "templateKey" = 'customer.password-reset'`,
+        [[unverifiedEmail, inactiveEmail]],
+      );
+      expect(deliveries.rows[0].count).toBe(0);
+
+      const tokens = await pool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM customer_password_reset_tokens
+         WHERE "userId" = ANY($1::uuid[])`,
+        [userIds],
+      );
+      expect(tokens.rows[0].count).toBe(0);
+    } finally {
+      if (userIds.length) {
+        await pool.query("DELETE FROM users WHERE id = ANY($1::uuid[])", [userIds]);
+      }
+    }
+  });
+
+  it("allows only one concurrent attempt to consume a reset token", async () => {
+    const email = `password-reset-concurrent-${randomUUID()}@test.local`;
+    let userId: string | undefined;
+
+    try {
+      const user = await registerUser({
+        email,
+        password: "Original-Password-2026!",
+        firstName: "Concurrent",
+        lastName: "Tester",
+      });
+      userId = user.id;
+
+      await pool.query(
+        'UPDATE users SET "emailVerified" = TRUE WHERE id = $1',
+        [userId],
+      );
+
+      await requestCustomerPasswordReset(email);
+
+      const queued = await pool.query(
+        `SELECT "templateData" FROM notification_email_deliveries
+         WHERE "recipientEmail" = $1
+           AND "templateKey" = 'customer.password-reset'
+         ORDER BY "createdAt" DESC, id DESC LIMIT 1`,
+        [email],
+      );
+      expect(queued.rows).toHaveLength(1);
+
+      const actionUrl = (
+        queued.rows[0].templateData as { actionUrl: string }
+      ).actionUrl;
+      const token = new URL(
+        actionUrl,
+        "https://shop.example.com",
+      ).searchParams.get("token");
+      expect(token).toBeTruthy();
+
+      const outcomes = await Promise.allSettled([
+        resetCustomerPassword({
+          token: token!,
+          newPassword: "Concurrent-Password-A-2026!",
+        }),
+        resetCustomerPassword({
+          token: token!,
+          newPassword: "Concurrent-Password-B-2026!",
+        }),
+      ]);
+
+      expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+      expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
+
+      const rejected = outcomes.find(
+        (outcome): outcome is PromiseRejectedResult => outcome.status === "rejected",
+      );
+      expect(rejected?.reason).toMatchObject({ statusCode: 400 });
+
+      const passwordA = await loginUser({
+        email,
+        password: "Concurrent-Password-A-2026!",
+      }).then(() => true, () => false);
+      const passwordB = await loginUser({
+        email,
+        password: "Concurrent-Password-B-2026!",
+      }).then(() => true, () => false);
+
+      expect(Number(passwordA) + Number(passwordB)).toBe(1);
+    } finally {
+      if (userId) {
+        await pool.query("DELETE FROM users WHERE id = $1", [userId]);
+      }
+    }
+  });
 });
