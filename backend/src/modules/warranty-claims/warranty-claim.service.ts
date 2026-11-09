@@ -142,13 +142,6 @@ export async function getCustomerWarrantyClaim(userId: string, claimId: string) 
   const claim = await prisma.warrantyClaim.findFirst({
     where: { id: claimId, userId },
     include: claimDetails,
-    await publishNotificationEvent(tx, {
-      eventType: "warranty.claim.created",
-      aggregateType: "WARRANTY",
-      aggregateId: claim.id,
-      payload: { warrantyClaimId: claim.id },
-    });
-    return claim;
   });
   if (!claim) throw new AppError("Warranty claim not found", 404);
   return claim;
