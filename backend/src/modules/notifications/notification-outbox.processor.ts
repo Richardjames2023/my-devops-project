@@ -484,8 +484,8 @@ async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
           where: {
             outboxEventId: event.id,
             OR: [
-              ...(inAppCustomerIds.length ? [{ customerUserId: { in: inAppCustomerIds } }] : []),
-              ...(inAppStaffIds.length ? [{ staffAccountId: { in: inAppStaffIds } }] : []),
+              ...(inAppCustomerIds.length ? [{ recipientType: "CUSTOMER" as const, customerUserId: { in: inAppCustomerIds } }] : []),
+              ...(inAppStaffIds.length ? [{ recipientType: "STAFF" as const, staffAccountId: { in: inAppStaffIds } }] : []),
             ],
           },
           select: { id: true, customerUserId: true, staffAccountId: true },
@@ -509,6 +509,7 @@ async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
         await tx.notificationEmailDelivery.createMany({
           data: emailDrafts.map((draft) => ({
             notificationId: notificationByIdentity.get(identity(draft))?.id ?? null,
+            eventRecipientKey: "v1:" + event.id + ":" + identity(draft),
             recipientEmail: draft.recipientEmail,
             templateKey: draft.templateKey,
             templateData: draft.templateData,
