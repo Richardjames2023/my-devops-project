@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
 import type {
   CreateReturnRequestInput,
@@ -298,7 +299,7 @@ export async function createReturnRequest(
         }
       }
 
-      return tx.returnRequest.create({
+      const returnRequest = await tx.returnRequest.create({
         data: {
           orderId: order.id,
           userId,
@@ -321,6 +322,13 @@ export async function createReturnRequest(
           evidence: true,
         },
       });
+      await publishNotificationEvent(tx, {
+        eventType: "return.requested",
+        aggregateType: "RETURN",
+        aggregateId: returnRequest.id,
+        payload: { returnRequestId: returnRequest.id },
+      });
+      return returnRequest;
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
   );
