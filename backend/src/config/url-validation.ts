@@ -5,3 +5,11 @@ export function isHttpsUrl(value: string): boolean {
     return false;
   }
 }
+
+export function isSecureProductionEmailUrl(
+  nodeEnv: string,
+  emailDeliveryEnabled: boolean,
+  appBaseUrl: string,
+): boolean {
+  return nodeEnv !== "production" || !emailDeliveryEnabled || isHttpsUrl(appBaseUrl);
+}
