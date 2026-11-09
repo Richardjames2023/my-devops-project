@@ -48,6 +48,8 @@ export function getNotificationEventPolicy(eventType: string): Policy {
       return { category: "RETURN", inAppMandatory: false, emailMandatory: false };
     case "warranty.claim.created":
       return { category: "WARRANTY", inAppMandatory: false, emailMandatory: false };
+    case "refund.needs_attention":
+      return { category: "REFUND", inAppMandatory: true, emailMandatory: true };
     default:
       throw new Error("Unsupported notification event type: " + eventType);
   }
@@ -212,6 +214,35 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       });
     }
     return drafts;
+  }
+
+  if (event.eventType === "refund.needs_attention") {
+    const refundId = payloadString(event.payload, "refundId") ?? event.aggregateId;
+    const refund = await tx.refund.findUnique({
+      where: { id: refundId },
+      include: { order: { select: { id: true, orderNumber: true } } },
+    });
+    if (!refund) throw new Error("Refund not found for notification event: " + refundId);
+
+    const staff = await tx.staffAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true, email: true,
+        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+      },
+    });
+    const title = "Refund requires manual attention";
+    const body = "Refund " + refund.reference + " for order " + refund.order.orderNumber + " requires manual attention.";
+    const actionUrl = "/staff/refunds/" + refund.id;
+    return staff.filter((item) => item.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) => permission.name === "refunds.manage"),
+    )).map((account) => ({
+      recipientType: "STAFF" as const, customerUserId: null, staffAccountId: account.id,
+      recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+      metadata: { refundId: refund.id, orderId: refund.order.id, orderNumber: refund.order.orderNumber },
+      templateKey: "staff.refund-needs-attention",
+      templateData: { refundReference: refund.reference, orderNumber: refund.order.orderNumber, actionUrl },
+    }));
   }
 
   if (event.eventType === "payment.succeeded") {
