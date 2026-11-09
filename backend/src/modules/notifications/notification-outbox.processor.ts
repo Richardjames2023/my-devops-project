@@ -57,6 +57,12 @@ export function getNotificationEventPolicy(eventType: string): Policy {
   }
 }
 
+function payloadNumber(payload: Prisma.JsonValue, key: string): number | null {
+  if (!payload || Array.isArray(payload) || typeof payload !== "object") return null;
+  const value = payload[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function payloadString(payload: Prisma.JsonValue, key: string): string | null {
   if (!payload || Array.isArray(payload) || typeof payload !== "object") return null;
   const value = payload[key];
@@ -226,7 +232,10 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
     });
     if (!inventory) throw new Error("Inventory not found for low-stock event: " + inventoryId);
 
-    const availableQuantity = inventory.quantity - inventory.reservedQuantity - inventory.quarantineQuantity;
+    const availableQuantity = payloadNumber(event.payload, "availableQuantity")
+      ?? inventory.quantity - inventory.reservedQuantity - inventory.quarantineQuantity;
+    const lowStockThreshold = payloadNumber(event.payload, "lowStockThreshold")
+      ?? inventory.lowStockThreshold;
     const staff = await tx.staffAccount.findMany({
       where: { status: "ACTIVE" },
       select: {
@@ -237,18 +246,18 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
     const productName = inventory.productVariant.product.name;
     const sku = inventory.productVariant.sku;
     const title = "Low stock alert";
-    const body = productName + " (" + sku + ") has " + availableQuantity + " available units, at or below its threshold of " + inventory.lowStockThreshold + ".";
+    const body = productName + " (" + sku + ") has " + availableQuantity + " available units, at or below its threshold of " + lowStockThreshold + ".";
     const actionUrl = "/staff/inventory/" + inventory.id;
     return staff.filter((item) => item.roles.some(({ role }) =>
       role.permissions.some(({ permission }) => permission.name === "inventory.manage"),
     )).map((account) => ({
       recipientType: "STAFF" as const, customerUserId: null, staffAccountId: account.id,
       recipientEmail: account.email, category: policy.category, title, body, actionUrl,
-      metadata: { inventoryId: inventory.id, productName, sku, availableQuantity, lowStockThreshold: inventory.lowStockThreshold },
+      metadata: { inventoryId: inventory.id, productName, sku, availableQuantity, lowStockThreshold },
       templateKey: "staff.inventory-low-stock",
       templateData: {
         productName, sku, availableQuantity: String(availableQuantity),
-        lowStockThreshold: String(inventory.lowStockThreshold), actionUrl,
+        lowStockThreshold: String(lowStockThreshold), actionUrl,
       },
     }));
   }
