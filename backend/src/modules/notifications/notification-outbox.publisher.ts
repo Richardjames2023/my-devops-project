@@ -6,15 +6,17 @@ export type NotificationEventType =
   | "delivery.delivered"
   | "order.created"
   | "return.requested"
-  | "warranty.claim.created";
+  | "warranty.claim.created"
+  | "refund.needs_attention";
 
-export type NotificationAggregateType = "PAYMENT" | "DELIVERY" | "ORDER" | "RETURN" | "WARRANTY";
+export type NotificationAggregateType = "PAYMENT" | "DELIVERY" | "ORDER" | "RETURN" | "WARRANTY" | "REFUND";
 
 export interface PublishNotificationEventInput {
   eventType: NotificationEventType;
   aggregateType: NotificationAggregateType;
   aggregateId: string;
   payload: Prisma.InputJsonObject;
+  deduplicationKey?: string;
 }
 
 /**
@@ -34,7 +36,8 @@ export async function publishNotificationEvent(
     throw new Error("Notification event aggregateId is required");
   }
 
-  const eventKey = `v1:${input.eventType}:${input.aggregateType}:${aggregateId}`;
+  const suffix = input.deduplicationKey?.trim();
+  const eventKey = `v1:${input.eventType}:${input.aggregateType}:${aggregateId}${suffix ? ":" + suffix : ""}`;
 
   return tx.notificationOutbox.upsert({
     where: { eventKey },
