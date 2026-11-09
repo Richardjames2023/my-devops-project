@@ -40,6 +40,10 @@ describe("transactional email templates", () => {
       claimNumber: "WAR-202", productName: "Laptop",
     }).text).toContain("Laptop");
 
+    expect(renderNotificationEmail("staff.return-received-for-inspection", {
+      orderNumber: "ORD-204", actionUrl: "/staff/returns/204/inspection",
+    }).text).toContain("ORD-204");
+
     expect(renderNotificationEmail("staff.refund-needs-attention", {
       refundReference: "REF-203", orderNumber: "ORD-203",
     }).text).toContain("REF-203");
