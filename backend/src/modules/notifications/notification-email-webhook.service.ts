@@ -2,6 +2,7 @@ import { Prisma, type NotificationEmailDeliveryStatus } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 
 export type ResendEmailEventType =
+  | "email.sent"
   | "email.delivered"
   | "email.delivery_delayed"
   | "email.bounced"
@@ -45,12 +46,16 @@ export async function processResendEmailEvent(input: ResendEmailEventInput) {
     if (inserted.count === 0) return { processed: false, duplicate: true };
 
     const now = new Date();
-    let status: "DELAYED" | "DELIVERED" | "BOUNCED" | "COMPLAINED" | "FAILED" | "SUPPRESSED";
+    let status: "SENT" | "DELAYED" | "DELIVERED" | "BOUNCED" | "COMPLAINED" | "FAILED" | "SUPPRESSED";
     const data: Prisma.NotificationEmailDeliveryUpdateManyMutationInput = {
       lastProviderEventType: input.eventType,
     };
 
     switch (input.eventType) {
+      case "email.sent":
+        status = "SENT";
+        data.sentAt = now;
+        break;
       case "email.delivered":
         status = "DELIVERED";
         data.deliveredAt = now;
@@ -76,7 +81,9 @@ export async function processResendEmailEvent(input: ResendEmailEventInput) {
         break;
     }
 
-    const protectedStatuses: NotificationEmailDeliveryStatus[] = input.eventType === "email.complained"
+    const protectedStatuses: NotificationEmailDeliveryStatus[] = input.eventType === "email.sent"
+      ? [...terminalStatuses, "DELIVERED", "DELAYED"]
+      : input.eventType === "email.complained"
       ? ["BOUNCED", "FAILED", "SUPPRESSED", "DEAD"]
       : input.eventType === "email.bounced"
         ? ["COMPLAINED", "FAILED", "SUPPRESSED", "DEAD", "DELIVERED"]
