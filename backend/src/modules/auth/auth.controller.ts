@@ -5,9 +5,10 @@ import {
   registerSchema,
   loginSchema,
   refreshTokenSchema,
+  resendVerificationSchema,
 } from "./auth.validation";
 
-import { registerUser, loginUser, refreshAccessToken, verifyCustomerEmail } from "./auth.service";
+import { registerUser, loginUser, refreshAccessToken, verifyCustomerEmail, resendCustomerEmailVerification } from "./auth.service";
 
 import { mergeGuestCartIntoUserCart } from "../cart/cart.service";
 
@@ -61,6 +62,16 @@ export async function register(req: Request, res: Response): Promise<void> {
     message: "Account created. Please check your email for a verification link before logging in.",
     user,
   });
+}
+
+export async function resendVerificationEmail(req: Request, res: Response): Promise<void> {
+  const parsed = resendVerificationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "A valid email address is required" });
+    return;
+  }
+  await resendCustomerEmailVerification(parsed.data.email);
+  res.status(200).json({ message: "If an unverified account exists for this email, a verification link will be sent." });
 }
 
 export async function verifyEmail(req: Request, res: Response): Promise<void> {
