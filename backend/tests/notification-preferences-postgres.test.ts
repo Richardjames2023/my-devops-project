@@ -166,6 +166,16 @@ describe("PostgreSQL notification preference APIs", () => {
       .expect(400);
   });
 
+  it("defaults staff routine email notifications to opt-in", async () => {
+    const response = await request(app)
+      .get("/api/v1/staff/notifications/preferences")
+      .set("Authorization", `Bearer ${staff.token}`)
+      .expect(200);
+
+    expect(response.body.preferences.find((item: { category: string }) => item.category === "ORDER"))
+      .toMatchObject({ inAppEnabled: true, emailEnabled: false });
+  });
+
   it("isolates customer preferences and staff preferences by identity", async () => {
     await request(app)
       .put("/api/v1/staff/notifications/preferences/ORDER")
