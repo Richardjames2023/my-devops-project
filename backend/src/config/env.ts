@@ -17,6 +17,11 @@ const envSchema = z.object({
     .string()
     .min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
 
+  PAYSTACK_SECRET_KEY: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1, "PAYSTACK_SECRET_KEY cannot be empty").optional(),
+  ),
+
   CLOUDINARY_CLOUD_NAME: z.string().min(1).optional(),
   CLOUDINARY_API_KEY: z.string().min(1).optional(),
   CLOUDINARY_API_SECRET: z.string().min(1).optional(),
@@ -39,6 +44,14 @@ const envSchema = z.object({
   }).optional()),
   APP_BASE_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
 }).superRefine((value, context) => {
+  if (value.NODE_ENV === "production" && !value.PAYSTACK_SECRET_KEY) {
+    context.addIssue({
+      code: "custom",
+      path: ["PAYSTACK_SECRET_KEY"],
+      message: "PAYSTACK_SECRET_KEY is required in production",
+    });
+  }
+
   if (value.EMAIL_DELIVERY_ENABLED && !value.RESEND_API_KEY) {
     context.addIssue({
       code: "custom",

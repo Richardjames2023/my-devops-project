@@ -1,4 +1,5 @@
 import { AppError } from "../../common/errors/AppError";
+import { env } from "../../config/env";
 
 const PAYSTACK_BASE_URL = "https://api.paystack.co";
 
@@ -115,7 +116,7 @@ export interface PaystackRefundListItem {
 }
 
 function getSecretKey(): string {
-  const secretKey = process.env.PAYSTACK_SECRET_KEY;
+  const secretKey = env.PAYSTACK_SECRET_KEY;
 
   if (!secretKey) {
     throw new AppError("Paystack is not configured", 500);
