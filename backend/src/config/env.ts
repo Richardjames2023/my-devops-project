@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { z } from "zod";
+import { isHttpsUrl } from "./url-validation";
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -64,6 +65,18 @@ const envSchema = z.object({
       code: "custom",
       path: ["EMAIL_FROM"],
       message: "EMAIL_FROM is required when email delivery is enabled",
+    });
+  }
+  if (
+    value.NODE_ENV === "production" &&
+    value.EMAIL_DELIVERY_ENABLED &&
+    value.APP_BASE_URL &&
+    !isHttpsUrl(value.APP_BASE_URL)
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["APP_BASE_URL"],
+      message: "APP_BASE_URL must use HTTPS when email delivery is enabled in production",
     });
   }
 });
