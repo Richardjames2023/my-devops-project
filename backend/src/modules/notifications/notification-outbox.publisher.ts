@@ -22,9 +22,9 @@ export interface PublishNotificationEventInput {
 /**
  * Persists a notification event using the caller's business transaction.
  *
- * The event key is stable for a given event type and aggregate, so repeated
- * publication attempts cannot create duplicate outbox records. The empty
- * update intentionally preserves the first committed event payload.
+ * By default, the event key is stable for an event type and aggregate. Events
+ * that can recur after a later state transition provide a deduplicationKey.
+ * The empty update intentionally preserves the first committed event payload.
  */
 export async function publishNotificationEvent(
   tx: Prisma.TransactionClient,
