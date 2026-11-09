@@ -99,6 +99,13 @@ export async function createWarrantyClaim(
         },
       },
     });
+    await publishNotificationEvent(tx, {
+      eventType: "warranty.claim.created",
+      aggregateType: "WARRANTY",
+      aggregateId: claim.id,
+      payload: { warrantyClaimId: claim.id },
+    });
+    return claim;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
