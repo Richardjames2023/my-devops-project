@@ -7,7 +7,7 @@ import {
   refreshTokenSchema,
 } from "./auth.validation";
 
-import { registerUser, loginUser, refreshAccessToken } from "./auth.service";
+import { registerUser, loginUser, refreshAccessToken, verifyCustomerEmail } from "./auth.service";
 
 import { mergeGuestCartIntoUserCart } from "../cart/cart.service";
 
@@ -56,12 +56,21 @@ export async function register(req: Request, res: Response): Promise<void> {
   }
 
   const user = await registerUser(result.data);
-  await mergeGuestCartIfPresent(req, res, user.id);
 
   res.status(201).json({
-    message: "Account created successfully",
+    message: "Account created. Please check your email for a verification link before logging in.",
     user,
   });
+}
+
+export async function verifyEmail(req: Request, res: Response): Promise<void> {
+  const parsed = z.object({ token: z.string().min(32).max(256) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "A valid verification token is required" });
+    return;
+  }
+  await verifyCustomerEmail(parsed.data.token);
+  res.status(200).json({ message: "Email address verified successfully. You can now log in." });
 }
 
 export async function login(req: Request, res: Response): Promise<void> {
