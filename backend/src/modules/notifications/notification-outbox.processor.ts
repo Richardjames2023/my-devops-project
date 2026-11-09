@@ -41,7 +41,7 @@ export function getNotificationEventPolicy(eventType: string): Policy {
     case "payment.reconciliation_required":
       return { category: "PAYMENT", inAppMandatory: true, emailMandatory: true };
     case "delivery.delivered":
-      return { category: "DELIVERY", inAppMandatory: true, emailMandatory: false };
+      return { category: "DELIVERY", inAppMandatory: false, emailMandatory: false };
     default:
       throw new Error("Unsupported notification event type: " + eventType);
   }
