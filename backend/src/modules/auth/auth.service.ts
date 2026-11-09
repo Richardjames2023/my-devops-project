@@ -192,7 +192,7 @@ export async function resetCustomerPassword(input: ResetPasswordInput): Promise<
 
     const updated = await tx.user.updateMany({
       where: { id: current.userId, isActive: true, emailVerified: true },
-      data: { passwordHash },
+      data: { passwordHash, sessionVersion: { increment: 1 } },
     });
     if (updated.count !== 1) {
       throw new AppError("This password reset link is invalid or expired", 400);
@@ -258,6 +258,7 @@ export async function loginUser(input: LoginInput) {
   const accessToken = generateAccessToken({
     sub: user.id,
     identityType: "CUSTOMER",
+    sessionVersion: user.sessionVersion,
     roles,
     permissions,
   });
@@ -334,7 +335,7 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
   const permissions = [...new Set(user.userRoles.flatMap((userRole) =>
     userRole.role.permissions.map((rolePermission) => rolePermission.permission.name),
   ))];
-  const accessToken = generateAccessToken({ sub: user.id, identityType: "CUSTOMER", roles, permissions });
+  const accessToken = generateAccessToken({ sub: user.id, identityType: "CUSTOMER", sessionVersion: user.sessionVersion, roles, permissions });
   const newRefreshToken = generateRefreshToken();
   const newRefreshTokenHash = hashRefreshToken(newRefreshToken);
   const newRefreshTokenExpiresAt = new Date();
