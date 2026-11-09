@@ -67,7 +67,14 @@ export async function updatePreference(req: AuthenticatedRequest, res: Response)
   const preference = await updateNotificationPreference(
     identity,
     categoryResult.data,
-    inputResult.data,
+    {
+      ...(inputResult.data.inAppEnabled === undefined
+        ? {}
+        : { inAppEnabled: inputResult.data.inAppEnabled }),
+      ...(inputResult.data.emailEnabled === undefined
+        ? {}
+        : { emailEnabled: inputResult.data.emailEnabled }),
+    },
   );
   res.status(200).json({
     message: "Notification preference updated successfully",
