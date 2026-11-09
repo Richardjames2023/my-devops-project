@@ -19,13 +19,20 @@ type Fixture = {
   userIds: string[];
   orderIds: string[];
   refundIds: string[];
+  returnIds: string[];
+  warrantyClaimIds: string[];
+  orderItemIds: string[];
+  variantIds: string[];
+  productIds: string[];
+  categoryIds: string[];
   staffIds: string[];
   roleIds: string[];
   outboxIds: string[];
   recipientEmails: string[];
 };
 const fixture: Fixture = {
-  userIds: [], orderIds: [], refundIds: [], staffIds: [], roleIds: [], outboxIds: [],
+  userIds: [], orderIds: [], refundIds: [], returnIds: [], warrantyClaimIds: [], orderItemIds: [],
+  variantIds: [], productIds: [], categoryIds: [], staffIds: [], roleIds: [], outboxIds: [], recipientEmails: [],
 };
 
 async function createCustomer(): Promise<{ id: string; email: string }> {
@@ -124,7 +131,13 @@ async function cleanup() {
   await pool.query(`DELETE FROM notifications WHERE "outboxEventId" = ANY($1::uuid[])`, [fixture.outboxIds]);
   await pool.query(`DELETE FROM notification_outbox WHERE id = ANY($1::uuid[])`, [fixture.outboxIds]);
   await pool.query(`DELETE FROM refunds WHERE id = ANY($1::uuid[])`, [fixture.refundIds]);
+  await pool.query(`DELETE FROM warranty_claims WHERE id = ANY($1::uuid[])`, [fixture.warrantyClaimIds]);
+  await pool.query(`DELETE FROM return_requests WHERE id = ANY($1::uuid[])`, [fixture.returnIds]);
+  await pool.query(`DELETE FROM order_items WHERE id = ANY($1::uuid[])`, [fixture.orderItemIds]);
   await pool.query(`DELETE FROM orders WHERE id = ANY($1::uuid[])`, [fixture.orderIds]);
+  await pool.query(`DELETE FROM product_variants WHERE id = ANY($1::uuid[])`, [fixture.variantIds]);
+  await pool.query(`DELETE FROM products WHERE id = ANY($1::uuid[])`, [fixture.productIds]);
+  await pool.query(`DELETE FROM categories WHERE id = ANY($1::uuid[])`, [fixture.categoryIds]);
   await pool.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [fixture.userIds]);
   await pool.query(`DELETE FROM staff_account_roles WHERE "staffAccountId" = ANY($1::uuid[])`, [fixture.staffIds]);
   await pool.query(`DELETE FROM role_permissions WHERE "roleId" = ANY($1::uuid[])`, [fixture.roleIds]);
@@ -140,7 +153,7 @@ describe("PostgreSQL notification business event fan-out", () => {
     if (result.rows[0]?.name !== "shop_db_test") {
       throw new Error("Safety check failed: connected to the wrong database");
     }
-    staffId = await createStaff(["orders.manage", "refunds.manage"]);
+    staffId = await createStaff(["orders.manage", "refunds.manage", "returns.manage", "warranty.manage"]);
   });
 
   afterAll(async () => {
@@ -207,6 +220,109 @@ describe("PostgreSQL notification business event fan-out", () => {
       recipientEmail: order.email,
       templateKey: "customer.order-created",
     });
+  });
+
+
+  it("notifies customers and return managers when a return request is created", async () => {
+    const customer = await createCustomer();
+    const order = await createOrder(customer);
+    const returnId = randomUUID();
+    await pool.query(
+      `INSERT INTO return_requests
+       (id, "orderId", "userId", status, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, 'PENDING', NOW(), NOW())`,
+      [returnId, order.id, customer.id],
+    );
+    fixture.returnIds.push(returnId);
+    const eventId = await createEvent("return.requested", "RETURN", returnId, { returnRequestId: returnId });
+
+    expect(await processNotificationOutboxBatch({ eventId }))
+      .toEqual({ claimed: 1, processed: 1, failed: 0 });
+
+    const notices = await pool.query(
+      `SELECT "recipientType", "customerUserId", "staffAccountId", title
+       FROM notifications WHERE "outboxEventId" = $1`,
+      [eventId],
+    );
+    expect(notices.rows).toHaveLength(2);
+    expect(notices.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ recipientType: "CUSTOMER", customerUserId: customer.id, title: "Return request received" }),
+      expect.objectContaining({ recipientType: "STAFF", staffAccountId: staffId, title: "Return request requires review" }),
+    ]));
+
+    const emails = await pool.query(
+      `SELECT "recipientEmail", "templateKey" FROM notification_email_deliveries
+       WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = $1)`,
+      [eventId],
+    );
+    expect(emails.rows).toHaveLength(1);
+    expect(emails.rows[0].templateKey).toBe("customer.return-request-received");
+  });
+
+  it("notifies customers and warranty managers when a warranty claim is created", async () => {
+    const customer = await createCustomer();
+    const order = await createOrder(customer);
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    const variantId = randomUUID();
+    const orderItemId = randomUUID();
+    const claimId = randomUUID();
+    await pool.query(
+      `INSERT INTO categories (id, name, slug, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, NOW(), NOW())`,
+      [categoryId, `Notification Category ${categoryId}`, `notification-category-${categoryId}`],
+    );
+    await pool.query(
+      `INSERT INTO products (id, "categoryId", name, slug, "basePrice", "createdAt", "updatedAt")
+       VALUES ($1, $2, 'Notification Laptop', $3, 2500, NOW(), NOW())`,
+      [productId, categoryId, `notification-product-${productId}`],
+    );
+    await pool.query(
+      `INSERT INTO product_variants (id, "productId", sku, name, price, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, 'Default', 2500, NOW(), NOW())`,
+      [variantId, productId, `NOTIFY-SKU-${variantId}`],
+    );
+    await pool.query(
+      `INSERT INTO order_items
+       (id, "orderId", "productVariantId", "productName", "variantName", sku,
+        quantity, "unitPrice", "totalPrice", "createdAt")
+       VALUES ($1, $2, $3, 'Notification Laptop', 'Default', $4, 1, 2500, 2500, NOW())`,
+      [orderItemId, order.id, variantId, `NOTIFY-SKU-${variantId}`],
+    );
+    await pool.query(
+      `INSERT INTO warranty_claims
+       (id, "orderItemId", quantity, "userId", "claimNumber", issue, "createdAt", "updatedAt")
+       VALUES ($1, $2, 1, $3, $4, 'Device will not start', NOW(), NOW())`,
+      [claimId, orderItemId, customer.id, `WAR-${claimId.slice(0, 8)}`],
+    );
+    fixture.categoryIds.push(categoryId);
+    fixture.productIds.push(productId);
+    fixture.variantIds.push(variantId);
+    fixture.orderItemIds.push(orderItemId);
+    fixture.warrantyClaimIds.push(claimId);
+    const eventId = await createEvent("warranty.claim.created", "WARRANTY", claimId, { warrantyClaimId: claimId });
+
+    expect(await processNotificationOutboxBatch({ eventId }))
+      .toEqual({ claimed: 1, processed: 1, failed: 0 });
+
+    const notices = await pool.query(
+      `SELECT "recipientType", "customerUserId", "staffAccountId", title
+       FROM notifications WHERE "outboxEventId" = $1`,
+      [eventId],
+    );
+    expect(notices.rows).toHaveLength(2);
+    expect(notices.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ recipientType: "CUSTOMER", customerUserId: customer.id, title: "Warranty claim received" }),
+      expect.objectContaining({ recipientType: "STAFF", staffAccountId: staffId, title: "Warranty claim requires review" }),
+    ]));
+
+    const emails = await pool.query(
+      `SELECT "recipientEmail", "templateKey" FROM notification_email_deliveries
+       WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = $1)`,
+      [eventId],
+    );
+    expect(emails.rows).toHaveLength(1);
+    expect(emails.rows[0].templateKey).toBe("customer.warranty-claim-received");
   });
 
   it("routes refund intervention to staff with refunds.manage and queues mandatory email", async () => {
