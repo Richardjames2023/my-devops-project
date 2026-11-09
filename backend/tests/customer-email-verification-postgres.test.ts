@@ -15,7 +15,7 @@ process.env.NODE_ENV = "test";
 process.env.EMAIL_DELIVERY_ENABLED = "false";
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
-const [{ registerUser, verifyCustomerEmail, loginUser }, { disconnectDatabase }] = await Promise.all([
+const [{ registerUser, verifyCustomerEmail, resendCustomerEmailVerification, loginUser }, { disconnectDatabase }] = await Promise.all([
   import("../src/modules/auth/auth.service"),
   import("../src/infrastructure/prisma/client"),
 ]);
@@ -67,8 +67,20 @@ describe("PostgreSQL customer email verification", () => {
       const token = new URL(actionUrl, "https://shop.example.com").searchParams.get("token");
       expect(token).toBeTruthy();
 
-      await verifyCustomerEmail(token!);
+      await resendCustomerEmailVerification(email);
+      const resent = await pool.query(
+        `SELECT "templateData" FROM notification_email_deliveries
+         WHERE "recipientEmail" = $1 AND "templateKey" = 'customer.email-verification'
+         ORDER BY "createdAt" DESC, id DESC LIMIT 1`,
+        [email],
+      );
+      const resentUrl = (resent.rows[0].templateData as { actionUrl: string }).actionUrl;
+      const resentToken = new URL(resentUrl, "https://shop.example.com").searchParams.get("token");
+      expect(resentToken).toBeTruthy();
       await expect(verifyCustomerEmail(token!)).rejects.toMatchObject({ statusCode: 400 });
+
+      await verifyCustomerEmail(resentToken!);
+      await expect(verifyCustomerEmail(resentToken!)).rejects.toMatchObject({ statusCode: 400 });
 
       const verified = await pool.query(
         `SELECT "emailVerified" FROM users WHERE id = $1`,
