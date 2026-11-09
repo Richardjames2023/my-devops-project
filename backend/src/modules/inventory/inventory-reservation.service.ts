@@ -1,6 +1,7 @@
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type { CreateInventoryReservationInput } from "./inventory-reservation.validation";
+import { publishInventoryLowStockIfCrossed } from "./inventory-low-stock.notification";
 
 const RESERVATION_DURATION_MINUTES = 15;
 
@@ -78,6 +79,10 @@ export async function createInventoryReservation(
     const updatedInventoryRecord = await tx.inventory.findUnique({
       where: { id: input.inventoryId },
     });
+
+    if (updatedInventoryRecord) {
+      await publishInventoryLowStockIfCrossed(tx, inventory, updatedInventoryRecord);
+    }
 
     return {
       reservation,
