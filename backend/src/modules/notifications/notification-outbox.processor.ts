@@ -449,8 +449,8 @@ async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
       const customerIds = drafts.flatMap((draft) => draft.customerUserId ? [draft.customerUserId] : []);
       const staffIds = drafts.flatMap((draft) => draft.staffAccountId ? [draft.staffAccountId] : []);
       const preferenceOr: Prisma.NotificationPreferenceWhereInput[] = [];
-      if (customerIds.length) preferenceOr.push({ customerUserId: { in: customerIds }, category: policy.category });
-      if (staffIds.length) preferenceOr.push({ staffAccountId: { in: staffIds }, category: policy.category });
+      if (customerIds.length) preferenceOr.push({ recipientType: "CUSTOMER", customerUserId: { in: customerIds }, category: policy.category });
+      if (staffIds.length) preferenceOr.push({ recipientType: "STAFF", staffAccountId: { in: staffIds }, category: policy.category });
       const preferences = preferenceOr.length
         ? await tx.notificationPreference.findMany({ where: { OR: preferenceOr } })
         : [];
