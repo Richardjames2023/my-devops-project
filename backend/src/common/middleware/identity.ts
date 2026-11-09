@@ -25,11 +25,12 @@ export async function requireCustomer(
       select: {
         isActive: true,
         emailVerified: true,
+        sessionVersion: true,
         userRoles: { select: { role: { select: { name: true } } } },
       },
     });
 
-    if (!user || !user.isActive || !user.emailVerified) {
+    if (!user || !user.isActive || !user.emailVerified || user.sessionVersion !== (req.user.sessionVersion ?? 0)) {
       next(new AppError("Customer account is inactive, unverified, or unavailable", 403));
       return;
     }
