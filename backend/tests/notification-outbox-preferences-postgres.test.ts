@@ -134,7 +134,7 @@ describe("PostgreSQL notification channel preference fan-out", () => {
       [fixture.outboxId],
     );
     const email = await pool.query(
-      `SELECT "notificationId", "recipientEmail", status
+      `SELECT "notificationId", "recipientEmail", "eventRecipientKey", status
        FROM notification_email_deliveries WHERE "recipientEmail" = $1`,
       [fixture.email],
     );
@@ -145,6 +145,20 @@ describe("PostgreSQL notification channel preference fan-out", () => {
       recipientEmail: fixture.email,
       status: "QUEUED",
     });
+    expect(email.rows[0].eventRecipientKey).toContain(fixture.outboxId);
+
+    // Simulate an operator re-queuing an already-fanned-out outbox event.
+    await pool.query(
+      `UPDATE notification_outbox SET status = 'PENDING', "processedAt" = NULL WHERE id = $1`,
+      [fixture.outboxId],
+    );
+    expect(await processNotificationOutboxBatch({ eventId: fixture.outboxId }))
+      .toEqual({ claimed: 1, processed: 1, failed: 0 });
+    const duplicateCheck = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM notification_email_deliveries WHERE "recipientEmail" = $1`,
+      [fixture.email],
+    );
+    expect(duplicateCheck.rows[0].count).toBe(1);
   });
 
   it("creates an in-app notification without queuing email when only in-app is enabled", async () => {
