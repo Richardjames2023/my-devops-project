@@ -44,6 +44,14 @@ const envSchema = z.object({
   }).optional()),
   APP_BASE_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
 }).superRefine((value, context) => {
+  if (value.NODE_ENV === "production" && !value.EMAIL_DELIVERY_ENABLED) {
+    context.addIssue({
+      code: "custom",
+      path: ["EMAIL_DELIVERY_ENABLED"],
+      message: "EMAIL_DELIVERY_ENABLED must be true in production because customer email verification is required",
+    });
+  }
+
   if (value.NODE_ENV === "production" && !value.PAYSTACK_SECRET_KEY) {
     context.addIssue({
       code: "custom",
