@@ -30,6 +30,18 @@ describe("transactional email templates", () => {
     expect(email.text).toContain("expires in 24 hours");
   });
 
+  it("renders a customer password-reset link with a 60-minute expiry notice", () => {
+    const email = renderNotificationEmail("customer.password-reset", {
+      firstName: "<Customer>",
+      actionUrl: "/reset-password?token=opaque-token",
+    }, "https://shop.example.com");
+
+    expect(email.subject).toBe("Reset your password");
+    expect(email.html).toContain("&lt;Customer&gt;");
+    expect(email.html).toContain("https://shop.example.com/reset-password?token=opaque-token");
+    expect(email.text).toContain("expires in 60 minutes");
+  });
+
   it("does not turn an untrusted external URL into an email link", () => {
     const email = renderNotificationEmail("customer.delivery-delivered", {
       orderNumber: "ORD-100",
