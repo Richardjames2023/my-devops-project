@@ -58,6 +58,8 @@ interface CheckoutFixture {
   inventoryId: string;
   cartId: string;
   cartItemId: string;
+  deliveryZoneId: string;
+  shippingAddress: typeof shippingAddress;
   guest: boolean;
 }
 
@@ -89,6 +91,12 @@ async function createFixture(
     inventoryId: randomUUID(),
     cartId: randomUUID(),
     cartItemId: randomUUID(),
+    deliveryZoneId: randomUUID(),
+    shippingAddress: {
+      ...shippingAddress,
+      city: `Checkout City ${randomUUID()}`,
+      state: `Checkout State ${randomUUID()}`,
+    },
     guest,
   };
 
@@ -119,6 +127,19 @@ async function createFixture(
         ],
       );
     }
+
+    await pool.query(
+      `INSERT INTO delivery_zones
+       (id, name, "deliveryFee", "isActive", "createdAt", "updatedAt")
+       VALUES ($1, $2, 350, TRUE, NOW(), NOW())`,
+      [fixture.deliveryZoneId, `Checkout Zone ${fixture.deliveryZoneId}`],
+    );
+
+    await pool.query(
+      `INSERT INTO delivery_zone_locations ("zoneId", state, city, "createdAt")
+       VALUES ($1, $2, $3, NOW())`,
+      [fixture.deliveryZoneId, fixture.shippingAddress.state.toUpperCase(), fixture.shippingAddress.city.toUpperCase()],
+    );
 
     await pool.query(
       `INSERT INTO categories
@@ -217,6 +238,7 @@ async function cleanupFixture(
   }
 
   await pool.query(`DELETE FROM carts WHERE id = $1`, [fixture.cartId]);
+  await pool.query(`DELETE FROM delivery_zones WHERE id = $1`, [fixture.deliveryZoneId]);
   await pool.query(`DELETE FROM guest_sessions WHERE id = $1`, [
     fixture.sessionId,
   ]);
@@ -253,7 +275,7 @@ describe("PostgreSQL customer checkout", () => {
 
     try {
       const order = await createOrder(fixture.userId, {
-        shippingAddress,
+        shippingAddress: fixture.shippingAddress,
       });
 
       orderIds.push(order.id);
@@ -265,8 +287,9 @@ describe("PostgreSQL customer checkout", () => {
       });
       expect(order.subtotal.toString()).toBe("2501");
       expect(order.discountAmount.toString()).toBe("0");
-      expect(order.deliveryFee.toString()).toBe("0");
-      expect(order.totalAmount.toString()).toBe("2501");
+      expect(order.deliveryFee.toString()).toBe("350");
+      expect(order.deliveryZoneName).toContain("Checkout Zone");
+      expect(order.totalAmount.toString()).toBe("2851");
       expect(order.items).toHaveLength(1);
       expect(order.items[0]).toMatchObject({
         productVariantId: fixture.variantId,
@@ -300,7 +323,7 @@ describe("PostgreSQL customer checkout", () => {
 
     try {
       await expect(
-        createOrder(fixture.userId, { shippingAddress }),
+        createOrder(fixture.userId, { shippingAddress: fixture.shippingAddress }),
       ).rejects.toMatchObject({
         statusCode: 409,
       });
@@ -365,7 +388,7 @@ describe("PostgreSQL customer checkout", () => {
 
     try {
       const result = await createGuestOrder(fixture.sessionId, {
-        shippingAddress,
+        shippingAddress: fixture.shippingAddress,
         customerEmail: "guest-checkout@example.test",
       });
 
