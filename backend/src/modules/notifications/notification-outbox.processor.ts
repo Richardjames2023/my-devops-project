@@ -50,6 +50,8 @@ export function getNotificationEventPolicy(eventType: string): Policy {
       return { category: "WARRANTY", inAppMandatory: false, emailMandatory: false };
     case "refund.needs_attention":
       return { category: "REFUND", inAppMandatory: true, emailMandatory: true };
+    case "inventory.low_stock":
+      return { category: "INVENTORY", inAppMandatory: false, emailMandatory: false };
     default:
       throw new Error("Unsupported notification event type: " + eventType);
   }
@@ -214,6 +216,41 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       });
     }
     return drafts;
+  }
+
+  if (event.eventType === "inventory.low_stock") {
+    const inventoryId = payloadString(event.payload, "inventoryId") ?? event.aggregateId;
+    const inventory = await tx.inventory.findUnique({
+      where: { id: inventoryId },
+      include: { productVariant: { include: { product: true } } },
+    });
+    if (!inventory) throw new Error("Inventory not found for low-stock event: " + inventoryId);
+
+    const availableQuantity = inventory.quantity - inventory.reservedQuantity - inventory.quarantineQuantity;
+    const staff = await tx.staffAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true, email: true,
+        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+      },
+    });
+    const productName = inventory.productVariant.product.name;
+    const sku = inventory.productVariant.sku;
+    const title = "Low stock alert";
+    const body = productName + " (" + sku + ") has " + availableQuantity + " available units, at or below its threshold of " + inventory.lowStockThreshold + ".";
+    const actionUrl = "/staff/inventory/" + inventory.id;
+    return staff.filter((item) => item.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) => permission.name === "inventory.manage"),
+    )).map((account) => ({
+      recipientType: "STAFF" as const, customerUserId: null, staffAccountId: account.id,
+      recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+      metadata: { inventoryId: inventory.id, productName, sku, availableQuantity, lowStockThreshold: inventory.lowStockThreshold },
+      templateKey: "staff.inventory-low-stock",
+      templateData: {
+        productName, sku, availableQuantity: String(availableQuantity),
+        lowStockThreshold: String(inventory.lowStockThreshold), actionUrl,
+      },
+    }));
   }
 
   if (event.eventType === "refund.needs_attention") {
