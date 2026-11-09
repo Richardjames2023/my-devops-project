@@ -289,7 +289,7 @@ describe("PostgreSQL customer password reset", () => {
       await pool.query(
         `INSERT INTO customer_password_reset_tokens
           (id, "userId", "tokenHash", "expiresAt", "createdAt")
-         VALUES ($1, $2, $3, NOW() - INTERVAL '1 minute', NOW())`,
+         VALUES ($1, $2, $3, NOW() - INTERVAL '1 day', NOW())`,
         [randomUUID(), userId, hashRefreshToken(expiredToken)],
       );
 
