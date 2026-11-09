@@ -45,6 +45,7 @@ export function getNotificationEventPolicy(eventType: string): Policy {
     case "order.created":
       return { category: "ORDER", inAppMandatory: false, emailMandatory: false };
     case "return.requested":
+    case "return.received":
       return { category: "RETURN", inAppMandatory: false, emailMandatory: false };
     case "warranty.claim.created":
       return { category: "WARRANTY", inAppMandatory: false, emailMandatory: false };
@@ -167,6 +168,35 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       });
     }
     return drafts;
+  }
+
+  if (event.eventType === "return.received") {
+    const returnRequestId = payloadString(event.payload, "returnRequestId") ?? event.aggregateId;
+    const returnRequest = await tx.returnRequest.findUnique({
+      where: { id: returnRequestId },
+      include: { order: { select: { id: true, orderNumber: true } } },
+    });
+    if (!returnRequest) throw new Error("Return request not found for inspection notification: " + returnRequestId);
+
+    const staff = await tx.staffAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true, email: true,
+        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+      },
+    });
+    const title = "Returned items ready for inspection";
+    const body = "The return for order " + returnRequest.order.orderNumber + " has been received and is awaiting inspection.";
+    const actionUrl = "/staff/returns/" + returnRequest.id + "/inspection";
+    return staff.filter((item) => item.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) => permission.name === "returns.manage"),
+    )).map((account) => ({
+      recipientType: "STAFF" as const, customerUserId: null, staffAccountId: account.id,
+      recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+      metadata: { returnRequestId: returnRequest.id, orderId: returnRequest.order.id, orderNumber: returnRequest.order.orderNumber },
+      templateKey: "staff.return-received-for-inspection",
+      templateData: { orderNumber: returnRequest.order.orderNumber, actionUrl },
+    }));
   }
 
   if (event.eventType === "warranty.claim.created") {
