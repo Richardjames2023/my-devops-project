@@ -36,7 +36,7 @@ export async function createInventory(
         productVariantId: input.productVariantId,
         quantity: input.quantity,
         reservedQuantity: 0,
-        lowStockThreshold: input.lowStockThreshold,
+        lowStockThreshold: input.lowStockThreshold ?? 5,
       },
     });
 
