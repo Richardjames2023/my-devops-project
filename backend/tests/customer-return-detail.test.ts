@@ -40,6 +40,7 @@ describe("customer return detail HTTP endpoint", () => {
     vi.resetAllMocks();
     mocks.findCustomer.mockResolvedValue({
       isActive: true,
+      emailVerified: true,
       userRoles: [{ role: { name: "CUSTOMER" } }],
     });
     mocks.getCustomerReturnRequest.mockResolvedValue({
