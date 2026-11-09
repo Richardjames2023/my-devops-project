@@ -163,8 +163,9 @@ async function cleanupFixtures() {
     `DELETE FROM notification_email_deliveries
      WHERE "notificationId" IN (
        SELECT id FROM notifications WHERE "outboxEventId" = ANY($1::uuid[])
-     )`,
-    [outboxIds],
+     )
+        OR "recipientEmail" = ANY($2::text[])`,
+    [outboxIds, paymentFixtures.map((item) => item.customerEmail)],
   );
   await pool.query(
     `DELETE FROM notification_email_deliveries
