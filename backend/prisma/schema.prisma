@@ -845,6 +845,7 @@ model NotificationEmailDelivery {
   bouncedAt         DateTime?
   complainedAt      DateTime?
   failedAt          DateTime?
+  suppressedAt      DateTime?
   lastProviderEventType String?
   lastError         String?
   createdAt         DateTime                        @default(now())
@@ -926,6 +927,7 @@ enum NotificationEmailDeliveryStatus {
   BOUNCED
   COMPLAINED
   FAILED
+  SUPPRESSED
   DEAD
 }
 
