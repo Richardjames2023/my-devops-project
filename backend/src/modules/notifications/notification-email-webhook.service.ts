@@ -6,7 +6,8 @@ export type ResendEmailEventType =
   | "email.delivery_delayed"
   | "email.bounced"
   | "email.complained"
-  | "email.failed";
+  | "email.failed"
+  | "email.suppressed";
 
 export interface ResendEmailEventInput {
   providerEventId: string;
@@ -15,7 +16,7 @@ export interface ResendEmailEventInput {
   payload: Record<string, unknown>;
 }
 
-const terminalStatuses = ["BOUNCED", "COMPLAINED", "FAILED", "DEAD"] as const;
+const terminalStatuses = ["BOUNCED", "COMPLAINED", "FAILED", "SUPPRESSED", "DEAD"] as const;
 
 export async function processResendEmailEvent(input: ResendEmailEventInput) {
   return prisma.$transaction(async (tx) => {
@@ -44,7 +45,7 @@ export async function processResendEmailEvent(input: ResendEmailEventInput) {
     if (inserted.count === 0) return { processed: false, duplicate: true };
 
     const now = new Date();
-    let status: "DELAYED" | "DELIVERED" | "BOUNCED" | "COMPLAINED" | "FAILED";
+    let status: "DELAYED" | "DELIVERED" | "BOUNCED" | "COMPLAINED" | "FAILED" | "SUPPRESSED";
     const data: Prisma.NotificationEmailDeliveryUpdateManyMutationInput = {
       lastProviderEventType: input.eventType,
     };
@@ -69,6 +70,10 @@ export async function processResendEmailEvent(input: ResendEmailEventInput) {
         status = "FAILED";
         data.failedAt = now;
         break;
+      case "email.suppressed":
+        status = "SUPPRESSED";
+        data.suppressedAt = now;
+        break;
     }
 
     const protectedStatuses: NotificationEmailDeliveryStatus[] = input.eventType === "email.complained"
@@ -77,9 +82,11 @@ export async function processResendEmailEvent(input: ResendEmailEventInput) {
         ? ["COMPLAINED", "FAILED", "DEAD", "DELIVERED"]
         : input.eventType === "email.failed"
           ? ["COMPLAINED", "DEAD", "DELIVERED", "BOUNCED"]
-          : input.eventType === "email.delivery_delayed"
-            ? [...terminalStatuses, "DELIVERED"]
-            : [...terminalStatuses];
+          : input.eventType === "email.suppressed"
+            ? ["DELIVERED", "BOUNCED", "COMPLAINED", "FAILED", "DEAD"]
+            : input.eventType === "email.delivery_delayed"
+              ? [...terminalStatuses, "DELIVERED"]
+              : [...terminalStatuses];
 
     await tx.notificationEmailDelivery.updateMany({
       where: { id: delivery.id, status: { notIn: protectedStatuses } },
