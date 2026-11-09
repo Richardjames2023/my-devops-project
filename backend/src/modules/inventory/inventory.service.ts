@@ -2,47 +2,58 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type { CreateInventoryInput } from "./inventory.validation";
+import { publishInventoryLowStockIfCrossed } from "./inventory-low-stock.notification";
 
 export async function createInventory(
   input: CreateInventoryInput,
 ) {
-  const variant = await prisma.productVariant.findUnique({
-    where: {
-      id: input.productVariantId,
-    },
-  });
+  return prisma.$transaction(async (tx) => {
+    const variant = await tx.productVariant.findUnique({
+      where: { id: input.productVariantId },
+    });
 
-  if (!variant) {
-    throw new AppError("Product variant not found", 404);
-  }
+    if (!variant) {
+      throw new AppError("Product variant not found", 404);
+    }
 
-  if (!variant.isActive) {
-    throw new AppError("Product variant is inactive", 400);
-  }
+    if (!variant.isActive) {
+      throw new AppError("Product variant is inactive", 400);
+    }
 
-  const existingInventory =
-    await prisma.inventory.findUnique({
-      where: {
+    const existingInventory = await tx.inventory.findUnique({
+      where: { productVariantId: input.productVariantId },
+    });
+
+    if (existingInventory) {
+      throw new AppError(
+        "Inventory already exists for this product variant",
+        409,
+      );
+    }
+
+    const inventory = await tx.inventory.create({
+      data: {
         productVariantId: input.productVariantId,
+        quantity: input.quantity,
+        reservedQuantity: 0,
+        lowStockThreshold: input.lowStockThreshold,
       },
     });
 
-  if (existingInventory) {
-    throw new AppError(
-      "Inventory already exists for this product variant",
-      409,
+    await publishInventoryLowStockIfCrossed(
+      tx,
+      {
+        id: inventory.id,
+        quantity: inventory.lowStockThreshold + 1,
+        reservedQuantity: 0,
+        quarantineQuantity: 0,
+        lowStockThreshold: inventory.lowStockThreshold,
+      },
+      inventory,
     );
-  }
 
-  const inventory = await prisma.inventory.create({
-    data: {
-      productVariantId: input.productVariantId,
-      quantity: input.quantity,
-      reservedQuantity: 0,
-    },
+    return inventory;
   });
-
-  return inventory;
 }
 
 const ACTIVE_PAYMENT_STATUSES = [
