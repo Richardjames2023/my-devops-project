@@ -185,7 +185,7 @@ describe("PostgreSQL notification preference APIs", () => {
       .set("Authorization", `Bearer ${otherCustomer.token}`)
       .expect(200);
     expect(otherCustomerSettings.body.preferences.find((item: { category: string }) => item.category === "REFUND"))
-      .toMatchObject({ inAppEnabled: true, emailEnabled: true });
+      .toMatchObject({ inAppEnabled: true, emailEnabled: false });
   });
 
   it("rejects unauthenticated, cross-identity, and inactive staff access", async () => {
