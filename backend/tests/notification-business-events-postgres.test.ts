@@ -10,8 +10,9 @@ if (new URL(databaseUrl).pathname !== "/shop_db_test") {
 process.env.DATABASE_URL = databaseUrl;
 
 const pool = new Pool({ connectionString: databaseUrl, max: 4 });
-const [{ processNotificationOutboxBatch }, { disconnectDatabase }] = await Promise.all([
+const [{ processNotificationOutboxBatch }, { createStockMovement }, { disconnectDatabase }] = await Promise.all([
   import("../src/modules/notifications/notification-outbox.processor"),
+  import("../src/modules/inventory/stock-movement.service"),
   import("../src/infrastructure/prisma/client"),
 ]);
 
@@ -25,6 +26,7 @@ type Fixture = {
   variantIds: string[];
   productIds: string[];
   categoryIds: string[];
+  inventoryIds: string[];
   staffIds: string[];
   roleIds: string[];
   outboxIds: string[];
@@ -32,7 +34,7 @@ type Fixture = {
 };
 const fixture: Fixture = {
   userIds: [], orderIds: [], refundIds: [], returnIds: [], warrantyClaimIds: [], orderItemIds: [],
-  variantIds: [], productIds: [], categoryIds: [], staffIds: [], roleIds: [], outboxIds: [], recipientEmails: [],
+  variantIds: [], productIds: [], categoryIds: [], inventoryIds: [], staffIds: [], roleIds: [], outboxIds: [], recipientEmails: [],
 };
 
 async function createCustomer(): Promise<{ id: string; email: string }> {
@@ -135,6 +137,8 @@ async function cleanup() {
   await pool.query(`DELETE FROM return_requests WHERE id = ANY($1::uuid[])`, [fixture.returnIds]);
   await pool.query(`DELETE FROM order_items WHERE id = ANY($1::uuid[])`, [fixture.orderItemIds]);
   await pool.query(`DELETE FROM orders WHERE id = ANY($1::uuid[])`, [fixture.orderIds]);
+  await pool.query(`DELETE FROM stock_movements WHERE "inventoryId" = ANY($1::uuid[])`, [fixture.inventoryIds]);
+  await pool.query(`DELETE FROM inventory WHERE id = ANY($1::uuid[])`, [fixture.inventoryIds]);
   await pool.query(`DELETE FROM product_variants WHERE id = ANY($1::uuid[])`, [fixture.variantIds]);
   await pool.query(`DELETE FROM products WHERE id = ANY($1::uuid[])`, [fixture.productIds]);
   await pool.query(`DELETE FROM categories WHERE id = ANY($1::uuid[])`, [fixture.categoryIds]);
@@ -153,7 +157,7 @@ describe("PostgreSQL notification business event fan-out", () => {
     if (result.rows[0]?.name !== "shop_db_test") {
       throw new Error("Safety check failed: connected to the wrong database");
     }
-    staffId = await createStaff(["orders.manage", "refunds.manage", "returns.manage", "warranty.manage"]);
+    staffId = await createStaff(["orders.manage", "refunds.manage", "returns.manage", "warranty.manage", "inventory.manage"]);
   });
 
   afterAll(async () => {
@@ -323,6 +327,71 @@ describe("PostgreSQL notification business event fan-out", () => {
     );
     expect(emails.rows).toHaveLength(1);
     expect(emails.rows[0].templateKey).toBe("customer.warranty-claim-received");
+  });
+
+
+  it("notifies inventory managers when available stock crosses its low-stock threshold", async () => {
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    const variantId = randomUUID();
+    const inventoryId = randomUUID();
+    await pool.query(
+      `INSERT INTO categories (id, name, slug, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, NOW(), NOW())`,
+      [categoryId, `Low Stock Category ${categoryId}`, `low-stock-category-${categoryId}`],
+    );
+    await pool.query(
+      `INSERT INTO products (id, "categoryId", name, slug, "basePrice", "createdAt", "updatedAt")
+       VALUES ($1, $2, 'Low Stock Product', $3, 2500, NOW(), NOW())`,
+      [productId, categoryId, `low-stock-product-${productId}`],
+    );
+    await pool.query(
+      `INSERT INTO product_variants (id, "productId", sku, name, price, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, 'Default', 2500, NOW(), NOW())`,
+      [variantId, productId, `LOW-STOCK-SKU-${variantId}`],
+    );
+    await pool.query(
+      `INSERT INTO inventory
+       (id, "productVariantId", quantity, "reservedQuantity", "quarantineQuantity",
+        "lowStockThreshold", "createdAt", "updatedAt")
+       VALUES ($1, $2, 10, 0, 0, 5, NOW(), NOW())`,
+      [inventoryId, variantId],
+    );
+    fixture.categoryIds.push(categoryId);
+    fixture.productIds.push(productId);
+    fixture.variantIds.push(variantId);
+    fixture.inventoryIds.push(inventoryId);
+
+    await createStockMovement({ inventoryId, type: "SOLD", quantity: 5, reason: "Low-stock notification test" });
+    const event = await pool.query(
+      `SELECT id FROM notification_outbox
+       WHERE "eventType" = 'inventory.low_stock' AND "aggregateId" = $1
+       ORDER BY "createdAt" DESC LIMIT 1`,
+      [inventoryId],
+    );
+    expect(event.rows).toHaveLength(1);
+    const eventId = event.rows[0].id as string;
+    fixture.outboxIds.push(eventId);
+
+    expect(await processNotificationOutboxBatch({ eventId }))
+      .toEqual({ claimed: 1, processed: 1, failed: 0 });
+
+    const notices = await pool.query(
+      `SELECT "staffAccountId", title, body FROM notifications WHERE "outboxEventId" = $1`,
+      [eventId],
+    );
+    expect(notices.rows).toHaveLength(1);
+    expect(notices.rows[0]).toMatchObject({
+      staffAccountId: staffId,
+      title: "Low stock alert",
+    });
+    expect(notices.rows[0].body).toContain("5 available units");
+    const emails = await pool.query(
+      `SELECT id FROM notification_email_deliveries
+       WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = $1)`,
+      [eventId],
+    );
+    expect(emails.rows).toHaveLength(0);
   });
 
   it("routes refund intervention to staff with refunds.manage and queues mandatory email", async () => {
