@@ -42,6 +42,12 @@ export function getNotificationEventPolicy(eventType: string): Policy {
       return { category: "PAYMENT", inAppMandatory: true, emailMandatory: true };
     case "delivery.delivered":
       return { category: "DELIVERY", inAppMandatory: false, emailMandatory: false };
+    case "order.created":
+      return { category: "ORDER", inAppMandatory: false, emailMandatory: false };
+    case "return.requested":
+      return { category: "RETURN", inAppMandatory: false, emailMandatory: false };
+    case "warranty.claim.created":
+      return { category: "WARRANTY", inAppMandatory: false, emailMandatory: false };
     default:
       throw new Error("Unsupported notification event type: " + eventType);
   }
@@ -55,6 +61,158 @@ function payloadString(payload: Prisma.JsonValue, key: string): string | null {
 
 async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): Promise<Draft[]> {
   const policy = getNotificationEventPolicy(event.eventType);
+
+  if (event.eventType === "order.created") {
+    const orderId = payloadString(event.payload, "orderId") ?? event.aggregateId;
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      include: { user: { select: { id: true, email: true } } },
+    });
+    if (!order) throw new Error("Order not found for notification event: " + orderId);
+
+    const drafts: Draft[] = [];
+    const customerEmail = order.user?.email ?? order.customerEmail;
+    if (customerEmail) {
+      const customerId = order.user?.id ?? null;
+      const title = "Your order has been placed";
+      const body = "Your order " + order.orderNumber + " has been placed successfully.";
+      const actionUrl = customerId ? "/account/orders/" + order.id : "/orders/guest";
+      drafts.push({
+        recipientType: "CUSTOMER", customerUserId: customerId, staffAccountId: null,
+        recipientEmail: customerEmail, category: policy.category, title, body, actionUrl,
+        metadata: { orderId: order.id, orderNumber: order.orderNumber },
+        templateKey: "customer.order-created",
+        templateData: { orderNumber: order.orderNumber, actionUrl },
+      });
+    }
+
+    const staff = await tx.staffAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true, email: true,
+        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+      },
+    });
+    const title = "New order received";
+    const body = "Order " + order.orderNumber + " has been placed and is awaiting processing.";
+    const actionUrl = "/staff/orders/" + order.id;
+    for (const account of staff.filter((item) => item.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) => permission.name === "orders.manage"),
+    ))) {
+      drafts.push({
+        recipientType: "STAFF", customerUserId: null, staffAccountId: account.id,
+        recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+        metadata: { orderId: order.id, orderNumber: order.orderNumber },
+        templateKey: "staff.new-order-received",
+        templateData: { orderNumber: order.orderNumber, actionUrl },
+      });
+    }
+    return drafts;
+  }
+
+  if (event.eventType === "return.requested") {
+    const returnRequestId = payloadString(event.payload, "returnRequestId") ?? event.aggregateId;
+    const returnRequest = await tx.returnRequest.findUnique({
+      where: { id: returnRequestId },
+      include: {
+        order: { select: { id: true, orderNumber: true } },
+        user: { select: { id: true, email: true } },
+      },
+    });
+    if (!returnRequest) throw new Error("Return request not found for notification event: " + returnRequestId);
+
+    const drafts: Draft[] = [];
+    if (returnRequest.user) {
+      const title = "Return request received";
+      const body = "Your return request for order " + returnRequest.order.orderNumber + " has been received.";
+      const actionUrl = "/account/returns/" + returnRequest.id;
+      drafts.push({
+        recipientType: "CUSTOMER", customerUserId: returnRequest.user.id, staffAccountId: null,
+        recipientEmail: returnRequest.user.email, category: policy.category, title, body, actionUrl,
+        metadata: { returnRequestId: returnRequest.id, orderId: returnRequest.order.id, orderNumber: returnRequest.order.orderNumber },
+        templateKey: "customer.return-request-received",
+        templateData: { orderNumber: returnRequest.order.orderNumber, actionUrl },
+      });
+    }
+
+    const staff = await tx.staffAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true, email: true,
+        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+      },
+    });
+    const title = "Return request requires review";
+    const body = "A return request for order " + returnRequest.order.orderNumber + " is awaiting review.";
+    const actionUrl = "/staff/returns/" + returnRequest.id;
+    for (const account of staff.filter((item) => item.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) => permission.name === "returns.manage"),
+    ))) {
+      drafts.push({
+        recipientType: "STAFF", customerUserId: null, staffAccountId: account.id,
+        recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+        metadata: { returnRequestId: returnRequest.id, orderId: returnRequest.order.id, orderNumber: returnRequest.order.orderNumber },
+        templateKey: "staff.return-request-received",
+        templateData: { orderNumber: returnRequest.order.orderNumber, actionUrl },
+      });
+    }
+    return drafts;
+  }
+
+  if (event.eventType === "warranty.claim.created") {
+    const warrantyClaimId = payloadString(event.payload, "warrantyClaimId") ?? event.aggregateId;
+    const claim = await tx.warrantyClaim.findUnique({
+      where: { id: warrantyClaimId },
+      include: {
+        user: { select: { id: true, email: true } },
+        orderItem: {
+          select: {
+            productName: true,
+            variantName: true,
+            order: { select: { id: true, orderNumber: true } },
+          },
+        },
+      },
+    });
+    if (!claim) throw new Error("Warranty claim not found for notification event: " + warrantyClaimId);
+
+    const drafts: Draft[] = [];
+    if (claim.user) {
+      const title = "Warranty claim received";
+      const body = "Your warranty claim " + claim.claimNumber + " has been received.";
+      const actionUrl = "/account/warranty-claims/" + claim.id;
+      drafts.push({
+        recipientType: "CUSTOMER", customerUserId: claim.user.id, staffAccountId: null,
+        recipientEmail: claim.user.email, category: policy.category, title, body, actionUrl,
+        metadata: { warrantyClaimId: claim.id, orderId: claim.orderItem.order.id, orderNumber: claim.orderItem.order.orderNumber },
+        templateKey: "customer.warranty-claim-received",
+        templateData: { claimNumber: claim.claimNumber, productName: claim.orderItem.productName, actionUrl },
+      });
+    }
+
+    const staff = await tx.staffAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true, email: true,
+        roles: { select: { role: { select: { permissions: { select: { permission: { select: { name: true } } } } } } },
+      },
+    });
+    const title = "Warranty claim requires review";
+    const body = "Warranty claim " + claim.claimNumber + " for " + claim.orderItem.productName + " is awaiting review.";
+    const actionUrl = "/staff/warranty-claims/" + claim.id;
+    for (const account of staff.filter((item) => item.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) => permission.name === "warranty.manage"),
+    ))) {
+      drafts.push({
+        recipientType: "STAFF", customerUserId: null, staffAccountId: account.id,
+        recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+        metadata: { warrantyClaimId: claim.id, orderId: claim.orderItem.order.id, orderNumber: claim.orderItem.order.orderNumber },
+        templateKey: "staff.warranty-claim-received",
+        templateData: { claimNumber: claim.claimNumber, productName: claim.orderItem.productName, actionUrl },
+      });
+    }
+    return drafts;
+  }
 
   if (event.eventType === "payment.succeeded") {
     const paymentId = payloadString(event.payload, "paymentId") ?? event.aggregateId;
