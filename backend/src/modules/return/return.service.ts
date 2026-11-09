@@ -131,7 +131,7 @@ async function receiveReturnTransaction(
 
       const nextStatus = allItemsReceived ? "RECEIVED" : "APPROVED";
 
-      return tx.returnRequest.update({
+      const updatedReturnRequest = await tx.returnRequest.update({
         where: { id: returnRequest.id },
         data: { status: nextStatus },
         include: {
@@ -140,6 +140,15 @@ async function receiveReturnTransaction(
           order: true,
         },
       });
+      if (nextStatus === "RECEIVED") {
+        await publishNotificationEvent(tx, {
+          eventType: "return.received",
+          aggregateType: "RETURN",
+          aggregateId: returnRequest.id,
+          payload: { returnRequestId: returnRequest.id },
+        });
+      }
+      return updatedReturnRequest;
     },
     { isolationLevel: "Serializable" },
   );
