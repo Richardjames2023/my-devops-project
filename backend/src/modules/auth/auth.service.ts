@@ -70,6 +70,7 @@ export async function resendCustomerEmailVerification(email: string): Promise<vo
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}::text, 0))`;
     await tx.customerEmailVerificationToken.updateMany({
       where: { userId: user.id, consumedAt: null },
       data: { consumedAt: new Date() },
