@@ -27,6 +27,22 @@ export const refreshLimiter = rateLimit({
   message: rateLimitMessage("Too many token refresh attempts. Please try again later."),
 });
 
+export const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many password reset requests. Please try again later."),
+});
+
+export const resetPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many password reset attempts. Please try again later."),
+});
+
 // Guest session creation
 export const guestSessionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
