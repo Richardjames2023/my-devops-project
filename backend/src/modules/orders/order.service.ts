@@ -318,6 +318,7 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
       subtotal: true,
       discountAmount: true,
       deliveryFee: true,
+      deliveryZoneName: true,
       totalAmount: true,
       currency: true,
       shippingAddress: true,
