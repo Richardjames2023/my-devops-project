@@ -13,6 +13,7 @@ const supportedEvents = new Set<ResendEmailEventType>([
   "email.bounced",
   "email.complained",
   "email.failed",
+  "email.suppressed",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
