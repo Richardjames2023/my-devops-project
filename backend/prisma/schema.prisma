@@ -853,7 +853,7 @@ model NotificationEmailDelivery {
 
   @@index([status, nextAttemptAt, createdAt])
   @@index([status, lockedAt])
-  @@index([providerMessageId])
+  @@unique([providerMessageId])
   @@map("notification_email_deliveries")
 }
 
