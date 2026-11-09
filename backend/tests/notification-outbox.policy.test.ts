@@ -21,7 +21,7 @@ describe("notification event policy", () => {
   });
 
   it("allows recipient preferences to control order, return, and warranty alerts", () => {
-    for (const eventType of ["order.created", "return.requested", "warranty.claim.created"]) {
+    for (const eventType of ["order.created", "return.requested", "return.received", "warranty.claim.created", "inventory.low_stock"]) {
       expect(getNotificationEventPolicy(eventType)).toMatchObject({
         inAppMandatory: false,
         emailMandatory: false,
