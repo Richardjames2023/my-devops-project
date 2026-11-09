@@ -184,6 +184,18 @@ export function renderNotificationEmail(
         ),
       };
     }
+    case "staff.return-received-for-inspection": {
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("Return received for inspection: " + orderNumber),
+        ...layout(
+          "Returned items ready for inspection",
+          "The return for order " + orderNumber + " has been received and is awaiting inspection.",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
     default:
       throw new Error("Unsupported notification email template: " + templateKey);
   }
