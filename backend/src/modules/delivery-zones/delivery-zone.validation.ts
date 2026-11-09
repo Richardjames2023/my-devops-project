@@ -16,13 +16,13 @@ const locationsSchema = z.array(locationSchema).min(1).max(200)
 
 export const createDeliveryZoneSchema = z.object({
   name: z.string().trim().min(2).max(100),
-  deliveryFee: z.number().finite().min(0).max(9999999999.99),
+  deliveryFee: z.number().min(0).max(9999999999.99),
   locations: locationsSchema,
 });
 
 export const updateDeliveryZoneSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
-  deliveryFee: z.number().finite().min(0).max(9999999999.99).optional(),
+  deliveryFee: z.number().min(0).max(9999999999.99).optional(),
   isActive: z.boolean().optional(),
   locations: locationsSchema.optional(),
 }).refine((value) => Object.keys(value).length > 0, "At least one field must be supplied");
