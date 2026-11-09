@@ -32,6 +32,7 @@ import notificationOperationsRoutes from "./modules/notifications/notification-o
 import { resendEmailWebhook } from "./modules/notifications/notification-email-webhook.controller";
 import { errorHandler } from "./common/errors/errorHandler";
 import cookieParser from "cookie-parser";
+import healthRoutes from "./modules/health/health.routes";
 
 const app = express();
 const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
@@ -70,9 +71,7 @@ app.post(
 
 app.use(express.json());
 
-app.get("/health", (_req, res) => {
-  res.status(200).json({ status: "UP" });
-});
+app.use("/health", healthRoutes);
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/notifications", notificationInboxRoutes);
