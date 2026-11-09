@@ -61,6 +61,23 @@ describe("PostgreSQL Resend email webhook reconciliation", () => {
     }
   });
 
+
+  it("records the provider sent event separately from API acceptance and delivery", async () => {
+    const fixture = await createDelivery();
+    await processResendEmailEvent({
+      providerEventId: "svix-sent-" + randomUUID(),
+      providerMessageId: fixture.messageId,
+      eventType: "email.sent",
+      payload: { type: "email.sent", data: { email_id: fixture.messageId } },
+    });
+    const row = await pool.query(
+      `SELECT status, "sentAt" FROM notification_email_deliveries WHERE id = $1`,
+      [fixture.id],
+    );
+    expect(row.rows[0].status).toBe("SENT");
+    expect(row.rows[0].sentAt).toBeTruthy();
+  });
+
   it("records delivery confirmation and ignores duplicate provider events", async () => {
     const fixture = await createDelivery();
     const input = {
