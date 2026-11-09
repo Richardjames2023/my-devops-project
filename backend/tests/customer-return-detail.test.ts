@@ -41,6 +41,7 @@ describe("customer return detail HTTP endpoint", () => {
     mocks.findCustomer.mockResolvedValue({
       isActive: true,
       emailVerified: true,
+      sessionVersion: 0,
       userRoles: [{ role: { name: "CUSTOMER" } }],
     });
     mocks.getCustomerReturnRequest.mockResolvedValue({
