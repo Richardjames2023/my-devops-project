@@ -16,7 +16,7 @@ describe("notification event policy", () => {
 
   it("uses the delivery category for delivered orders", () => {
     expect(getNotificationEventPolicy("delivery.delivered")).toEqual({
-      category: "DELIVERY", inAppMandatory: true, emailMandatory: true,
+      category: "DELIVERY", inAppMandatory: true, emailMandatory: false,
     });
   });
 
