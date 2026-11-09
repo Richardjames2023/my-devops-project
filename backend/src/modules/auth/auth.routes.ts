@@ -4,6 +4,7 @@ import {
   login,
   refresh,
   getMe,
+  verifyEmail,
 } from "./auth.controller";
 import { authenticate } from "../../common/middleware/authenticate";
 import { requireCustomer } from "../../common/middleware/authorize";
@@ -16,6 +17,7 @@ import {
 const router = Router();
 
 router.post("/register", registrationLimiter, register);
+router.post("/verify-email", registrationLimiter, verifyEmail);
 router.post("/login", loginLimiter, login);
 router.post("/refresh", refreshLimiter, refresh);
 
