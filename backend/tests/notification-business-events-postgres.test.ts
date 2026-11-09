@@ -22,6 +22,7 @@ type Fixture = {
   staffIds: string[];
   roleIds: string[];
   outboxIds: string[];
+  recipientEmails: string[];
 };
 const fixture: Fixture = {
   userIds: [], orderIds: [], refundIds: [], staffIds: [], roleIds: [], outboxIds: [],
@@ -95,7 +96,9 @@ async function createOrder(customer: { id: string; email: string } | null) {
     [id, customer?.id ?? null, customer?.email ?? `guest-${id}@notification-business.test`, orderNumber],
   );
   fixture.orderIds.push(id);
-  return { id, orderNumber, email: customer?.email ?? `guest-${id}@notification-business.test` };
+  const email = customer?.email ?? `guest-${id}@notification-business.test`;
+  fixture.recipientEmails.push(email);
+  return { id, orderNumber, email };
 }
 
 async function createEvent(eventType: string, aggregateType: string, aggregateId: string, payload: Record<string, unknown>) {
@@ -114,8 +117,9 @@ async function createEvent(eventType: string, aggregateType: string, aggregateId
 async function cleanup() {
   await pool.query(
     `DELETE FROM notification_email_deliveries
-     WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = ANY($1::uuid[]))`,
-    [fixture.outboxIds],
+     WHERE "recipientEmail" = ANY($1::text[])
+        OR "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = ANY($2::uuid[]))`,
+    [fixture.recipientEmails, fixture.outboxIds],
   );
   await pool.query(`DELETE FROM notifications WHERE "outboxEventId" = ANY($1::uuid[])`, [fixture.outboxIds]);
   await pool.query(`DELETE FROM notification_outbox WHERE id = ANY($1::uuid[])`, [fixture.outboxIds]);
