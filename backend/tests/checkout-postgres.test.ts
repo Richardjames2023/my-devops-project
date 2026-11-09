@@ -303,6 +303,21 @@ describe("PostgreSQL customer checkout", () => {
       expect(order.items[0].unitPrice.toString()).toBe("1250.5");
       expect(order.items[0].totalPrice.toString()).toBe("2501");
 
+      await pool.query(
+        `UPDATE delivery_zones SET "deliveryFee" = 9999 WHERE id = $1`,
+        [fixture.deliveryZoneId],
+      );
+      const persistedOrder = await pool.query(
+        `SELECT "deliveryFee", "deliveryZoneName", "totalAmount"
+         FROM orders WHERE id = $1`,
+        [order.id],
+      );
+      expect(persistedOrder.rows[0]).toMatchObject({
+        deliveryFee: "350.00",
+        deliveryZoneName: order.deliveryZoneName,
+        totalAmount: "2851.00",
+      });
+
       const cartItems = await pool.query(
         `SELECT id FROM cart_items WHERE "cartId" = $1`,
         [fixture.cartId],
@@ -422,6 +437,8 @@ describe("PostgreSQL customer checkout", () => {
         status: "PENDING",
       });
       expect(result.order).not.toHaveProperty("guestAccessTokenHash");
+      expect(result.order.deliveryFee.toString()).toBe("350");
+      expect(result.order.totalAmount.toString()).toBe("2851");
 
       const storedOrder = await pool.query(
         `SELECT "guestAccessTokenHash"
