@@ -20,7 +20,6 @@ function identityWhere(identity: NotificationPreferenceIdentity) {
 
 /**
  * Payment and security notifications are mandatory on both channels.
- * Delivery updates remain mandatory in-app, while email can be disabled.
  * Other categories are configurable by the recipient.
  */
 function mandatoryChannels(category: NotificationCategory) {
@@ -48,7 +47,7 @@ export async function listNotificationPreferences(identity: NotificationPreferen
     return {
       category,
       inAppEnabled: mandatory.inApp || (saved?.inAppEnabled ?? true),
-      emailEnabled: mandatory.email || (saved?.emailEnabled ?? true),
+      emailEnabled: mandatory.email || (saved?.emailEnabled ?? identity.recipientType === "CUSTOMER"),
       mandatory,
       updatedAt: saved?.updatedAt ?? null,
     };
@@ -86,7 +85,7 @@ export async function updateNotificationPreference(
         ...identityWhere(identity),
         category,
         inAppEnabled: true,
-        emailEnabled: true,
+        emailEnabled: identity.recipientType === "CUSTOMER",
       }],
       skipDuplicates: true,
     });
