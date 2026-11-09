@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { z } from "zod";
-import { isHttpsUrl } from "./url-validation";
+import { isSecureProductionEmailUrl } from "./url-validation";
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -68,10 +68,9 @@ const envSchema = z.object({
     });
   }
   if (
-    value.NODE_ENV === "production" &&
     value.EMAIL_DELIVERY_ENABLED &&
     value.APP_BASE_URL &&
-    !isHttpsUrl(value.APP_BASE_URL)
+    !isSecureProductionEmailUrl(value.NODE_ENV, value.EMAIL_DELIVERY_ENABLED, value.APP_BASE_URL)
   ) {
     context.addIssue({
       code: "custom",
