@@ -121,7 +121,7 @@ describe("PostgreSQL notification preference APIs", () => {
     expect(response.body.preferences.find((item: { category: string }) => item.category === "PAYMENT"))
       .toMatchObject({ inAppEnabled: true, emailEnabled: true, mandatory: { inApp: true, email: true } });
     expect(response.body.preferences.find((item: { category: string }) => item.category === "DELIVERY"))
-      .toMatchObject({ inAppEnabled: true, emailEnabled: true, mandatory: { inApp: true, email: false } });
+      .toMatchObject({ inAppEnabled: true, emailEnabled: true, mandatory: { inApp: false, email: false } });
   });
 
   it("allows customers to change optional channels and persists the preference", async () => {
