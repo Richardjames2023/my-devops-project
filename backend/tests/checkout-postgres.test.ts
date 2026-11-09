@@ -345,14 +345,33 @@ describe("PostgreSQL customer checkout", () => {
     }
   });
 
+  it("rejects an unserved destination without consuming the cart", async () => {
+    const fixture = await createFixture();
+    try {
+      await expect(
+        createOrder(fixture.userId, {
+          shippingAddress: { ...fixture.shippingAddress, city: `Unserved ${randomUUID()}` },
+        }),
+      ).rejects.toMatchObject({ statusCode: 422 });
+
+      const cartItems = await pool.query(
+        `SELECT id FROM cart_items WHERE "cartId" = $1`,
+        [fixture.cartId],
+      );
+      expect(cartItems.rows).toHaveLength(1);
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
   it("serializes concurrent checkout requests for the same cart", async () => {
     const fixture = await createFixture();
     const orderIds: string[] = [];
 
     try {
       const results = await Promise.allSettled([
-        createOrder(fixture.userId, { shippingAddress }),
-        createOrder(fixture.userId, { shippingAddress }),
+        createOrder(fixture.userId, { shippingAddress: fixture.shippingAddress }),
+        createOrder(fixture.userId, { shippingAddress: fixture.shippingAddress }),
       ]);
 
       const successful = results.filter(
