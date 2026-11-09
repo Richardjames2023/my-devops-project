@@ -637,6 +637,7 @@ export async function listCustomerOrders(
         subtotal: true,
         discountAmount: true,
         deliveryFee: true,
+        deliveryZoneName: true,
         totalAmount: true,
         currency: true,
         createdAt: true,
