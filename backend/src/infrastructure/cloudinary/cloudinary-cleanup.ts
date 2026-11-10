@@ -5,7 +5,7 @@ import { getCloudinary } from "../../config/cloudinary";
 
 export async function enqueueCloudinaryCleanup(
   publicId: string,
-  tx: Pick<typeof prisma, "cloudinaryCleanupTask"> = prisma,
+  tx: Prisma.TransactionClient | typeof prisma = prisma,
 ): Promise<void> {
   await tx.cloudinaryCleanupTask.upsert({
     where: { publicId },
