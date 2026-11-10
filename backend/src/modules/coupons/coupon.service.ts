@@ -59,12 +59,12 @@ function allocateDiscount<T extends { totalPrice: Prisma.Decimal }>(
   });
 }
 
-export async function calculateCouponForOrder(
+export async function calculateCouponForOrder<T extends { totalPrice: Prisma.Decimal }>(
   tx: Prisma.TransactionClient,
   input: {
     code: string;
     subtotal: Prisma.Decimal;
-    items: Array<{ totalPrice: Prisma.Decimal; [key: string]: unknown }>;
+    items: T[];
     customerKey: string;
   },
 ) {
@@ -111,10 +111,7 @@ export async function calculateCouponForOrder(
   if (discount.greaterThan(input.subtotal)) discount = input.subtotal;
   discount = new Prisma.Decimal(fromMinorUnits(toMinorUnits(discount)).toFixed(2));
 
-  const allocatedItems = allocateDiscount(
-    input.items as Array<{ totalPrice: Prisma.Decimal; [key: string]: unknown }>,
-    toMinorUnits(discount),
-  );
+  const allocatedItems = allocateDiscount(input.items, toMinorUnits(discount));
 
   return {
     coupon,
