@@ -1,5 +1,4 @@
-// import { Prisma, PrismaClient } from "@prisma/client";
-import { NIGERIAN_DELIVERY_REGIONS } from "./nigeria-delivery-regions";
+// import { PrismaClient } from "@prisma/client";
 // import { PrismaPg } from "@prisma/adapter-pg";
 // import "dotenv/config";
 // 
@@ -105,7 +104,7 @@ import { NIGERIAN_DELIVERY_REGIONS } from "./nigeria-delivery-regions";
 // } as const;
 
 
-// async function seedNationwideDeliveryZones(): Promise<void> {
+async function seedNationwideDeliveryZones(): Promise<void> {
   const configuredFees = NIGERIAN_DELIVERY_REGIONS.map((region) => ({
     region,
     fee: process.env[region.feeEnvironmentVariable]?.trim(),
@@ -212,8 +211,9 @@ async function main(): Promise<void> {
 //     await prisma.$disconnect();
 //   });
 
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { NIGERIAN_DELIVERY_REGIONS } from "./nigeria-delivery-regions";
 import "dotenv/config";
 
 const adapter = new PrismaPg({
