@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import jwt from "jsonwebtoken";
-import { AppError } from "../src/common/errors/AppError";
 
 const mocks = vi.hoisted(() => ({
   findStaff: vi.fn(),
@@ -63,7 +62,7 @@ const productId = "e5c0f4a3-5b6d-6c7e-9f8a-0b1c2d3e4f5a";
 const categoryId = "f6d1a5b4-6c7e-7d8f-a9b0-1c2d3e4f5a6b";
 const variantId = "a7e2b6c5-7d8f-8e9a-b0c1-2d3e4f5a6b7c";
 
-function makeToken(roleName: string, permissions: string[]) {
+function makeToken() {
   return jwt.sign(
     { identityType: "STAFF", roles: [], permissions: [] },
     JWT_ACCESS_SECRET,
@@ -87,7 +86,7 @@ function staffRecord(roleName: string, permissions: string[]) {
 
 function authorizeAs(roleName: string, permissions: string[]) {
   mocks.findStaff.mockResolvedValue(staffRecord(roleName, permissions));
-  return { Authorization: "Bearer " + makeToken(roleName, permissions) };
+  return { Authorization: "Bearer " + makeToken() };
 }
 
 describe("product and category administration routes", () => {
