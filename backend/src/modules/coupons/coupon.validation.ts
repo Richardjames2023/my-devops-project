@@ -3,7 +3,7 @@ import { z } from "zod";
 const moneySchema = z
   .string()
   .trim()
-  .regex(/^\\d+(?:\\.\\d{1,2})?$/, "Enter a valid amount with up to two decimal places");
+  .regex(/^\d+(?:\.\d{1,2})?$/, "Enter a valid amount with up to two decimal places");
 
 const couponFields = {
   code: z
@@ -25,13 +25,29 @@ const couponFields = {
   isActive: z.boolean().optional(),
 };
 
-export const createCouponSchema = z.object(couponFields).superRefine((data, ctx) => {
-  const value = Number(data.discountValue);
-  if (data.discountType === "PERCENTAGE" && (value <= 0 || value > 100)) {
-    ctx.addIssue({ code: "custom", path: ["discountValue"], message: "Percentage discount must be greater than 0 and at most 100" });
-  }
-  if (data.discountType === "FIXED_AMOUNT" && value <= 0) {
-    ctx.addIssue({ code: "custom", path: ["discountValue"], message: "Fixed discount must be greater than zero" });
+const couponObjectSchema = z.object(couponFields);
+
+function validateCouponFields(
+  data: {
+    discountType?: "PERCENTAGE" | "FIXED_AMOUNT";
+    discountValue?: string;
+    startsAt?: string | null;
+    expiresAt?: string | null;
+    maxDiscountAmount?: string | null;
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (data.discountType && data.discountValue !== undefined) {
+    const value = Number(data.discountValue);
+    if (value <= 0 || (data.discountType === "PERCENTAGE" && value > 100)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["discountValue"],
+        message: data.discountType === "PERCENTAGE"
+          ? "Percentage discount must be greater than 0 and at most 100"
+          : "Fixed discount must be greater than zero",
+      });
+    }
   }
   if (data.startsAt && data.expiresAt && new Date(data.expiresAt) <= new Date(data.startsAt)) {
     ctx.addIssue({ code: "custom", path: ["expiresAt"], message: "Expiry must be later than the start date" });
@@ -39,19 +55,16 @@ export const createCouponSchema = z.object(couponFields).superRefine((data, ctx)
   if (data.maxDiscountAmount && Number(data.maxDiscountAmount) <= 0) {
     ctx.addIssue({ code: "custom", path: ["maxDiscountAmount"], message: "Maximum discount must be greater than zero" });
   }
+}
+
+export const createCouponSchema = couponObjectSchema.superRefine((data, ctx) => {
+  validateCouponFields(data, ctx);
 });
 
-export const updateCouponSchema = createCouponSchema.partial().omit({ code: true }).extend({
-  code: couponFields.code.optional(),
-}).superRefine((data, ctx) => {
-  if (data.discountType === "PERCENTAGE" && data.discountValue !== undefined) {
-    const value = Number(data.discountValue);
-    if (value <= 0 || value > 100) ctx.addIssue({ code: "custom", path: ["discountValue"], message: "Percentage discount must be greater than 0 and at most 100" });
-  }
-  if (data.startsAt && data.expiresAt && new Date(data.expiresAt) <= new Date(data.startsAt)) {
-    ctx.addIssue({ code: "custom", path: ["expiresAt"], message: "Expiry must be later than the start date" });
-  }
-});
+export const updateCouponSchema = couponObjectSchema
+  .partial()
+  .extend({ code: couponFields.code.optional() })
+  .superRefine((data, ctx) => validateCouponFields(data, ctx));
 
 export const couponListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
