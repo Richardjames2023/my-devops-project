@@ -114,6 +114,7 @@ model StaffAccount {
   createdAt                               DateTime                         @default(now())
   updatedAt                               DateTime                         @updatedAt
   roles                                   StaffAccountRole[]
+  assignedDeliveries                      Delivery[]                        @relation("DeliveryAssignedStaff")
   refreshTokens                           StaffRefreshToken[]
   auditLogs                               AuditLog[]
   createdInvitations                      StaffInvitation[]                @relation("StaffInvitationCreator")
@@ -620,11 +621,14 @@ model Delivery {
   status            DeliveryStatus    @default(PENDING)
   shippedAt         DateTime?
   deliveredAt       DateTime?
+  assignedStaffAccountId String?       @db.Uuid
   package           Package           @relation(fields: [packageId], references: [id])
+  assignedStaff     StaffAccount?     @relation("DeliveryAssignedStaff", fields: [assignedStaffAccountId], references: [id], onDelete: SetNull)
   attempts          DeliveryAttempt[]
 
   @@index([status])
   @@index([provider])
+  @@index([assignedStaffAccountId])
   @@map("deliveries")
 }
 
