@@ -28,6 +28,7 @@
 
 //   "orders.read",
 //   "orders.manage",
+  "coupons.manage",
 
 //   "payments.read",
 //   "payments.manage",
