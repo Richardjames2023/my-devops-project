@@ -87,7 +87,7 @@ export async function calculateCouponForOrder<T extends { totalPrice: Prisma.Dec
 
   await tx.$queryRaw`SELECT id FROM coupons WHERE id = ${found.id}::uuid FOR UPDATE`;
   const coupon = await tx.coupon.findUnique({ where: { id: found.id } });
-  if (!coupon) throw new AppError("This coupon code is invalid", 422);
+  if (!coupon || coupon.code !== code) throw new AppError("This coupon code is invalid", 422);
 
   const now = new Date();
   await tx.couponRedemption.updateMany({
@@ -189,10 +189,10 @@ export async function getCoupon(couponId: string) {
 export async function updateCoupon(couponId: string, input: UpdateCouponInput, staffAccountId: string, metadata: { ipAddress?: string; userAgent?: string } = {}) {
   try {
     return await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM coupons WHERE id = ${couponId}::uuid FOR UPDATE`;
     const existing = await tx.coupon.findUnique({ where: { id: couponId } });
     if (!existing) throw new AppError("Coupon not found", 404);
 
-    await tx.$queryRaw`SELECT id FROM coupons WHERE id = ${couponId}::uuid FOR UPDATE`;
     const now = new Date();
     await tx.couponRedemption.updateMany({
       where: { couponId, status: "RESERVED", expiresAt: { lte: now } },
