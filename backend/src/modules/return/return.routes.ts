@@ -29,14 +29,14 @@ router.post(
 router.patch(
   "/:returnRequestId/review",
   authenticate,
-  authorize("orders.manage"),
+  authorize("returns.manage"),
   review,
 );
 
 router.patch(
   "/:returnRequestId/receive",
   authenticate,
-  authorize("orders.manage"),
+  authorize("returns.manage"),
   receive,
 );
 
