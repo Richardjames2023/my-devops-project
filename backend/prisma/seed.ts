@@ -140,7 +140,6 @@ async function seedNationwideDeliveryZones(): Promise<void> {
     console.log("Seeded " + region.name + " (" + region.states.length + " states/territory).");
   }
 }
-async function main(): Promise<void> {
 //   console.log("Seeding permissions...");
 
 //   const permissionRecords = new Map<string, string>();
