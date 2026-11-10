@@ -1,4 +1,5 @@
-// import { PrismaClient } from "@prisma/client";
+// import { Prisma, PrismaClient } from "@prisma/client";
+import { NIGERIAN_DELIVERY_REGIONS } from "./nigeria-delivery-regions";
 // import { PrismaPg } from "@prisma/adapter-pg";
 // import "dotenv/config";
 // 
@@ -104,7 +105,43 @@
 // } as const;
 
 
-// async function main(): Promise<void> {
+// async function seedNationwideDeliveryZones(): Promise<void> {
+  const configuredFees = NIGERIAN_DELIVERY_REGIONS.map((region) => ({
+    region,
+    fee: process.env[region.feeEnvironmentVariable]?.trim(),
+  }));
+  const configuredCount = configuredFees.filter(({ fee }) => fee).length;
+  if (configuredCount === 0) {
+    console.log("Nationwide delivery zones skipped: configure all six regional DELIVERY_FEE_* values to seed them.");
+    return;
+  }
+  if (configuredCount !== NIGERIAN_DELIVERY_REGIONS.length) {
+    throw new Error("Configure all six regional DELIVERY_FEE_* values before seeding nationwide delivery zones.");
+  }
+  for (const { region, fee } of configuredFees) {
+    if (!fee || !/^(0|[1-9]\d{0,9})(\.\d{1,2})?$/.test(fee)) {
+      throw new Error(region.feeEnvironmentVariable + " must be a non-negative NGN amount with at most two decimal places.");
+    }
+    const decimalFee = new Prisma.Decimal(fee);
+    if (decimalFee.greaterThan("9999999999.99")) {
+      throw new Error(region.feeEnvironmentVariable + " exceeds the maximum delivery fee.");
+    }
+    const zone = await prisma.deliveryZone.upsert({
+      where: { name: region.name },
+      update: { deliveryFee: decimalFee, isActive: true },
+      create: { name: region.name, deliveryFee: decimalFee },
+    });
+    for (const state of region.states) {
+      await prisma.deliveryZoneLocation.upsert({
+        where: { state_city: { state, city: "*" } },
+        update: { zoneId: zone.id },
+        create: { zoneId: zone.id, state, city: "*" },
+      });
+    }
+    console.log("Seeded " + region.name + " (" + region.states.length + " states/territory).");
+  }
+}
+async function main(): Promise<void> {
 //   console.log("Seeding permissions...");
 
 //   const permissionRecords = new Map<string, string>();
@@ -342,6 +379,8 @@ async function main(): Promise<void> {
   }
 
   console.log("Roles seeded.");
+
+  await seedNationwideDeliveryZones();
 
   console.log("Roles and permissions seeded. Run the explicit staff bootstrap command to create the initial owner.");
 }
