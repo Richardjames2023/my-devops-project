@@ -37,17 +37,26 @@ function allocateDiscount<T extends { totalPrice: Prisma.Decimal }>(
     }));
   }
 
+  const totalMinor = BigInt(subtotalMinor);
+  const discountMinorBig = BigInt(discountMinor);
   const shares = grossMinor.map((amount, index) => {
-    const exact = (discountMinor * amount) / subtotalMinor;
-    const floor = Math.floor(exact);
-    return { index, floor, remainder: exact - floor };
+    const product = discountMinorBig * BigInt(amount);
+    return {
+      index,
+      floor: product / totalMinor,
+      remainder: product % totalMinor,
+    };
   });
-  let remaining = discountMinor - shares.reduce((sum, share) => sum + share.floor, 0);
-  shares.sort((a, b) => b.remainder - a.remainder || a.index - b.index);
-  for (let i = 0; i < shares.length && remaining > 0; i++, remaining--) {
-    shares[i]!.floor += 1;
+  let remaining = discountMinorBig - shares.reduce((sum, share) => sum + share.floor, 0n);
+  shares.sort((a, b) =>
+    a.remainder === b.remainder
+      ? a.index - b.index
+      : a.remainder > b.remainder ? -1 : 1,
+  );
+  for (let i = 0; i < shares.length && remaining > 0n; i++, remaining--) {
+    shares[i]!.floor += 1n;
   }
-  const allocated = new Map(shares.map((share) => [share.index, share.floor]));
+  const allocated = new Map(shares.map((share) => [share.index, Number(share.floor)]));
 
   return items.map((item, index) => {
     const lineDiscount = allocated.get(index) ?? 0;
