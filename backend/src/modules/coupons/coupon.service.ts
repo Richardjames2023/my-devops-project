@@ -23,6 +23,10 @@ function hashCustomerKey(value: string): string {
   return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
 }
 
+function isUniqueConstraintError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
 function allocateDiscount<T extends { totalPrice: Prisma.Decimal }>(
   items: T[],
   discountMinor: number,
@@ -132,7 +136,8 @@ export async function calculateCouponForOrder<T extends { totalPrice: Prisma.Dec
 }
 
 export async function createCoupon(input: CreateCouponInput, staffAccountId: string, metadata: { ipAddress?: string; userAgent?: string } = {}) {
-  return prisma.$transaction(async (tx) => {
+  try {
+    return await prisma.$transaction(async (tx) => {
     const coupon = await tx.coupon.create({
       data: {
         code: input.code,
@@ -153,8 +158,14 @@ export async function createCoupon(input: CreateCouponInput, staffAccountId: str
       newValues: { code: coupon.code, discountType: coupon.discountType, discountValue: coupon.discountValue.toString() },
       ...metadata,
     });
-    return coupon;
-  });
+      return coupon;
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      throw new AppError("A coupon with this code already exists", 409);
+    }
+    throw error;
+  }
 }
 
 export async function listCoupons(query: { page: number; limit: number; active?: "true" | "false" }) {
@@ -176,7 +187,8 @@ export async function getCoupon(couponId: string) {
 }
 
 export async function updateCoupon(couponId: string, input: UpdateCouponInput, staffAccountId: string, metadata: { ipAddress?: string; userAgent?: string } = {}) {
-  return prisma.$transaction(async (tx) => {
+  try {
+    return await prisma.$transaction(async (tx) => {
     const existing = await tx.coupon.findUnique({ where: { id: couponId } });
     if (!existing) throw new AppError("Coupon not found", 404);
 
@@ -235,6 +247,12 @@ export async function updateCoupon(couponId: string, input: UpdateCouponInput, s
       newValues: { code: updated.code, isActive: updated.isActive, discountType: updated.discountType, discountValue: updated.discountValue.toString() },
       ...metadata,
     });
-    return updated;
-  });
+      return updated;
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      throw new AppError("A coupon with this code already exists", 409);
+    }
+    throw error;
+  }
 }
