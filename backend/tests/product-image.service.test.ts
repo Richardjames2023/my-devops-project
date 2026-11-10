@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   uploadStream: vi.fn(),
   destroyAsset: vi.fn(),
+  upsertCleanup: vi.fn(),
+  deleteManyCleanup: vi.fn(),
 }));
 
 vi.mock("../src/infrastructure/prisma/client", () => ({
@@ -22,6 +24,7 @@ vi.mock("../src/infrastructure/prisma/client", () => ({
       count: mocks.countImages,
     },
     $transaction: mocks.transaction,
+    cloudinaryCleanupTask: { upsert: mocks.upsertCleanup, deleteMany: mocks.deleteManyCleanup },
   },
 }));
 
@@ -58,6 +61,7 @@ const imageFile = {
 
 const tx = {
   $queryRaw: mocks.lockProduct,
+  cloudinaryCleanupTask: { upsert: mocks.upsertCleanup },
   productImage: {
     findMany: mocks.findManyImages,
     findFirst: mocks.findImage,
@@ -107,6 +111,8 @@ describe("product image management services", () => {
       }),
     );
     mocks.destroyAsset.mockResolvedValue({ result: "ok" });
+    mocks.upsertCleanup.mockResolvedValue({ id: "cleanup-id" });
+    mocks.deleteManyCleanup.mockResolvedValue({ count: 1 });
   });
 
   it("lists images in primary and display order", async () => {
@@ -183,6 +189,7 @@ describe("product image management services", () => {
     expect(mocks.deleteImage).toHaveBeenCalledWith({
       where: { id: imageId },
     });
+    expect(mocks.upsertCleanup).toHaveBeenCalledWith(expect.objectContaining({ where: { publicId: "products/product/front" } }));
     expect(mocks.destroyAsset).toHaveBeenCalledWith(
       "products/product/front",
       expect.objectContaining({ resource_type: "image" }),
@@ -250,6 +257,7 @@ describe("product image management services", () => {
     const result = await deleteProductImage(productId, imageId);
 
     expect(mocks.deleteImage).toHaveBeenCalled();
+    expect(mocks.upsertCleanup).toHaveBeenCalled();
     expect(result.cloudinaryCleanupPending).toBe(true);
   });
 });
