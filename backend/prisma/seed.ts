@@ -126,9 +126,12 @@ async function seedNationwideDeliveryZones(
           create: { zoneId: zone.id, state, city: "*" },
         });
       }
-      console.log("Seeded " + region.name + " (" + region.states.length + " states/territory).");
     }
   }, { timeout: 30_000 });
+
+  for (const { region } of configuredFees) {
+    console.log("Seeded " + region.name + " (" + region.states.length + " states/territory).");
+  }
 }
 //   console.log("Seeding permissions...");
 
