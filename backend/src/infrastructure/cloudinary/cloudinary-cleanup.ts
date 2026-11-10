@@ -35,7 +35,8 @@ export async function processCloudinaryCleanupBatch(limit = 20): Promise<number>
         WHERE (status = 'PENDING' AND "availableAt" <= NOW())
            OR (status = 'PROCESSING' AND "lockedAt" < NOW() - INTERVAL '5 minutes')
         ORDER BY "availableAt" ASC
-        FOR UPDATE SKIP LOCKED LIMIT 1
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
       `);
       const row = rows[0];
       if (!row) return null;
