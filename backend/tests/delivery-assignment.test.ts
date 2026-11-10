@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   updateDelivery: vi.fn(),
   findStaff: vi.fn(),
   findManyDeliveries: vi.fn(),
+  updatePackage: vi.fn(),
+  createAttempt: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -20,9 +22,11 @@ vi.mock("../src/infrastructure/prisma/client", () => ({
 
 import {
   assignDelivery,
+  createDeliveryAttempt,
   listAssignedDeliveries,
   updateDeliveryStatus,
 } from "../src/modules/delivery/delivery.service";
+import { updateDeliveryTracking } from "../src/modules/delivery/delivery-tracking.service";
 
 const agentId = "c3a8d2e1-3f4b-4a5c-9d6e-7f8a9b0c1d2e";
 const otherAgentId = "d4b9e3f2-4a5c-5b6d-8e7f-9a0b1c2d3e4f";
@@ -37,6 +41,12 @@ function transactionClient() {
     },
     staffAccount: {
       findFirst: mocks.findStaff,
+    },
+    package: {
+      update: mocks.updatePackage,
+    },
+    deliveryAttempt: {
+      create: mocks.createAttempt,
     },
   };
 }
@@ -126,6 +136,45 @@ describe("delivery staff assignment", () => {
         canManageAllDeliveries: true,
       }),
     ).resolves.toMatchObject({ status: "PICKED_UP" });
+  });
+
+  it("does not allow an agent to change tracking details for another agent's delivery", async () => {
+    mocks.findDelivery.mockResolvedValue({
+      id: deliveryId,
+      packageId: "f6d1a5b4-6c7e-7d8f-a9b0-1c2d3e4f5a6b",
+      status: "ASSIGNED",
+      assignedStaffAccountId: otherAgentId,
+    });
+
+    await expect(
+      updateDeliveryTracking(
+        deliveryId,
+        { trackingNumber: "TRACK-123" },
+        { staffAccountId: agentId, canManageAllDeliveries: false },
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(mocks.updatePackage).not.toHaveBeenCalled();
+    expect(mocks.updateDelivery).not.toHaveBeenCalled();
+  });
+
+  it("does not allow an agent to create an attempt for another agent's delivery", async () => {
+    mocks.findDelivery.mockResolvedValue({
+      id: deliveryId,
+      packageId: "f6d1a5b4-6c7e-7d8f-a9b0-1c2d3e4f5a6b",
+      status: "OUT_FOR_DELIVERY",
+      assignedStaffAccountId: otherAgentId,
+    });
+
+    await expect(
+      createDeliveryAttempt(
+        deliveryId,
+        { status: "OTHER", notes: "Customer requested another attempt" },
+        { staffAccountId: agentId, canManageAllDeliveries: false },
+      ),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    expect(mocks.createAttempt).not.toHaveBeenCalled();
   });
 
   it("only lists deliveries assigned to the requesting staff account", async () => {
