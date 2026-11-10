@@ -9,14 +9,14 @@ const router = Router();
 router.post(
   "/:returnRequestId",
   authenticate,
-  authorize("orders.manage"),
+  authorize("refunds.manage"),
   create,
 );
 
 router.patch(
   "/:refundId/reconcile",
   authenticate,
-  authorize("orders.manage"),
+  authorize("refunds.manage"),
   reconcile,
 );
 
@@ -24,7 +24,7 @@ router.patch(
 router.post(
   "/:refundId/retry",
   authenticate,
-  authorize("orders.manage"),
+  authorize("refunds.manage"),
   retryWithCustomerDetails,
 );
 
