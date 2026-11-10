@@ -136,6 +136,28 @@ async function createPaymentWithAccess(
       throw new AppError("Cannot pay for an empty order", 400);
     }
 
+    if (order.discountAmount.greaterThan(0)) {
+      const redemption = await tx.couponRedemption.findUnique({
+        where: { orderId: order.id },
+      });
+      if (!redemption || redemption.status !== "RESERVED") {
+        throw new AppError("The coupon reservation for this order is no longer valid. Please create a new order and apply the coupon again.", 409);
+      }
+      if (redemption.expiresAt && redemption.expiresAt <= new Date()) {
+        await tx.couponRedemption.updateMany({
+          where: { id: redemption.id, status: "RESERVED" },
+          data: { status: "RELEASED", releasedAt: new Date(), expiresAt: null },
+        });
+        throw new AppError("The coupon reservation for this order has expired. Please create a new order and apply the coupon again.", 409);
+      }
+      // Once payment initialization begins, retain the coupon while Paystack
+      // is pending or its outcome is being reconciled.
+      await tx.couponRedemption.update({
+        where: { id: redemption.id },
+        data: { expiresAt: null },
+      });
+    }
+
     if (order.currency !== "NGN") {
       throw new AppError(
         "This Paystack integration currently supports NGN only",
@@ -823,6 +845,11 @@ async function markPaymentSuccessfulWithAccess(
             },
           });
 
+          await tx.couponRedemption.updateMany({
+            where: { orderId: currentPayment.orderId, status: "RESERVED" },
+            data: { status: "REDEEMED", redeemedAt: now, expiresAt: null },
+          });
+
           await publishNotificationEvent(tx, {
             eventType: "payment.succeeded",
             aggregateType: "PAYMENT",
@@ -990,6 +1017,13 @@ async function markPaymentSuccessfulWithAccess(
               409,
             );
           }
+
+          // A verified successful charge consumes the coupon even when
+          // inventory needs separate manual reconciliation.
+          await tx.couponRedemption.updateMany({
+            where: { orderId: currentPayment.orderId, status: "RESERVED" },
+            data: { status: "REDEEMED", redeemedAt: new Date(), expiresAt: null },
+          });
 
           // Create the reconciliation record in the same transaction
           // that marks the payment as successful.
