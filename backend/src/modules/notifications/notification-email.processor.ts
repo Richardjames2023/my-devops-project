@@ -72,6 +72,30 @@ async function claimBatch(deliveryId?: string): Promise<ClaimedDelivery[]> {
   `;
 }
 
+function redactOneTimeActionUrl(
+  templateKey: string,
+  templateData: Prisma.JsonValue,
+): Prisma.InputJsonValue {
+  if (
+    templateKey !== "customer.password-reset" &&
+    templateKey !== "customer.email-verification"
+  ) {
+    return templateData as Prisma.InputJsonValue;
+  }
+
+  if (
+    typeof templateData !== "object" ||
+    templateData === null ||
+    Array.isArray(templateData)
+  ) {
+    return templateData as Prisma.InputJsonValue;
+  }
+
+  const safeData = { ...templateData };
+  delete safeData.actionUrl;
+  return safeData;
+}
+
 async function markAccepted(
   delivery: ClaimedDelivery,
   messageId: string,
@@ -82,6 +106,9 @@ async function markAccepted(
       status: "ACCEPTED",
       providerMessageId: messageId,
       acceptedAt: new Date(),
+      // Reset and verification links are bearer credentials. Keep them only
+      // until provider acceptance, then remove them from persistent storage.
+      templateData: redactOneTimeActionUrl(delivery.templateKey, delivery.templateData),
       lockedAt: null,
       lockedBy: null,
       lastError: null,
@@ -99,6 +126,9 @@ async function markFailed(delivery: ClaimedDelivery, error: unknown): Promise<vo
     where: { id: delivery.id, status: "PROCESSING", lockedBy: delivery.lockedBy },
     data: {
       status: terminal ? "DEAD" : "RETRYING",
+      ...(terminal
+        ? { templateData: redactOneTimeActionUrl(delivery.templateKey, delivery.templateData) }
+        : {}),
       nextAttemptAt: new Date(Date.now() + retryDelay(delivery.attemptCount)),
       lockedAt: null,
       lockedBy: null,
