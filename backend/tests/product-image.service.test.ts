@@ -215,6 +215,29 @@ describe("product image management services", () => {
     });
   });
 
+  it("logs Cloudinary cleanup failures when the image database transaction fails", async () => {
+    const cleanupError = new Error("Cloudinary unavailable");
+    const databaseError = new Error("Database write failed");
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    mocks.transaction.mockRejectedValueOnce(databaseError);
+    mocks.destroyAsset.mockRejectedValueOnce(cleanupError);
+
+    await expect(
+      createProductImages(productId, [imageFile]),
+    ).rejects.toBe(databaseError);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Cloudinary product image cleanup failed after a database write error:",
+      {
+        publicId: "products/product/front",
+        message: "Cloudinary unavailable",
+      },
+    );
+
+    errorSpy.mockRestore();
+  });
+
   it("reports pending Cloudinary cleanup without losing the database deletion", async () => {
     mocks.findImage.mockResolvedValue({
       id: imageId,
