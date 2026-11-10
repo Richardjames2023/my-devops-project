@@ -77,7 +77,11 @@ export async function updateCategory(
 
   return prisma.category.update({
     where: { id: categoryId },
-    data: input,
+    data: {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.slug !== undefined ? { slug: input.slug } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+    },
   });
 }
 
