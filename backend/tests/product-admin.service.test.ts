@@ -30,7 +30,6 @@ vi.mock("../src/infrastructure/prisma/client", () => ({
   },
 }));
 
-import { AppError } from "../src/common/errors/AppError";
 import { updateProduct, setProductActive } from "../src/modules/products/product.service";
 import { setCategoryActive } from "../src/modules/products/category.service";
 import { updateProductVariant, setProductVariantActive } from "../src/modules/products/product-variant.service";
