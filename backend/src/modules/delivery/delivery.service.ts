@@ -152,6 +152,13 @@ export async function updateDeliveryStatus(
       throw new AppError("Delivery not found", 404);
     }
     assertDeliveryAssignment(delivery, actor);
+    if (
+      actor &&
+      !actor.canManageAllDeliveries &&
+      !["PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED", "FAILED"].includes(status)
+    ) {
+      throw new AppError("Delivery agents cannot perform this status transition", 403);
+    }
 
     const allowedTransitions: Record<string, string[]> = {
       PENDING: ["ASSIGNED", "CANCELLED"],
