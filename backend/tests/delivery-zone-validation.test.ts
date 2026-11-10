@@ -53,6 +53,11 @@ describe("delivery zone fee validation", () => {
     },
   );
 
+  it("accepts only the complete wildcard city sentinel", () => {
+    expect(createDeliveryZoneSchema.safeParse({ ...validCreateInput, locations: [{ state: "LAGOS", city: "*" }] }).success).toBe(true);
+    expect(createDeliveryZoneSchema.safeParse({ ...validCreateInput, locations: [{ state: "LAGOS", city: "IKE*JA" }] }).success).toBe(false);
+  });
+
   it("continues to reject negative and out-of-range delivery fees", () => {
     expect(
       createDeliveryZoneSchema.safeParse({
