@@ -1,7 +1,10 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
-import type { CreateProductInput } from "./product.validation";
+import type {
+  CreateProductInput,
+  UpdateProductInput,
+} from "./product.validation";
 import type { ProductCatalogQuery } from "./product-catalog.validation";
 
 const publicProductSelect = {
@@ -49,6 +52,21 @@ const publicProductSelect = {
     },
   },
 } satisfies Prisma.ProductSelect;
+
+const adminProductInclude = {
+  category: { select: { id: true, name: true, slug: true, isActive: true } },
+  images: {
+    orderBy: [
+      { isPrimary: "desc" as const },
+      { sortOrder: "asc" as const },
+      { createdAt: "asc" as const },
+    ],
+  },
+  variants: {
+    orderBy: { createdAt: "asc" as const },
+    include: { inventory: true },
+  },
+} satisfies Prisma.ProductInclude;
 
 function presentProduct(
   product: Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>,
@@ -102,18 +120,12 @@ export async function createProduct(input: CreateProductInput) {
     where: { id: input.categoryId },
   });
 
-  if (!category) {
-    throw new AppError("Category not found", 404);
-  }
-
-  if (!category.isActive) {
-    throw new AppError("Category is inactive", 400);
-  }
+  if (!category) throw new AppError("Category not found", 404);
+  if (!category.isActive) throw new AppError("Category is inactive", 400);
 
   const existingProduct = await prisma.product.findUnique({
     where: { slug: input.slug },
   });
-
   if (existingProduct) {
     throw new AppError("A product with this slug already exists", 409);
   }
@@ -130,6 +142,111 @@ export async function createProduct(input: CreateProductInput) {
       warrantyTerms: input.warrantyTerms ?? null,
     },
   });
+}
+
+export async function listAdminProducts(page = 1, limit = 20) {
+  const [items, total] = await prisma.$transaction([
+    prisma.product.findMany({
+      include: adminProductInclude,
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      skip: (page - 1) * limit,
+      take: limit,
+    }),
+    prisma.product.count(),
+  ]);
+
+  return {
+    items,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      hasNextPage: page * limit < total,
+      hasPreviousPage: page > 1,
+    },
+  };
+}
+
+export async function getAdminProductById(productId: string) {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    include: adminProductInclude,
+  });
+  if (!product) throw new AppError("Product not found", 404);
+  return product;
+}
+
+export async function updateProduct(
+  productId: string,
+  input: UpdateProductInput,
+) {
+  const current = await prisma.product.findUnique({ where: { id: productId } });
+  if (!current) throw new AppError("Product not found", 404);
+
+  const categoryId = input.categoryId ?? current.categoryId;
+  if (input.categoryId !== undefined) {
+    const category = await prisma.category.findUnique({ where: { id: categoryId } });
+    if (!category) throw new AppError("Category not found", 404);
+    if (!category.isActive) throw new AppError("Category is inactive", 400);
+  }
+
+  if (input.slug && input.slug !== current.slug) {
+    const existing = await prisma.product.findUnique({ where: { slug: input.slug } });
+    if (existing) throw new AppError("A product with this slug already exists", 409);
+  }
+
+  const hasWarranty = input.hasWarranty ?? current.hasWarranty;
+  const warrantyDuration =
+    input.warrantyDuration === undefined
+      ? current.warrantyDuration
+      : input.warrantyDuration;
+  const warrantyTerms =
+    input.warrantyTerms === undefined ? current.warrantyTerms : input.warrantyTerms;
+
+  if (hasWarranty && !warrantyDuration) {
+    throw new AppError("Warranty duration is required when warranty is enabled", 400);
+  }
+  if (
+    !hasWarranty &&
+    ((input.warrantyDuration !== undefined && input.warrantyDuration !== null) ||
+      (input.warrantyTerms !== undefined && input.warrantyTerms !== null))
+  ) {
+    throw new AppError("Warranty details cannot be supplied when warranty is disabled", 400);
+  }
+
+  return prisma.product.update({
+    where: { id: productId },
+    data: {
+      ...(input.categoryId !== undefined ? { categoryId } : {}),
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.slug !== undefined ? { slug: input.slug } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.basePrice !== undefined ? { basePrice: input.basePrice } : {}),
+      hasWarranty,
+      warrantyDuration: hasWarranty ? warrantyDuration : null,
+      warrantyTerms: hasWarranty ? warrantyTerms : null,
+    },
+  });
+}
+
+export async function setProductActive(productId: string, isActive: boolean) {
+  const product = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { id: true, category: { select: { isActive: true } } },
+  });
+  if (!product) throw new AppError("Product not found", 404);
+  if (isActive && !product.category.isActive) {
+    throw new AppError("Cannot activate a product in an inactive category", 400);
+  }
+  return prisma.product.update({
+    where: { id: productId },
+    data: { isActive },
+  });
+}
+
+export async function deactivateProduct(productId: string) {
+  return setProductActive(productId, false);
 }
 
 export async function listCatalogProducts(query: ProductCatalogQuery) {
@@ -333,9 +450,6 @@ export async function getCatalogProductBySlug(slug: string) {
     select: publicProductSelect,
   });
 
-  if (!product) {
-    throw new AppError("Product not found", 404);
-  }
-
+  if (!product) throw new AppError("Product not found", 404);
   return presentProduct(product);
 }
