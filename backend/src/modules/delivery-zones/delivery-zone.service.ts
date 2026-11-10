@@ -35,21 +35,41 @@ export async function listActiveDeliveryZones() {
   });
 }
 
-export async function quoteDeliveryFee(state: string, city: string) {
+export type DeliveryZoneLookupClient = Pick<Prisma.TransactionClient, "deliveryZone">;
+
+/** Exact city pricing takes precedence over the state's "*" fallback. */
+export async function findDeliveryZoneForLocation(
+  client: DeliveryZoneLookupClient,
+  state: string,
+  city: string,
+) {
   const normalizedState = normalizeLocation(state);
   const normalizedCity = normalizeLocation(city);
-  const zone = await prisma.deliveryZone.findFirst({
+  const select = { id: true, name: true, deliveryFee: true } as const;
+
+  const exactCityZone = await client.deliveryZone.findFirst({
     where: {
       isActive: true,
       locations: { some: { state: normalizedState, city: normalizedCity } },
     },
-    select: { id: true, name: true, deliveryFee: true },
+    select,
   });
+  if (exactCityZone) return exactCityZone;
 
+  return client.deliveryZone.findFirst({
+    where: {
+      isActive: true,
+      locations: { some: { state: normalizedState, city: "*" } },
+    },
+    select,
+  });
+}
+
+export async function quoteDeliveryFee(state: string, city: string) {
+  const zone = await findDeliveryZoneForLocation(prisma, state, city);
   if (!zone) {
     throw new AppError(`We do not currently deliver to ${city.trim()}, ${state.trim()}`, 422);
   }
-
   return {
     zoneId: zone.id,
     zoneName: zone.name,
