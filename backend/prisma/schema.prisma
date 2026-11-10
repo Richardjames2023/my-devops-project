@@ -502,6 +502,7 @@ model Order {
   @@index([status])
   @@index([createdAt])
   @@index([deliveryZoneId])
+  @@index([couponId])
   @@map("orders")
 }
 
