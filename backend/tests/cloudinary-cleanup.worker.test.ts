@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   destroy: vi.fn(),
 }));
 
-vi.mock("../../src/infrastructure/prisma/client", () => ({
+vi.mock("../src/infrastructure/prisma/client", () => ({
   default: {
     $transaction: mocks.transaction,
     cloudinaryCleanupTask: {
@@ -20,13 +20,13 @@ vi.mock("../../src/infrastructure/prisma/client", () => ({
   },
 }));
 
-vi.mock("../../src/config/cloudinary", () => ({
+vi.mock("../src/config/cloudinary", () => ({
   getCloudinary: () => ({
     uploader: { destroy: mocks.destroy },
   }),
 }));
 
-import { processCloudinaryCleanupBatch } from "../../src/infrastructure/cloudinary/cloudinary-cleanup";
+import { processCloudinaryCleanupBatch } from "../src/infrastructure/cloudinary/cloudinary-cleanup";
 
 describe("Cloudinary cleanup worker", () => {
   beforeEach(() => {
