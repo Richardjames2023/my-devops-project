@@ -220,9 +220,26 @@ export async function createProductImages(
       return created;
     });
   } catch (error) {
-    await Promise.allSettled(
+    const cleanupResults = await Promise.allSettled(
       uploadedAssets.map((asset) => deleteCloudinaryAsset(asset.publicId)),
     );
+
+    cleanupResults.forEach((result, index) => {
+      if (result.status === "rejected") {
+        const asset = uploadedAssets[index];
+        console.error(
+          "Cloudinary product image cleanup failed after a database write error:",
+          {
+            publicId: asset?.publicId,
+            message:
+              result.reason instanceof Error
+                ? result.reason.message
+                : "Unknown cleanup error",
+          },
+        );
+      }
+    });
+
     throw error;
   }
 }
