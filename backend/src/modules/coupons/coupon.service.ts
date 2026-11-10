@@ -123,6 +123,9 @@ export async function calculateCouponForOrder<T extends { totalPrice: Prisma.Dec
   }
   if (discount.greaterThan(input.subtotal)) discount = input.subtotal;
   discount = new Prisma.Decimal(fromMinorUnits(toMinorUnits(discount)).toFixed(2));
+  if (toMinorUnits(discount) <= 0) {
+    throw new AppError("This coupon discount is smaller than the minimum currency unit", 422);
+  }
 
   const allocatedItems = allocateDiscount(input.items, toMinorUnits(discount));
 
