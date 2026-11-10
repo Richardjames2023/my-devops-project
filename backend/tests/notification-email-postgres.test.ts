@@ -189,6 +189,27 @@ describe("PostgreSQL notification email delivery worker", () => {
     expect(JSON.stringify(delivery.templateData)).not.toContain(token);
   });
 
+  it("redacts customer email verification links after provider acceptance", async () => {
+    const token = randomUUID() + randomUUID();
+    const fixture = await createFixture({
+      templateKey: "customer.email-verification",
+      templateData: { firstName: "Verify", actionUrl: "/verify-email?token=" + token },
+    });
+    const send = vi.fn<EmailProvider["send"]>().mockResolvedValue({ messageId: "resend-verification-accepted" });
+
+    const result = await processNotificationEmailBatch({
+      deliveryId: fixture.deliveryId,
+      provider: { send },
+      enabled: true,
+    });
+
+    expect(result.accepted).toBe(1);
+    const delivery = await getDelivery(fixture.deliveryId);
+    expect(delivery.status).toBe("ACCEPTED");
+    expect(delivery.templateData).toEqual({ firstName: "Verify" });
+    expect(JSON.stringify(delivery.templateData)).not.toContain(token);
+  });
+
   it("retains password reset links after retryable failures so delivery can retry", async () => {
     const token = randomUUID() + randomUUID();
     const fixture = await createFixture({
