@@ -6,9 +6,11 @@ import {
   loginSchema,
   refreshTokenSchema,
   resendVerificationSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "./auth.validation";
 
-import { registerUser, loginUser, refreshAccessToken, verifyCustomerEmail, resendCustomerEmailVerification } from "./auth.service";
+import { registerUser, loginUser, refreshAccessToken, verifyCustomerEmail, resendCustomerEmailVerification, requestCustomerPasswordReset, resetCustomerPassword } from "./auth.service";
 
 import { mergeGuestCartIntoUserCart } from "../cart/cart.service";
 
@@ -82,6 +84,33 @@ export async function verifyEmail(req: Request, res: Response): Promise<void> {
   }
   await verifyCustomerEmail(parsed.data.token);
   res.status(200).json({ message: "Email address verified successfully. You can now log in." });
+}
+
+export async function forgotPassword(req: Request, res: Response): Promise<void> {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "A valid email address is required" });
+    return;
+  }
+
+  await requestCustomerPasswordReset(parsed.data.email);
+  res.status(200).json({
+    message: "If an eligible account exists for this email, password reset instructions will be sent.",
+  });
+}
+
+export async function resetPassword(req: Request, res: Response): Promise<void> {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  await resetCustomerPassword(parsed.data);
+  res.status(200).json({ message: "Password reset successfully. Please log in with your new password." });
 }
 
 export async function login(req: Request, res: Response): Promise<void> {

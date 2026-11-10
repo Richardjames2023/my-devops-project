@@ -73,6 +73,7 @@ describe("JWT authentication middleware", () => {
       identityType: "STAFF",
       roles: ["OPERATIONS"],
       permissions: ["orders.manage"],
+      sessionVersion: 0,
     });
     expect(next).toHaveBeenCalledWith();
   });

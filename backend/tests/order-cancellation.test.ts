@@ -63,6 +63,7 @@ describe("order cancellation HTTP endpoints", () => {
     mocks.findCustomer.mockResolvedValue({
       isActive: true,
       emailVerified: true,
+      sessionVersion: 0,
       userRoles: [{ role: { name: "CUSTOMER" } }],
     });
     mocks.cancelOrder.mockResolvedValue(successfulCancellation);

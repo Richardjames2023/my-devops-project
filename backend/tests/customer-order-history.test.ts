@@ -39,6 +39,7 @@ describe("customer order history HTTP endpoint", () => {
     mocks.findCustomer.mockResolvedValue({
       isActive: true,
       emailVerified: true,
+      sessionVersion: 0,
       userRoles: [{ role: { name: "CUSTOMER" } }],
     });
     mocks.listCustomerOrders.mockResolvedValue({

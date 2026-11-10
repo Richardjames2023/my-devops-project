@@ -87,6 +87,19 @@ export function renderNotificationEmail(
         ),
       };
     }
+    case "customer.password-reset": {
+      const firstName = requiredString(data, "firstName");
+      if (!actionUrl) throw new Error("Password reset template requires an action URL");
+      return {
+        subject: "Reset your password",
+        ...layout(
+          "Reset your password",
+          "Hello " + firstName + ", we received a request to reset your account password. This link expires in 60 minutes. If you did not request this change, you can safely ignore this email.",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
     case "customer.payment-succeeded": {
       const orderNumber = requiredString(data, "orderNumber");
       const amount = requiredString(data, "amount");
