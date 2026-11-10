@@ -355,18 +355,19 @@ async function main(): Promise<void> {
       return permissionId;
     });
 
-    // Keep seeded roles in sync with this role matrix, including permission
-    // removals. Staff who hold multiple roles still receive the union of all
-    // permissions from their assigned roles at authorization time.
-    await prisma.rolePermission.deleteMany({ where: { roleId: role.id } });
-    if (rolePermissionIds.length) {
-      await prisma.rolePermission.createMany({
-        data: rolePermissionIds.map((permissionId) => ({
-          roleId: role.id,
-          permissionId,
-        })),
-      });
-    }
+    // Synchronize each role atomically so a failed insert cannot leave it
+    // without its previously assigned permissions.
+    await prisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({ where: { roleId: role.id } });
+      if (rolePermissionIds.length) {
+        await tx.rolePermission.createMany({
+          data: rolePermissionIds.map((permissionId) => ({
+            roleId: role.id,
+            permissionId,
+          })),
+        });
+      }
+    });
   }
 
   console.log("Roles seeded.");
