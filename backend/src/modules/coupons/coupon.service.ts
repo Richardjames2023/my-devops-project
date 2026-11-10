@@ -170,6 +170,42 @@ export async function updateCoupon(couponId: string, input: UpdateCouponInput, s
   return prisma.$transaction(async (tx) => {
     const existing = await tx.coupon.findUnique({ where: { id: couponId } });
     if (!existing) throw new AppError("Coupon not found", 404);
+
+    await tx.$queryRaw`SELECT id FROM coupons WHERE id = ${couponId}::uuid FOR UPDATE`;
+    const now = new Date();
+    await tx.couponRedemption.updateMany({
+      where: { couponId, status: "RESERVED", expiresAt: { lte: now } },
+      data: { status: "RELEASED", releasedAt: now },
+    });
+
+    const nextType = input.discountType ?? existing.discountType;
+    const nextValue = input.discountValue !== undefined
+      ? decimal(input.discountValue)
+      : existing.discountValue;
+    if (nextValue.lessThanOrEqualTo(0) ||
+        (nextType === "PERCENTAGE" && nextValue.greaterThan(100))) {
+      throw new AppError("The discount value is invalid for the selected discount type", 400);
+    }
+
+    const nextStartsAt = input.startsAt !== undefined
+      ? (input.startsAt === null ? null : new Date(input.startsAt))
+      : existing.startsAt;
+    const nextExpiresAt = input.expiresAt !== undefined
+      ? (input.expiresAt === null ? null : new Date(input.expiresAt))
+      : existing.expiresAt;
+    if (nextStartsAt && nextExpiresAt && nextExpiresAt <= nextStartsAt) {
+      throw new AppError("Coupon expiry must be later than its start date", 400);
+    }
+
+    if (input.usageLimit !== undefined && input.usageLimit !== null) {
+      const activeUsage = await tx.couponRedemption.count({
+        where: { couponId, status: { in: ["RESERVED", "REDEEMED"] } },
+      });
+      if (input.usageLimit < activeUsage) {
+        throw new AppError("Usage limit cannot be lower than existing active reservations and redemptions", 409);
+      }
+    }
+
     const data: Prisma.CouponUpdateInput = {
       ...(input.code !== undefined ? { code: input.code } : {}),
       ...(input.description !== undefined ? { description: input.description } : {}),
