@@ -3,7 +3,7 @@ import { z } from "zod";
 const moneySchema = z
   .string()
   .trim()
-  .regex(/^\d+(?:\.\d{1,2})?$/, "Enter a valid amount with up to two decimal places");
+  .regex(/^\\d+(?:\\.\\d{1,2})?$/, "Enter a valid amount with up to two decimal places");
 
 const couponFields = {
   code: z
@@ -29,11 +29,11 @@ const couponObjectSchema = z.object(couponFields);
 
 function validateCouponFields(
   data: {
-    discountType?: "PERCENTAGE" | "FIXED_AMOUNT";
-    discountValue?: string;
-    startsAt?: string | null;
-    expiresAt?: string | null;
-    maxDiscountAmount?: string | null;
+    discountType?: "PERCENTAGE" | "FIXED_AMOUNT" | undefined;
+    discountValue?: string | undefined;
+    startsAt?: string | null | undefined;
+    expiresAt?: string | null | undefined;
+    maxDiscountAmount?: string | null | undefined;
   },
   ctx: z.RefinementCtx,
 ) {
@@ -49,11 +49,21 @@ function validateCouponFields(
       });
     }
   }
+
   if (data.startsAt && data.expiresAt && new Date(data.expiresAt) <= new Date(data.startsAt)) {
-    ctx.addIssue({ code: "custom", path: ["expiresAt"], message: "Expiry must be later than the start date" });
+    ctx.addIssue({
+      code: "custom",
+      path: ["expiresAt"],
+      message: "Expiry must be later than the start date",
+    });
   }
+
   if (data.maxDiscountAmount && Number(data.maxDiscountAmount) <= 0) {
-    ctx.addIssue({ code: "custom", path: ["maxDiscountAmount"], message: "Maximum discount must be greater than zero" });
+    ctx.addIssue({
+      code: "custom",
+      path: ["maxDiscountAmount"],
+      message: "Maximum discount must be greater than zero",
+    });
   }
 }
 
