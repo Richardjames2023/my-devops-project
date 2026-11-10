@@ -324,6 +324,7 @@ model ProductImage {
   id        String   @id @default(uuid()) @db.Uuid
   productId String   @db.Uuid
   url       String
+  publicId  String?  @unique
   altText   String?
   sortOrder Int      @default(0)
   isPrimary Boolean  @default(false)
