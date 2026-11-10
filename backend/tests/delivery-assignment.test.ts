@@ -67,6 +67,24 @@ describe("delivery staff assignment", () => {
     expect(mocks.updateDelivery).not.toHaveBeenCalled();
   });
 
+  it("prevents a Delivery Agent from cancelling an assigned delivery", async () => {
+    mocks.findDelivery.mockResolvedValue({
+      id: deliveryId,
+      packageId: "f6d1a5b4-6c7e-7d8f-a9b0-1c2d3e4f5a6b",
+      status: "ASSIGNED",
+      assignedStaffAccountId: agentId,
+    });
+
+    await expect(
+      updateDeliveryStatus(deliveryId, "CANCELLED", {
+        staffAccountId: agentId,
+        canManageAllDeliveries: false,
+      }),
+    ).rejects.toMatchObject({ statusCode: 403 });
+
+    expect(mocks.updateDelivery).not.toHaveBeenCalled();
+  });
+
   it("allows an agent to update their assigned delivery", async () => {
     mocks.findDelivery.mockResolvedValue({
       id: deliveryId,
@@ -120,6 +138,34 @@ describe("delivery staff assignment", () => {
         where: { assignedStaffAccountId: agentId },
       }),
     );
+  });
+
+  it("assigns a delivery to an active Delivery Agent and moves it to ASSIGNED", async () => {
+    mocks.findDelivery.mockResolvedValue({
+      id: deliveryId,
+      status: "PENDING",
+      assignedStaffAccountId: null,
+    });
+    mocks.findStaff.mockResolvedValue({ id: agentId });
+    mocks.updateDelivery.mockResolvedValue({
+      id: deliveryId,
+      status: "ASSIGNED",
+      assignedStaffAccountId: agentId,
+    });
+
+    const result = await assignDelivery(deliveryId, agentId);
+
+    expect(result).toMatchObject({
+      status: "ASSIGNED",
+      assignedStaffAccountId: agentId,
+    });
+    expect(mocks.findStaff).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: agentId,
+        status: "ACTIVE",
+        roles: { some: { role: { name: "DELIVERY_AGENT" } } },
+      }),
+    }));
   });
 
   it("only assigns deliveries to active staff members with the DELIVERY_AGENT role", async () => {
