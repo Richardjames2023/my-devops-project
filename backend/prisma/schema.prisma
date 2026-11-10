@@ -432,6 +432,8 @@ model Order {
   subtotal                 Decimal                          @db.Decimal(12, 2)
   discountAmount           Decimal                          @default(0) @db.Decimal(12, 2)
   deliveryFee              Decimal                          @default(0) @db.Decimal(12, 2)
+  deliveryZoneId           String?                          @db.Uuid
+  deliveryZoneName         String?
   totalAmount              Decimal                          @db.Decimal(12, 2)
   currency                 String                           @default("NGN")
   shippingAddress          Json
@@ -445,11 +447,40 @@ model Order {
   payments                 Payment[]
   refunds                  Refund[]
   returnRequests           ReturnRequest[]
+  deliveryZone             DeliveryZone?                     @relation(fields: [deliveryZoneId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([deliveryZoneId])
   @@map("orders")
+}
+
+model DeliveryZone {
+  id          String                 @id @default(uuid()) @db.Uuid
+  name        String                 @unique
+  deliveryFee Decimal                @db.Decimal(12, 2)
+  isActive    Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  locations   DeliveryZoneLocation[]
+  orders      Order[]
+
+  @@index([isActive])
+  @@map("delivery_zones")
+}
+
+model DeliveryZoneLocation {
+  id        String       @id @default(uuid()) @db.Uuid
+  zoneId    String       @db.Uuid
+  state     String
+  city      String
+  createdAt DateTime     @default(now())
+  zone      DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([state, city])
+  @@index([zoneId])
+  @@map("delivery_zone_locations")
 }
 
 model OrderItem {
