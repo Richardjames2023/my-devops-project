@@ -6,6 +6,7 @@ import type {
   CreateDeliveryZoneInput,
   UpdateDeliveryZoneInput,
 } from "./delivery-zone.validation";
+import { normalizeDeliveryCity, normalizeDeliveryState } from "./delivery-zone.normalization";
 
 function normalizeLocation(value: string): string {
   return value.trim().toUpperCase();
@@ -43,8 +44,8 @@ export async function findDeliveryZoneForLocation(
   state: string,
   city: string,
 ) {
-  const normalizedState = normalizeLocation(state);
-  const normalizedCity = normalizeLocation(city);
+  const normalizedState = normalizeDeliveryState(state);
+  const normalizedCity = normalizeDeliveryCity(city);
   const select = { id: true, name: true, deliveryFee: true } as const;
 
   const exactCityZone = await client.deliveryZone.findFirst({
