@@ -481,6 +481,13 @@ async function createPaymentWithAccess(
               );
             }
 
+            await tx.couponRedemption.updateMany({
+              where: { orderId: currentPayment.orderId, status: "RESERVED" },
+              data: {
+                expiresAt: new Date(Date.now() + STALE_PENDING_PAYMENT_GRACE_PERIOD_MS),
+              },
+            });
+
             const reservations = await tx.inventoryReservation.findMany({
               where: {
                 orderId: currentPayment.orderId,
@@ -1258,6 +1265,13 @@ export async function reconcileUnknownPayment(paymentId: string) {
               409,
             );
           }
+
+          await tx.couponRedemption.updateMany({
+            where: { orderId: currentPayment.orderId, status: "RESERVED" },
+            data: {
+              expiresAt: new Date(Date.now() + STALE_PENDING_PAYMENT_GRACE_PERIOD_MS),
+            },
+          });
 
           const reservations = await tx.inventoryReservation.findMany({
             where: {
