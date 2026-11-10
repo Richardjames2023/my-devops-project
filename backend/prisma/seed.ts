@@ -104,41 +104,31 @@
 // } as const;
 
 
-async function seedNationwideDeliveryZones(): Promise<void> {
-  const configuredFees = NIGERIAN_DELIVERY_REGIONS.map((region) => ({
-    region,
-    fee: process.env[region.feeEnvironmentVariable]?.trim(),
-  }));
-  const configuredCount = configuredFees.filter(({ fee }) => fee).length;
-  if (configuredCount === 0) {
+async function seedNationwideDeliveryZones(
+  configuredFees: ReturnType<typeof getConfiguredNigeriaDeliveryFees>,
+): Promise<void> {
+  if (configuredFees.length === 0) {
     console.log("Nationwide delivery zones skipped: configure all six regional DELIVERY_FEE_* values to seed them.");
     return;
   }
-  if (configuredCount !== NIGERIAN_DELIVERY_REGIONS.length) {
-    throw new Error("Configure all six regional DELIVERY_FEE_* values before seeding nationwide delivery zones.");
-  }
-  for (const { region, fee } of configuredFees) {
-    if (!fee || !/^(0|[1-9]\d{0,9})(\.\d{1,2})?$/.test(fee)) {
-      throw new Error(region.feeEnvironmentVariable + " must be a non-negative NGN amount with at most two decimal places.");
-    }
-    const decimalFee = new Prisma.Decimal(fee);
-    if (decimalFee.greaterThan("9999999999.99")) {
-      throw new Error(region.feeEnvironmentVariable + " exceeds the maximum delivery fee.");
-    }
-    const zone = await prisma.deliveryZone.upsert({
-      where: { name: region.name },
-      update: { deliveryFee: decimalFee, isActive: true },
-      create: { name: region.name, deliveryFee: decimalFee },
-    });
-    for (const state of region.states) {
-      await prisma.deliveryZoneLocation.upsert({
-        where: { state_city: { state, city: "*" } },
-        update: { zoneId: zone.id },
-        create: { zoneId: zone.id, state, city: "*" },
+
+  await prisma.$transaction(async (tx) => {
+    for (const { region, deliveryFee } of configuredFees) {
+      const zone = await tx.deliveryZone.upsert({
+        where: { name: region.name },
+        update: { deliveryFee, isActive: true },
+        create: { name: region.name, deliveryFee },
       });
+      for (const state of region.states) {
+        await tx.deliveryZoneLocation.upsert({
+          where: { state_city: { state, city: "*" } },
+          update: { zoneId: zone.id },
+          create: { zoneId: zone.id, state, city: "*" },
+        });
+      }
+      console.log("Seeded " + region.name + " (" + region.states.length + " states/territory).");
     }
-    console.log("Seeded " + region.name + " (" + region.states.length + " states/territory).");
-  }
+  }, { timeout: 30_000 });
 }
 //   console.log("Seeding permissions...");
 
@@ -210,9 +200,9 @@ async function seedNationwideDeliveryZones(): Promise<void> {
 //     await prisma.$disconnect();
 //   });
 
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { NIGERIAN_DELIVERY_REGIONS } from "./nigeria-delivery-regions";
+import { getConfiguredNigeriaDeliveryFees } from "./nigeria-delivery-fees";
 import "dotenv/config";
 
 const adapter = new PrismaPg({
@@ -319,6 +309,9 @@ const roles = {
 } as const;
 
 async function main(): Promise<void> {
+  // Parse every regional fee before any seed writes begin.
+  const configuredDeliveryFees = getConfiguredNigeriaDeliveryFees(process.env);
+
   console.log("Seeding permissions...");
 
   const permissionRecords = new Map<string, string>();
@@ -379,7 +372,7 @@ async function main(): Promise<void> {
 
   console.log("Roles seeded.");
 
-  await seedNationwideDeliveryZones();
+  await seedNationwideDeliveryZones(configuredDeliveryFees);
 
   console.log("Roles and permissions seeded. Run the explicit staff bootstrap command to create the initial owner.");
 }
