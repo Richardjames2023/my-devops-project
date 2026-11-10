@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -42,7 +42,9 @@ const pool = new Pool({
 const {
   updateDeliveryStatus,
   createDeliveryAttempt,
+  createDelivery,
   completeDelivery,
+  allocatePackage,
   prisma,
   disconnectDatabase,
 } = await import("../src/modules/delivery/delivery.service").then(
@@ -50,16 +52,30 @@ const {
     const database = await import("../src/infrastructure/prisma/client");
     const completion =
       await import("../src/modules/delivery/delivery-completion.service");
+    const fulfillment =
+      await import("../src/modules/fulfillment/fulfillment.service");
 
     return {
       updateDeliveryStatus: service.updateDeliveryStatus,
       createDeliveryAttempt: service.createDeliveryAttempt,
+      createDelivery: service.createDelivery,
       completeDelivery: completion.completeDelivery,
+      allocatePackage: fulfillment.allocatePackage,
       prisma: database.default,
       disconnectDatabase: database.disconnectDatabase,
     };
   },
 );
+
+const {
+  updateDeliveryTracking,
+  getGuestOrderDeliveryTracking,
+} = await import("../src/modules/delivery/delivery-tracking.service");
+
+const {
+  createWarrantyClaim,
+  reviewWarrantyClaim,
+} = await import("../src/modules/warranty-claims/warranty-claim.service");
 
 interface TestFixture {
   categoryId: string;
@@ -217,21 +233,47 @@ async function createFixture(
 }
 
 async function cleanupFixture(fixture: TestFixture): Promise<void> {
-  await pool.query(`DELETE FROM deliveries WHERE id = ANY($1::uuid[])`, [
-    fixture.deliveryIds,
-  ]);
-
+   // Outbox aggregate IDs are intentionally not foreign keys; clean test events explicitly.
   await pool.query(
-    `DELETE FROM package_items WHERE "packageId" = ANY($1::uuid[])`,
-    [fixture.packageIds],
+    `DELETE FROM notification_outbox
+     WHERE "aggregateType" = 'DELIVERY'
+       AND "aggregateId" IN (
+         SELECT d.id::text FROM deliveries d
+         JOIN packages p ON p.id = d."packageId"
+         WHERE p."fulfillmentId" = $1
+       )`,
+    [fixture.fulfillmentId],
   );
 
-  await pool.query(`DELETE FROM packages WHERE id = ANY($1::uuid[])`, [
-    fixture.packageIds,
-  ]);
+  // Tests may allocate additional packages after fixture creation. Clean up
+  // through the fulfillment relation rather than only the original IDs.
+  await pool.query(
+    `DELETE FROM deliveries
+     WHERE "packageId" IN (
+       SELECT id FROM packages WHERE "fulfillmentId" = $1
+     )`,
+    [fixture.fulfillmentId],
+  );
+
+  await pool.query(
+    `DELETE FROM package_items
+     WHERE "packageId" IN (
+       SELECT id FROM packages WHERE "fulfillmentId" = $1
+     )`,
+    [fixture.fulfillmentId],
+  );
+
+  await pool.query(
+    `DELETE FROM packages WHERE "fulfillmentId" = $1`,
+    [fixture.fulfillmentId],
+  );
 
   await pool.query(`DELETE FROM fulfillments WHERE id = $1`, [
     fixture.fulfillmentId,
+  ]);
+
+  await pool.query(`DELETE FROM warranty_claims WHERE "orderItemId" = $1`, [
+    fixture.orderItemId,
   ]);
 
   await pool.query(`DELETE FROM order_items WHERE id = $1`, [
@@ -265,6 +307,207 @@ describe("PostgreSQL delivery and warranty activation", () => {
     await pool.end();
   });
 
+  it("creates only one delivery when concurrent requests target the same package", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+
+    try {
+      await pool.query(
+        `UPDATE packages SET status = 'HANDED_TO_COURIER' WHERE id = $1`,
+        [fixture.packageIds[0]],
+      );
+      await pool.query(`DELETE FROM deliveries WHERE id = $1`, [
+        fixture.deliveryIds[0],
+      ]);
+
+      const results = await Promise.allSettled([
+        createDelivery({ packageId: fixture.packageIds[0] }),
+        createDelivery({ packageId: fixture.packageIds[0] }),
+      ]);
+
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+
+      const deliveries = await pool.query(
+        `SELECT id, status FROM deliveries WHERE "packageId" = $1`,
+        [fixture.packageIds[0]],
+      );
+      expect(deliveries.rows).toHaveLength(1);
+      expect(deliveries.rows[0].status).toBe("PENDING");
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("keeps package status synchronized when a delivery enters transit", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+
+    try {
+      await pool.query(
+        `UPDATE packages SET status = 'HANDED_TO_COURIER' WHERE id = $1`,
+        [fixture.packageIds[0]],
+      );
+      await pool.query(
+        `UPDATE deliveries SET status = 'PENDING' WHERE id = $1`,
+        [fixture.deliveryIds[0]],
+      );
+
+      await updateDeliveryStatus(fixture.deliveryIds[0], "ASSIGNED");
+      await updateDeliveryStatus(fixture.deliveryIds[0], "PICKED_UP");
+      await updateDeliveryStatus(fixture.deliveryIds[0], "IN_TRANSIT");
+
+      const states = await pool.query(
+        `SELECT p.status AS package_status, d.status AS delivery_status
+         FROM packages p
+         JOIN deliveries d ON d."packageId" = p.id
+         WHERE p.id = $1`,
+        [fixture.packageIds[0]],
+      );
+
+      expect(states.rows[0].package_status).toBe("IN_TRANSIT");
+      expect(states.rows[0].delivery_status).toBe("IN_TRANSIT");
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("does not fulfill an order when a package is marked delivered but its delivery is not", async () => {
+    const fixture = await createFixture({
+      quantities: [1, 1],
+      orderQuantity: 2,
+      hasWarranty: true,
+      warrantyDuration: 12,
+    });
+
+    try {
+      // Simulate inconsistent legacy state: the second package says DELIVERED,
+      // but its courier delivery is still OUT_FOR_DELIVERY.
+      await pool.query(
+        `UPDATE packages SET status = 'DELIVERED' WHERE id = $1`,
+        [fixture.packageIds[1]],
+      );
+
+      await updateDeliveryStatus(fixture.deliveryIds[0], "DELIVERED");
+
+      let state = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+
+      expect(state.rows[0].order_status).toBe("PARTIALLY_FULFILLED");
+      expect(state.rows[0].fulfillment_status).toBe("PARTIALLY_FULFILLED");
+
+      // Once the second delivery is genuinely completed, fulfillment may finish.
+      await updateDeliveryStatus(fixture.deliveryIds[1], "DELIVERED");
+
+      state = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+
+      expect(state.rows[0].order_status).toBe("FULFILLED");
+      expect(state.rows[0].fulfillment_status).toBe("FULFILLED");
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("serializes simultaneous split-package completions and fulfills only after both finish", async () => {
+    const fixture = await createFixture({
+      quantities: [1, 1],
+      orderQuantity: 2,
+      hasWarranty: true,
+      warrantyDuration: 12,
+    });
+
+    try {
+      await Promise.all(
+        fixture.deliveryIds.map((deliveryId) =>
+          updateDeliveryStatus(deliveryId, "DELIVERED"),
+        ),
+      );
+
+      const state = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status,
+                f."completedAt"
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+
+      expect(state.rows[0].order_status).toBe("FULFILLED");
+      expect(state.rows[0].fulfillment_status).toBe("FULFILLED");
+      expect(state.rows[0].completedAt).not.toBeNull();
+
+      const outboxEvents = await pool.query(
+        `SELECT "aggregateId" FROM notification_outbox
+         WHERE "eventType" = 'delivery.delivered'
+           AND "aggregateId" = ANY($1::text[])`,
+        [fixture.deliveryIds],
+      );
+      expect(outboxEvents.rows).toHaveLength(2);
+
+      const warranty = await pool.query(
+        `SELECT "warrantyStartedAt", "warrantyExpiresAt"
+         FROM order_items WHERE id = $1`,
+        [fixture.orderItemId],
+      );
+      expect(warranty.rows[0].warrantyStartedAt).not.toBeNull();
+      expect(warranty.rows[0].warrantyExpiresAt).not.toBeNull();
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("serializes package allocation with delivery completion", async () => {
+    const fixture = await createFixture({
+      quantities: [1],
+      orderQuantity: 2,
+      hasWarranty: true,
+      warrantyDuration: 12,
+    });
+
+    try {
+      const [completion, allocation] = await Promise.all([
+        updateDeliveryStatus(fixture.deliveryIds[0], "DELIVERED"),
+        allocatePackage(fixture.fulfillmentId, {
+          items: [{ orderItemId: fixture.orderItemId, quantity: 1 }],
+        }),
+      ]);
+
+      expect(completion.status).toBe("DELIVERED");
+      expect(allocation.status).toBe("PENDING");
+
+      const state = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+      expect(state.rows[0].order_status).toBe("PARTIALLY_FULFILLED");
+      expect(state.rows[0].fulfillment_status).toBe("PARTIALLY_FULFILLED");
+
+      const packages = await pool.query(
+        `SELECT status FROM packages WHERE "fulfillmentId" = $1 ORDER BY status`,
+        [fixture.fulfillmentId],
+      );
+      expect(packages.rows).toHaveLength(2);
+      expect(packages.rows.map((row) => row.status).sort()).toEqual([
+        "DELIVERED",
+        "PENDING",
+      ]);
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
   it("activates warranty only after all split-package quantities are delivered", async () => {
     const fixture = await createFixture({
       quantities: [3, 2],
@@ -292,6 +535,16 @@ describe("PostgreSQL delivery and warranty activation", () => {
 
       expect(afterFirstDelivery.rows[0].warrantyStartedAt).toBeNull();
       expect(afterFirstDelivery.rows[0].warrantyExpiresAt).toBeNull();
+
+      const partialStatuses = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+      expect(partialStatuses.rows[0].order_status).toBe("PARTIALLY_FULFILLED");
+      expect(partialStatuses.rows[0].fulfillment_status).toBe("PARTIALLY_FULFILLED");
 
       // Deliver the remaining 2 units.
       await updateDeliveryStatus(fixture.deliveryIds[1], "DELIVERED");
@@ -326,6 +579,18 @@ describe("PostgreSQL delivery and warranty activation", () => {
       expect(new Date(warranty.rows[0].warrantyExpiresAt).toISOString()).toBe(
         expectedExpiry.toISOString(),
       );
+
+      const completedStatuses = await pool.query(
+        `SELECT o.status AS order_status, f.status AS fulfillment_status,
+                f."completedAt"
+         FROM orders o
+         JOIN fulfillments f ON f."orderId" = o.id
+         WHERE o.id = $1`,
+        [fixture.orderId],
+      );
+      expect(completedStatuses.rows[0].order_status).toBe("FULFILLED");
+      expect(completedStatuses.rows[0].fulfillment_status).toBe("FULFILLED");
+      expect(completedStatuses.rows[0].completedAt).not.toBeNull();
 
       const packages = await pool.query(
         `SELECT p.status AS package_status,
@@ -475,4 +740,132 @@ describe("PostgreSQL delivery and warranty activation", () => {
       await cleanupFixture(fixture);
     }
   });
+
+  it("updates package tracking details and exposes them only with the guest order token", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+    const guestToken = randomUUID().replace(/-/g, "").repeat(2);
+    const guestTokenHash = createHash("sha256").update(guestToken).digest("hex");
+
+    try {
+      await pool.query(
+        'UPDATE orders SET "guestAccessTokenHash" = $2 WHERE id = $1',
+        [fixture.orderId, guestTokenHash],
+      );
+
+      await updateDeliveryTracking(fixture.deliveryIds[0], {
+        trackingNumber: `TRACK-${fixture.packageIds[0]}`,
+        provider: "Test Courier",
+        externalReference: "COURIER-REF-001",
+      });
+
+      const tracking = await getGuestOrderDeliveryTracking(
+        fixture.orderId,
+        guestToken,
+      );
+
+      expect(tracking.fulfillment?.packages).toHaveLength(1);
+      expect(tracking.fulfillment?.packages[0].trackingNumber).toBe(
+        `TRACK-${fixture.packageIds[0]}`,
+      );
+      expect(tracking.fulfillment?.packages[0].delivery?.provider).toBe(
+        "Test Courier",
+      );
+      expect(
+        tracking.fulfillment?.packages[0].delivery?.externalReference,
+      ).toBe("COURIER-REF-001");
+
+      await expect(
+        getGuestOrderDeliveryTracking(fixture.orderId, "0".repeat(64)),
+      ).rejects.toThrow("Order not found");
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+  it("enforces warranty claim eligibility, quantity limits, ownership, and the review lifecycle", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+    const userId = randomUUID();
+    const otherUserId = randomUUID();
+
+    try {
+      await pool.query(
+        `INSERT INTO users (id, email, "passwordHash", "firstName", "lastName", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'test-hash', 'Warranty', 'Customer', NOW(), NOW())`,
+        [userId, `warranty-${userId}@example.test`],
+      );
+      await pool.query(
+        `INSERT INTO users (id, email, "passwordHash", "firstName", "lastName", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'test-hash', 'Other', 'Customer', NOW(), NOW())`,
+        [otherUserId, `warranty-${otherUserId}@example.test`],
+      );
+      await pool.query(`UPDATE orders SET "userId" = $2 WHERE id = $1`, [
+        fixture.orderId,
+        userId,
+      ]);
+      await pool.query(
+        `UPDATE order_items
+         SET "warrantyStartedAt" = NOW() - INTERVAL '1 day',
+             "warrantyExpiresAt" = NOW() + INTERVAL '30 days'
+         WHERE id = $1`,
+        [fixture.orderItemId],
+      );
+
+      const claim = await createWarrantyClaim(userId, {
+        orderItemId: fixture.orderItemId,
+        quantity: 1,
+        issue: "Device will not power on",
+        description: "The device stopped working during normal use.",
+      });
+      expect(claim.status).toBe("PENDING");
+      expect(claim.quantity).toBe(1);
+      expect(claim.claimNumber).toMatch(/^WAR-/);
+
+      await expect(
+        createWarrantyClaim(userId, {
+          orderItemId: fixture.orderItemId,
+          quantity: 1,
+          issue: "Another issue",
+        }),
+      ).rejects.toThrow("remaining eligible item quantity");
+
+      await expect(
+        createWarrantyClaim(otherUserId, {
+          orderItemId: fixture.orderItemId,
+          quantity: 1,
+          issue: "Not my purchase",
+        }),
+      ).rejects.toThrow("not allowed");
+
+      const underReview = await reviewWarrantyClaim(claim.id, {
+        status: "UNDER_REVIEW",
+      });
+      expect(underReview.status).toBe("UNDER_REVIEW");
+
+      const approved = await reviewWarrantyClaim(claim.id, {
+        status: "APPROVED",
+      });
+      expect(approved.status).toBe("APPROVED");
+
+      const resolved = await reviewWarrantyClaim(claim.id, {
+        status: "RESOLVED",
+        resolution: "REPAIR",
+        resolutionNotes: "Repaired and tested successfully.",
+      });
+      expect(resolved.status).toBe("RESOLVED");
+      expect(resolved.resolution).toBe("REPAIR");
+      expect(resolved.resolvedAt).not.toBeNull();
+
+      await expect(
+        reviewWarrantyClaim(claim.id, { status: "APPROVED" }),
+      ).rejects.toThrow("cannot move from RESOLVED");
+    } finally {
+      await pool.query(`DELETE FROM warranty_claims WHERE "orderItemId" = $1`, [
+        fixture.orderItemId,
+      ]);
+      await cleanupFixture(fixture);
+      await pool.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [
+        [userId, otherUserId],
+      ]);
+    }
+  });
+
 });

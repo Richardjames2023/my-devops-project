@@ -1,6 +1,7 @@
 
 import { Router } from "express";
 import { authenticate } from "../../common/middleware/authenticate";
+import { requireCustomer } from "../../common/middleware/authorize";
 import {
   get,
   addItem,
@@ -11,10 +12,10 @@ import {
 
 const router = Router();
 
-router.get("/", authenticate, get);
-router.post("/items", authenticate, addItem);
-router.patch("/items/:itemId", authenticate, updateItem);
-router.delete("/items/:itemId", authenticate, removeItem);
-router.delete("/", authenticate, clear);
+router.get("/", authenticate, requireCustomer, get);
+router.post("/items", authenticate, requireCustomer, addItem);
+router.patch("/items/:itemId", authenticate, requireCustomer, updateItem);
+router.delete("/items/:itemId", authenticate, requireCustomer, removeItem);
+router.delete("/", authenticate, requireCustomer, clear);
 
 export default router;

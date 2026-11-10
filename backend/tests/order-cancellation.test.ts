@@ -6,11 +6,20 @@ import jwt from "jsonwebtoken";
 const mocks = vi.hoisted(() => ({
   cancelOrder: vi.fn(),
   adminCancelOrder: vi.fn(),
+  findStaffAccount: vi.fn(),
+  findCustomer: vi.fn(),
 }));
 
 vi.mock("../src/modules/orders/order.service", () => ({
   cancelOrder: mocks.cancelOrder,
   adminCancelOrder: mocks.adminCancelOrder,
+}));
+
+vi.mock("../src/infrastructure/prisma/client", () => ({
+  default: {
+    staffAccount: { findUnique: mocks.findStaffAccount },
+    user: { findUnique: mocks.findCustomer },
+  },
 }));
 
 import app from "../src/app.ts";
@@ -21,19 +30,23 @@ const orderId = "2eb258a2-8574-46c9-a4d1-e86b8c8fe23e";
 function makeToken(
   subject: string,
   permissions: string[] = ["orders.create"],
+  identityType: "CUSTOMER" | "STAFF" = "CUSTOMER",
 ) {
   return jwt.sign(
-    { roles: [], permissions },
+    { identityType, roles: [], permissions },
     JWT_ACCESS_SECRET,
     { subject, expiresIn: "5m" },
   );
 }
 
-const customerToken = makeToken("test-customer");
-const adminToken = makeToken("test-admin", ["orders.manage"]);
-const unauthorizedAdminToken = makeToken("test-admin-without-permission", [
-  "orders.create",
-]);
+const customerId = "2eb258a2-8574-46c9-a4d1-e86b8c8fe23e";
+const customerToken = makeToken(customerId);
+const adminToken = makeToken("test-admin", ["orders.manage"], "STAFF");
+const unauthorizedAdminToken = makeToken(
+  "test-admin-without-permission",
+  ["orders.create"],
+  "STAFF",
+);
 
 const customerCancelUrl = `/api/v1/orders/${orderId}/cancel`;
 const adminCancelUrl = `/api/v1/orders/${orderId}/admin-cancel`;
@@ -47,8 +60,30 @@ describe("order cancellation HTTP endpoints", () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
+    mocks.findCustomer.mockResolvedValue({
+      isActive: true,
+      emailVerified: true,
+      sessionVersion: 0,
+      userRoles: [{ role: { name: "CUSTOMER" } }],
+    });
     mocks.cancelOrder.mockResolvedValue(successfulCancellation);
     mocks.adminCancelOrder.mockResolvedValue(successfulCancellation);
+    mocks.findStaffAccount.mockImplementation(async ({ where }) => ({
+      status: "ACTIVE",
+      roles:
+        where.id === "test-admin"
+          ? [
+              {
+                role: {
+                  name: "ADMIN",
+                  permissions: [
+                    { permission: { name: "orders.manage" } },
+                  ],
+                },
+              },
+            ]
+          : [],
+    }));
   });
 
   it("rejects unauthenticated customer cancellation requests", async () => {
@@ -68,7 +103,7 @@ describe("order cancellation HTTP endpoints", () => {
 
     expect(mocks.cancelOrder).toHaveBeenCalledWith(
       orderId,
-      "test-customer",
+      customerId,
       expect.any(Object),
     );
 

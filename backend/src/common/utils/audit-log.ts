@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 
 interface CreateAuditLogInput {
   userId?: string;
+  staffAccountId?: string;
   action: string;
   entity: string;
   entityId?: string;
@@ -21,8 +22,9 @@ export async function createAuditLog(
       action: input.action,
       entity: input.entity,
 
-      ...(input.userId
-        ? { user: { connect: { id: input.userId } } }
+      ...(input.userId ? { user: { connect: { id: input.userId } } } : {}),
+      ...(input.staffAccountId
+        ? { staffAccount: { connect: { id: input.staffAccountId } } }
         : {}),
 
       ...(input.entityId !== undefined

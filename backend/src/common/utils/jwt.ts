@@ -4,8 +4,12 @@ import {
   ACCESS_TOKEN_EXPIRES_IN,
 } from "../../config/auth";
 
+export type AuthIdentityType = "CUSTOMER" | "STAFF";
+
 export interface AccessTokenPayload {
   sub: string;
+  identityType?: AuthIdentityType;
+  sessionVersion?: number;
   roles: string[];
   permissions: string[];
 }
@@ -14,6 +18,7 @@ export function generateAccessToken(
   payload: AccessTokenPayload,
 ): string {
   return jwt.sign(payload, JWT_ACCESS_SECRET, {
+    algorithm: "HS256",
     expiresIn: ACCESS_TOKEN_EXPIRES_IN,
   });
 }

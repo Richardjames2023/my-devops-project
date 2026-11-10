@@ -1,11 +1,14 @@
 import { Router } from "express";
 import { authenticate } from "../../common/middleware/authenticate";
-import { authorize } from "../../common/middleware/authorize";
+import { authorize, requireCustomer } from "../../common/middleware/authorize";
 import {
   create,
   createGuest,
   markSuccessful,
   markGuestSuccessful,
+  reconcileUnknown,
+  listStalePending,
+  reconcileStalePending,
   listStaleWebhookEvents,
   reconcileStaleWebhookEvent,
 } from "./payment.controller";
@@ -19,7 +22,7 @@ const router = Router();
 router.post(
   "/",
   authenticate,
-  authorize("orders.create"),
+  requireCustomer,
   create,
 );
 
@@ -34,6 +37,28 @@ router.post(
   "/guest/:paymentId/success",
   guestPaymentVerificationLimiter,
   markGuestSuccessful,
+);
+
+
+router.post(
+  "/:paymentId/reconcile-unknown",
+  authenticate,
+  authorize("orders.manage"),
+  reconcileUnknown,
+);
+
+router.get(
+  "/stale-pending",
+  authenticate,
+  authorize("orders.manage"),
+  listStalePending,
+);
+
+router.post(
+  "/:paymentId/reconcile-stale-pending",
+  authenticate,
+  authorize("orders.manage"),
+  reconcileStalePending,
 );
 
 router.get(

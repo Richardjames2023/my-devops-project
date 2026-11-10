@@ -13,6 +13,9 @@ import {
   createGuestPayment,
   markPaymentSuccessful,
   markGuestPaymentSuccessful,
+  reconcileUnknownPayment,
+  listStalePendingPayments,
+  reconcileStalePendingPayment,
 } from "./payment.service";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { processPaystackSuccessfulWebhook } from "./payment.service";
@@ -200,6 +203,112 @@ export async function markGuestSuccessful(
     payment: result.payment,
     order: safeOrder,
     reconciliationRequired,
+  });
+}
+
+
+export async function reconcileUnknown(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const paramsResult = paymentIdSchema.safeParse(req.params);
+
+  if (!paramsResult.success) {
+    res.status(400).json({ message: "Invalid payment ID" });
+    return;
+  }
+
+  const result = await reconcileUnknownPayment(paramsResult.data.paymentId);
+
+  res.status(result.reconciled ? 200 : 202).json({
+    message: result.reconciled
+      ? "Unknown payment was reconciled using Paystack's verified transaction status."
+      : "Paystack has not returned a terminal transaction status. The payment and inventory reservation remain unchanged.",
+    ...result,
+  });
+}
+
+export async function listStalePending(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const queryResult = z
+    .object({
+      limit: z.coerce.number().int().min(1).max(500).optional(),
+    })
+    .safeParse(req.query);
+
+  if (!queryResult.success) {
+    res.status(400).json({ message: "Invalid stale payment list limit" });
+    return;
+  }
+
+  const payments = await listStalePendingPayments(queryResult.data.limit);
+
+  res.status(200).json({
+    message: "Stale pending Paystack payments retrieved successfully",
+    count: payments.length,
+    payments,
+  });
+}
+
+export async function reconcileStalePending(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const paramsResult = paymentIdSchema.safeParse(req.params);
+
+  if (!paramsResult.success) {
+    res.status(400).json({ message: "Invalid payment ID" });
+    return;
+  }
+
+  const result = await reconcileStalePendingPayment(
+    paramsResult.data.paymentId,
+  );
+
+  const terminalLocalStatuses = [
+    "SUCCESS",
+    "FAILED",
+    "CANCELLED",
+    "EXPIRED",
+  ];
+  const isAlreadyTerminal = terminalLocalStatuses.includes(result.status);
+
+  const responseStatus = result.reconciled
+    ? 200
+    : "stale" in result && result.stale === false
+      ? 409
+      : isAlreadyTerminal
+        ? 200
+        : 202;
+
+  const message = result.reconciled
+    ? "Stale pending payment was reconciled using Paystack's verified transaction status."
+    : "stale" in result && result.stale === false
+      ? "This payment has not reached the 15-minute reconciliation threshold."
+      : isAlreadyTerminal
+        ? `Payment is already in ${result.status}; no changes were made.`
+        : "Paystack has not returned a terminal transaction status. The payment and inventory reservation remain protected.";
+
+  res.status(responseStatus).json({
+    message,
+    ...result,
   });
 }
 

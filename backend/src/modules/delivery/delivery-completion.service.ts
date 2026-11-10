@@ -2,6 +2,7 @@
 import { Prisma } from "@prisma/client";
 import type { Prisma as PrismaTypes } from "@prisma/client";
 import { AppError } from "../../common/errors/AppError";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
 function addMonthsClamped(date: Date, months: number): Date {
   const result = new Date(date);
@@ -42,6 +43,12 @@ export async function completeDelivery(
       package: {
         include: {
           items: true,
+          fulfillment: {
+            select: {
+              id: true,
+              orderId: true,
+            },
+          },
         },
       },
     },
@@ -50,6 +57,18 @@ export async function completeDelivery(
   if (!delivery) {
     throw new AppError("Delivery not found", 404);
   }
+
+  // Use the same order-level lock as package allocation. This makes the
+  // package snapshot used for fulfillment completion consistent with any
+  // concurrent allocation or delivery completion for this order.
+  await tx.$queryRaw(
+    Prisma.sql`
+      SELECT id
+      FROM orders
+      WHERE id = ${delivery.package.fulfillment.orderId}::uuid
+      FOR UPDATE
+    `,
+  );
 
   // Only deliveries that have reached OUT_FOR_DELIVERY can be completed.
   // DELIVERED is allowed to preserve idempotency.
@@ -82,6 +101,96 @@ export async function completeDelivery(
       where: { id: delivery.package.id },
       data: {
         status: "DELIVERED",
+      },
+    });
+  }
+
+  // Recalculate the parent Fulfillment and Order from the package states.
+  // This keeps split-package orders partially fulfilled until every package
+  // has been delivered, then marks the fulfillment and order as fulfilled.
+  const fulfillment = await tx.fulfillment.findUnique({
+    where: { id: delivery.package.fulfillment.id },
+    include: {
+      packages: {
+        select: {
+          status: true,
+          delivery: { select: { status: true } },
+          items: { select: { orderItemId: true, quantity: true } },
+        },
+      },
+      order: {
+        select: { items: { select: { id: true, quantity: true } } },
+      },
+    },
+  });
+
+  if (!fulfillment) {
+    throw new AppError("Fulfillment not found for delivered package", 404);
+  }
+
+  // A package counts as delivered only when both lifecycle records agree.
+  // This prevents stale or inconsistent package state from completing an order
+  // before its corresponding courier delivery is actually marked delivered.
+  const deliveredPackageCount = fulfillment.packages.filter(
+    (pkg) => pkg.status === "DELIVERED" && pkg.delivery?.status === "DELIVERED",
+  ).length;
+  const allPackagesDelivered =
+    fulfillment.packages.length > 0 &&
+    deliveredPackageCount === fulfillment.packages.length;
+
+  // A fulfillment is complete only when every ordered unit has been assigned
+  // to a package AND every package has been delivered. This matters when an
+  // order is intentionally split into packages created over multiple requests.
+  const allocatedByOrderItem = new Map<string, number>();
+  for (const pkg of fulfillment.packages) {
+    for (const item of pkg.items) {
+      allocatedByOrderItem.set(
+        item.orderItemId,
+        (allocatedByOrderItem.get(item.orderItemId) ?? 0) + item.quantity,
+      );
+    }
+  }
+  const allOrderItemsFullyAllocated = fulfillment.order.items.every(
+    (item) => (allocatedByOrderItem.get(item.id) ?? 0) === item.quantity,
+  );
+  const fulfillmentComplete = allPackagesDelivered && allOrderItemsFullyAllocated;
+
+  const fulfillmentStatus = fulfillmentComplete
+    ? "FULFILLED"
+    : deliveredPackageCount > 0
+      ? "PARTIALLY_FULFILLED"
+      : "PROCESSING";
+
+  await tx.fulfillment.update({
+    where: { id: fulfillment.id },
+    data: {
+      status: fulfillmentStatus,
+      ...(fulfillmentComplete
+        ? { completedAt: fulfillment.completedAt ?? effectiveDeliveredAt }
+        : { completedAt: null }),
+    },
+  });
+
+  await tx.order.updateMany({
+    where: {
+      id: fulfillment.orderId,
+      status: { notIn: ["CANCELLED"] },
+    },
+    data: {
+      status: fulfillmentComplete ? "FULFILLED" : "PARTIALLY_FULFILLED",
+    },
+  });
+
+  if (delivery.status !== "DELIVERED") {
+    await publishNotificationEvent(tx, {
+      eventType: "delivery.delivered",
+      aggregateType: "DELIVERY",
+      aggregateId: delivery.id,
+      payload: {
+        deliveryId: delivery.id,
+        packageId: delivery.package.id,
+        orderId: fulfillment.orderId,
+        fulfillmentId: fulfillment.id,
       },
     });
   }

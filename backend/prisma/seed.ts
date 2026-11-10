@@ -1,8 +1,7 @@
 // import { PrismaClient } from "@prisma/client";
 // import { PrismaPg } from "@prisma/adapter-pg";
 // import "dotenv/config";
-// import argon2 from "argon2";
-
+// 
 // const adapter = new PrismaPg({
 //   connectionString: process.env.DATABASE_URL!,
 // });
@@ -15,6 +14,8 @@
 // const permissions = [
 //   "users.read",
 //   "users.manage",
+//   "staff.read",
+//   "staff.manage",
 
 //   "products.read",
 //   "products.manage",
@@ -103,7 +104,35 @@
 // } as const;
 
 
-// async function main(): Promise<void> {
+async function seedNationwideDeliveryZones(
+  configuredFees: ReturnType<typeof getConfiguredNigeriaDeliveryFees>,
+): Promise<void> {
+  if (configuredFees.length === 0) {
+    console.log("Nationwide delivery zones skipped: configure all six regional DELIVERY_FEE_* values to seed them.");
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const { region, deliveryFee } of configuredFees) {
+      const zone = await tx.deliveryZone.upsert({
+        where: { name: region.name },
+        update: { deliveryFee, isActive: true },
+        create: { name: region.name, deliveryFee },
+      });
+      for (const state of region.states) {
+        await tx.deliveryZoneLocation.upsert({
+          where: { state_city: { state, city: "*" } },
+          update: { zoneId: zone.id },
+          create: { zoneId: zone.id, state, city: "*" },
+        });
+      }
+    }
+  }, { timeout: 30_000 });
+
+  for (const { region } of configuredFees) {
+    console.log("Seeded " + region.name + " (" + region.states.length + " states/territory).");
+  }
+}
 //   console.log("Seeding permissions...");
 
 //   const permissionRecords = new Map<string, string>();
@@ -176,8 +205,8 @@
 
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { getConfiguredNigeriaDeliveryFees } from "./nigeria-delivery-fees";
 import "dotenv/config";
-import argon2 from "argon2";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
@@ -190,6 +219,8 @@ const prisma = new PrismaClient({
 const permissions = [
   "users.read",
   "users.manage",
+  "staff.read",
+  "staff.manage",
 
   "products.read",
   "products.manage",
@@ -212,6 +243,7 @@ const permissions = [
 
   "deliveries.read",
   "deliveries.manage",
+  "delivery_zones.manage",
 
   "returns.read",
   "returns.manage",
@@ -280,6 +312,9 @@ const roles = {
 } as const;
 
 async function main(): Promise<void> {
+  // Parse every regional fee before any seed writes begin.
+  const configuredDeliveryFees = getConfiguredNigeriaDeliveryFees(process.env);
+
   console.log("Seeding permissions...");
 
   const permissionRecords = new Map<string, string>();
@@ -340,55 +375,9 @@ async function main(): Promise<void> {
 
   console.log("Roles seeded.");
 
-  // --------------------------------------------------
-  // Seed development BUSINESS_OWNER account
-  // --------------------------------------------------
+  await seedNationwideDeliveryZones(configuredDeliveryFees);
 
-  console.log("Seeding business owner...");
-
-  const passwordHash = await argon2.hash(
-    "BusinessOwner123!",
-  );
-
-  const businessOwner = await prisma.user.upsert({
-    where: {
-      email: "business.owner@example.com",
-    },
-    update: {},
-    create: {
-      email: "business.owner@example.com",
-      passwordHash,
-      firstName: "Business",
-      lastName: "Owner",
-      isActive: true,
-    },
-  });
-
-  const businessOwnerRole = await prisma.role.findUnique({
-    where: {
-      name: "BUSINESS_OWNER",
-    },
-  });
-
-  if (!businessOwnerRole) {
-    throw new Error("BUSINESS_OWNER role not found.");
-  }
-
-  await prisma.userRole.upsert({
-    where: {
-      userId_roleId: {
-        userId: businessOwner.id,
-        roleId: businessOwnerRole.id,
-      },
-    },
-    update: {},
-    create: {
-      userId: businessOwner.id,
-      roleId: businessOwnerRole.id,
-    },
-  });
-
-  console.log("Business owner seeded.");
+  console.log("Roles and permissions seeded. Run the explicit staff bootstrap command to create the initial owner.");
 }
 
 main()

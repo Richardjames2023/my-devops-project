@@ -14,6 +14,8 @@ import {
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import type { GuestSessionRequest } from "../guest-session/guest-session.middleware";
 import { AppError } from "../../common/errors/AppError";
+import { customerOrderHistoryQuerySchema } from "./order-history.validation";
+import { listCustomerOrders } from "./order.service";
 
 export async function create(
   req: AuthenticatedRequest,
@@ -166,5 +168,32 @@ export async function adminCancel(
       ? "Order has already been cancelled"
       : "Order cancelled successfully by admin",
     order,
+  });
+}
+
+
+export async function listMine(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.user) {
+    throw new AppError("Authentication required", 401);
+  }
+
+  const queryResult = customerOrderHistoryQuerySchema.safeParse(req.query);
+
+  if (!queryResult.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: z.flattenError(queryResult.error).fieldErrors,
+    });
+    return;
+  }
+
+  const result = await listCustomerOrders(req.user.id, queryResult.data);
+
+  res.status(200).json({
+    message: "Orders retrieved successfully",
+    ...result,
   });
 }

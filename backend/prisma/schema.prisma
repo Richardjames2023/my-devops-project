@@ -37,6 +37,7 @@ model User {
   phone                                   String?                          @unique
   isActive                                Boolean                          @default(true)
   emailVerified                           Boolean                          @default(false)
+  sessionVersion                          Int                              @default(0)
   createdAt                               DateTime                         @default(now())
   updatedAt                               DateTime                         @updatedAt
   auditLogs                               AuditLog[]
@@ -46,8 +47,13 @@ model User {
   userRoles                               UserRole[]
   warrantyClaims                          WarrantyClaim[]
   refreshTokens                           RefreshToken[]
+  emailVerificationTokens                 CustomerEmailVerificationToken[]
+  passwordResetTokens                      CustomerPasswordResetToken[]
   returnItemInspections                   ReturnItemInspection[]           @relation("ReturnItemInspections")
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("PaymentInventoryReconciliationResolver")
+  productReviews                          ProductReview[]
+  notifications                           Notification[]
+  notificationPreferences                 NotificationPreference[]
 
   @@index([email])
   @@index([phone])
@@ -58,6 +64,7 @@ model User {
 model RefreshToken {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @db.Uuid
+  familyId  String    @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
@@ -65,18 +72,138 @@ model RefreshToken {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([familyId, revokedAt])
   @@index([expiresAt])
   @@map("refresh_tokens")
 }
 
+model CustomerEmailVerificationToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("customer_email_verification_tokens")
+}
+
+model CustomerPasswordResetToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("customer_password_reset_tokens")
+}
+
+model StaffAccount {
+  id                                      String                           @id @default(uuid()) @db.Uuid
+  email                                   String                           @unique
+  firstName                               String
+  lastName                                String
+  passwordHash                            String?
+  status                                  StaffAccountStatus               @default(PENDING_SETUP)
+  emailVerifiedAt                         DateTime?
+  createdAt                               DateTime                         @default(now())
+  updatedAt                               DateTime                         @updatedAt
+  roles                                   StaffAccountRole[]
+  refreshTokens                           StaffRefreshToken[]
+  auditLogs                               AuditLog[]
+  createdInvitations                      StaffInvitation[]                @relation("StaffInvitationCreator")
+  assignedRoleRecords                     StaffAccountRole[]               @relation("StaffRoleAssigner")
+  inspectedReturnItems                    ReturnItemInspection[]           @relation("StaffReturnItemInspections")
+  resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("StaffPaymentInventoryReconciliationResolver")
+  notifications                           Notification[]
+  notificationPreferences                 NotificationPreference[]
+
+  @@index([status])
+  @@map("staff_accounts")
+}
+
+model StaffAccountRole {
+  id                       String        @id @default(uuid()) @db.Uuid
+  staffAccountId           String        @db.Uuid
+  roleId                   String        @db.Uuid
+  assignedByStaffAccountId String?       @db.Uuid
+  assignedAt               DateTime      @default(now())
+  staffAccount             StaffAccount  @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
+  role                     Role          @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  assignedBy               StaffAccount? @relation("StaffRoleAssigner", fields: [assignedByStaffAccountId], references: [id], onDelete: SetNull)
+
+  @@unique([staffAccountId, roleId])
+  @@index([staffAccountId])
+  @@index([roleId])
+  @@index([assignedByStaffAccountId])
+  @@map("staff_account_roles")
+}
+
+model StaffInvitation {
+  id                      String                @id @default(uuid()) @db.Uuid
+  email                   String
+  tokenHash               String                @unique
+  status                  StaffInvitationStatus @default(PENDING)
+  expiresAt               DateTime
+  acceptedAt              DateTime?
+  revokedAt               DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  createdByStaffAccountId String?               @db.Uuid
+  createdBy               StaffAccount?         @relation("StaffInvitationCreator", fields: [createdByStaffAccountId], references: [id], onDelete: SetNull)
+  roles                   StaffInvitationRole[]
+
+  @@index([email, status])
+  @@index([expiresAt, status])
+  @@index([createdByStaffAccountId])
+  @@map("staff_invitations")
+}
+
+model StaffInvitationRole {
+  id           String          @id @default(uuid()) @db.Uuid
+  invitationId String          @db.Uuid
+  roleId       String          @db.Uuid
+  createdAt    DateTime        @default(now())
+  invitation   StaffInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  role         Role            @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([invitationId, roleId])
+  @@index([invitationId])
+  @@index([roleId])
+  @@map("staff_invitation_roles")
+}
+
+model StaffRefreshToken {
+  id             String       @id @default(uuid()) @db.Uuid
+  staffAccountId String       @db.Uuid
+  familyId       String       @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tokenHash      String       @unique
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  staffAccount   StaffAccount @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
+
+  @@index([staffAccountId])
+  @@index([familyId, revokedAt])
+  @@index([expiresAt])
+  @@map("staff_refresh_tokens")
+}
+
 model Role {
-  id          String           @id @default(uuid()) @db.Uuid
-  name        String           @unique
-  description String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  permissions RolePermission[]
-  userRoles   UserRole[]
+  id                String                @id @default(uuid()) @db.Uuid
+  name              String                @unique
+  description       String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  permissions       RolePermission[]
+  userRoles         UserRole[]
+  staffAccountRoles StaffAccountRole[]
+  invitationRoles   StaffInvitationRole[]
 
   @@map("roles")
 }
@@ -134,19 +261,22 @@ model RolePermission {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String?  @db.Uuid
-  action    String
-  entity    String
-  entityId  String?
-  oldValues Json?
-  newValues Json?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
-  user      User?    @relation(fields: [userId], references: [id])
+  id             String        @id @default(uuid()) @db.Uuid
+  userId         String?       @db.Uuid
+  staffAccountId String?       @db.Uuid
+  action         String
+  entity         String
+  entityId       String?
+  oldValues      Json?
+  newValues      Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime      @default(now())
+  user           User?         @relation(fields: [userId], references: [id])
+  staffAccount   StaffAccount? @relation(fields: [staffAccountId], references: [id])
 
   @@index([userId])
+  @@index([staffAccountId])
   @@index([entity, entityId])
   @@index([action])
   @@index([createdAt])
@@ -182,6 +312,7 @@ model Product {
   updatedAt        DateTime         @updatedAt
   images           ProductImage[]
   variants         ProductVariant[]
+  reviews          ProductReview[]
   category         Category         @relation(fields: [categoryId], references: [id])
 
   @@index([categoryId])
@@ -233,6 +364,7 @@ model Inventory {
   quantity              Int                    @default(0)
   reservedQuantity      Int                    @default(0)
   quarantineQuantity    Int                    @default(0)
+  lowStockThreshold     Int                    @default(5)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   productVariant        ProductVariant         @relation(fields: [productVariantId], references: [id], onDelete: Cascade)
@@ -300,6 +432,8 @@ model Order {
   subtotal                 Decimal                          @db.Decimal(12, 2)
   discountAmount           Decimal                          @default(0) @db.Decimal(12, 2)
   deliveryFee              Decimal                          @default(0) @db.Decimal(12, 2)
+  deliveryZoneId           String?                          @db.Uuid
+  deliveryZoneName         String?
   totalAmount              Decimal                          @db.Decimal(12, 2)
   currency                 String                           @default("NGN")
   shippingAddress          Json
@@ -313,11 +447,40 @@ model Order {
   payments                 Payment[]
   refunds                  Refund[]
   returnRequests           ReturnRequest[]
+  deliveryZone             DeliveryZone?                     @relation(fields: [deliveryZoneId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([deliveryZoneId])
   @@map("orders")
+}
+
+model DeliveryZone {
+  id          String                 @id @default(uuid()) @db.Uuid
+  name        String                 @unique
+  deliveryFee Decimal                @db.Decimal(12, 2)
+  isActive    Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  locations   DeliveryZoneLocation[]
+  orders      Order[]
+
+  @@index([isActive])
+  @@map("delivery_zones")
+}
+
+model DeliveryZoneLocation {
+  id        String       @id @default(uuid()) @db.Uuid
+  zoneId    String       @db.Uuid
+  state     String
+  city      String
+  createdAt DateTime     @default(now())
+  zone      DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([state, city])
+  @@index([zoneId])
+  @@map("delivery_zone_locations")
 }
 
 model OrderItem {
@@ -342,10 +505,33 @@ model OrderItem {
   packageItems      PackageItem[]
   returnItems       ReturnItem[]
   warrantyClaims    WarrantyClaim[]
+  productReviews    ProductReview[]
 
   @@index([orderId])
   @@index([productVariantId])
   @@map("order_items")
+}
+
+model ProductReview {
+  id          String              @id @default(uuid()) @db.Uuid
+  productId   String              @db.Uuid
+  userId      String              @db.Uuid
+  orderItemId String              @db.Uuid
+  rating      Int
+  title       String?
+  comment     String
+  status      ProductReviewStatus @default(PENDING)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  product     Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem           @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, productId])
+  @@index([productId, status, createdAt])
+  @@index([userId])
+  @@index([orderItemId])
+  @@map("product_reviews")
 }
 
 model Payment {
@@ -518,9 +704,10 @@ model ReturnItem {
 }
 
 model ReturnItemInspection {
-  id                String @id @default(uuid()) @db.Uuid
-  returnItemId      String @db.Uuid
-  inspectedByUserId String @db.Uuid
+  id                        String  @id @default(uuid()) @db.Uuid
+  returnItemId              String  @db.Uuid
+  inspectedByUserId         String? @db.Uuid
+  inspectedByStaffAccountId String? @db.Uuid
 
   inspectedQuantity Int
   acceptedQuantity  Int
@@ -529,11 +716,13 @@ model ReturnItemInspection {
   notes             String?
   createdAt         DateTime        @default(now())
 
-  returnItem  ReturnItem @relation(fields: [returnItemId], references: [id], onDelete: Restrict)
-  inspectedBy User       @relation("ReturnItemInspections", fields: [inspectedByUserId], references: [id], onDelete: Restrict)
+  returnItem       ReturnItem    @relation(fields: [returnItemId], references: [id], onDelete: Restrict)
+  inspectedBy      User?         @relation("ReturnItemInspections", fields: [inspectedByUserId], references: [id], onDelete: Restrict)
+  inspectedByStaff StaffAccount? @relation("StaffReturnItemInspections", fields: [inspectedByStaffAccountId], references: [id], onDelete: Restrict)
 
   @@index([returnItemId, createdAt])
   @@index([inspectedByUserId, createdAt])
+  @@index([inspectedByStaffAccountId, createdAt])
   @@map("return_item_inspections")
 }
 
@@ -621,27 +810,207 @@ model InventoryReservation {
 }
 
 model PaymentInventoryReconciliation {
-  id               String                        @id @default(uuid()) @db.Uuid
-  paymentId        String                        @unique @db.Uuid
-  orderId          String                        @db.Uuid
-  refundId         String?                       @unique @db.Uuid
-  status           InventoryReconciliationStatus @default(PENDING)
-  reason           String
-  resolutionNotes  String?
-  resolvedByUserId String?                       @db.Uuid
-  resolvedAt       DateTime?
-  createdAt        DateTime                      @default(now())
-  updatedAt        DateTime                      @updatedAt
+  id                       String                        @id @default(uuid()) @db.Uuid
+  paymentId                String                        @unique @db.Uuid
+  orderId                  String                        @db.Uuid
+  refundId                 String?                       @unique @db.Uuid
+  status                   InventoryReconciliationStatus @default(PENDING)
+  reason                   String
+  resolutionNotes          String?
+  resolvedByUserId         String?                       @db.Uuid
+  resolvedByStaffAccountId String?                       @db.Uuid
+  resolvedAt               DateTime?
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
 
-  payment    Payment @relation(fields: [paymentId], references: [id])
-  order      Order   @relation(fields: [orderId], references: [id])
-  refund     Refund? @relation(fields: [refundId], references: [id])
-  resolvedBy User?   @relation("PaymentInventoryReconciliationResolver", fields: [resolvedByUserId], references: [id])
+  payment         Payment       @relation(fields: [paymentId], references: [id])
+  order           Order         @relation(fields: [orderId], references: [id])
+  refund          Refund?       @relation(fields: [refundId], references: [id])
+  resolvedBy      User?         @relation("PaymentInventoryReconciliationResolver", fields: [resolvedByUserId], references: [id])
+  resolvedByStaff StaffAccount? @relation("StaffPaymentInventoryReconciliationResolver", fields: [resolvedByStaffAccountId], references: [id])
 
   @@index([orderId])
   @@index([status])
   @@index([resolvedByUserId])
+  @@index([resolvedByStaffAccountId])
   @@map("payment_inventory_reconciliations")
+}
+
+model NotificationOutbox {
+  id            String                   @id @default(uuid()) @db.Uuid
+  eventKey      String                   @unique
+  eventType     String
+  aggregateType String
+  aggregateId   String
+  payload       Json
+  status        NotificationOutboxStatus @default(PENDING)
+  attemptCount  Int                      @default(0)
+  availableAt   DateTime                 @default(now())
+  lockedAt      DateTime?
+  lockedBy      String?
+  processedAt   DateTime?
+  lastError     String?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  notifications Notification[]
+
+  @@index([status, availableAt, createdAt])
+  @@index([status, lockedAt])
+  @@index([aggregateType, aggregateId, createdAt])
+  @@map("notification_outbox")
+}
+
+model Notification {
+  id             String                     @id @default(uuid()) @db.Uuid
+  outboxEventId  String                     @db.Uuid
+  recipientType  NotificationRecipientType
+  customerUserId String?                    @db.Uuid
+  staffAccountId String?                    @db.Uuid
+  category       NotificationCategory
+  title          String
+  body           String
+  actionUrl      String?
+  metadata       Json?
+  readAt         DateTime?
+  createdAt      DateTime                   @default(now())
+  outboxEvent    NotificationOutbox         @relation(fields: [outboxEventId], references: [id], onDelete: Restrict)
+  customerUser   User?                      @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  staffAccount   StaffAccount?              @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
+  emailDelivery  NotificationEmailDelivery?
+
+  @@index([customerUserId, createdAt])
+  @@index([customerUserId, readAt, createdAt])
+  @@index([staffAccountId, createdAt])
+  @@index([staffAccountId, readAt, createdAt])
+  @@index([outboxEventId])
+  @@index([category, createdAt])
+  @@map("notifications")
+}
+
+model NotificationEmailDelivery {
+  id                String                          @id @default(uuid()) @db.Uuid
+  notificationId    String?                         @unique @db.Uuid
+  eventRecipientKey String?                         @unique
+  recipientEmail    String
+  templateKey       String
+  templateData      Json
+  status            NotificationEmailDeliveryStatus @default(QUEUED)
+  attemptCount      Int                             @default(0)
+  nextAttemptAt     DateTime                        @default(now())
+  lockedAt          DateTime?
+  lockedBy          String?
+  providerMessageId String?
+  acceptedAt        DateTime?
+  sentAt             DateTime?
+  deliveredAt       DateTime?
+  bouncedAt         DateTime?
+  complainedAt      DateTime?
+  failedAt          DateTime?
+  suppressedAt      DateTime?
+  lastProviderEventType String?
+  lastError         String?
+  createdAt         DateTime                        @default(now())
+  updatedAt         DateTime                        @updatedAt
+  notification      Notification?                   @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  providerEvents    NotificationEmailEvent[]
+
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([status, lockedAt])
+  @@unique([providerMessageId])
+  @@map("notification_email_deliveries")
+}
+
+model NotificationEmailEvent {
+  id                String                     @id @default(uuid()) @db.Uuid
+  providerEventId   String                     @unique
+  providerMessageId String
+  eventType         String
+  payload           Json
+  deliveryId        String?                    @db.Uuid
+  receivedAt        DateTime                   @default(now())
+  delivery          NotificationEmailDelivery? @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+
+  @@index([providerMessageId, receivedAt])
+  @@index([eventType, receivedAt])
+  @@map("notification_email_events")
+}
+
+model NotificationPreference {
+  id             String                    @id @default(uuid()) @db.Uuid
+  recipientType  NotificationRecipientType
+  customerUserId String?                   @db.Uuid
+  staffAccountId String?                   @db.Uuid
+  category       NotificationCategory
+  inAppEnabled   Boolean                   @default(true)
+  emailEnabled   Boolean                   @default(true)
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  customerUser   User?                     @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  staffAccount   StaffAccount?             @relation(fields: [staffAccountId], references: [id], onDelete: Cascade)
+
+  @@index([customerUserId, category])
+  @@index([staffAccountId, category])
+  @@map("notification_preferences")
+}
+
+enum NotificationRecipientType {
+  CUSTOMER
+  STAFF
+}
+
+enum NotificationCategory {
+  ACCOUNT
+  ORDER
+  PAYMENT
+  DELIVERY
+  RETURN
+  REFUND
+  WARRANTY
+  SECURITY
+  INVENTORY
+  STAFF
+}
+
+enum NotificationOutboxStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  DEAD
+}
+
+enum NotificationEmailDeliveryStatus {
+  QUEUED
+  PROCESSING
+  RETRYING
+  ACCEPTED
+  SENT
+  DELAYED
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+  SUPPRESSED
+  DEAD
+}
+
+enum StaffAccountStatus {
+  PENDING_SETUP
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum StaffInvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum ProductReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum InventoryReconciliationStatus {

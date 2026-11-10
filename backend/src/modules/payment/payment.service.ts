@@ -3,6 +3,7 @@ import {
   initializePaystackTransaction,
   verifyPaystackTransaction,
   PaystackInitializationUncertainError,
+  type PaystackVerifyData,
 } from "./paystack.client";
 import {
   finalizeOrderInventory,
@@ -12,9 +13,11 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type { CreatePaymentInput } from "./payment.validation";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
 const MAX_TRANSACTION_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
+const STALE_PENDING_PAYMENT_GRACE_PERIOD_MS = 15 * 60 * 1000;
 
 function isSerializationConflict(error: unknown): boolean {
   return (
@@ -181,7 +184,11 @@ async function createPaymentWithAccess(
         },
       });
 
-      if (existingReservation && existingReservation.status !== "RELEASED") {
+      if (
+        existingReservation &&
+        existingReservation.status !== "RELEASED" &&
+        existingReservation.status !== "EXPIRED"
+      ) {
         throw new AppError(
           "An existing inventory reservation requires reconciliation",
           409,
@@ -207,7 +214,7 @@ async function createPaymentWithAccess(
         const reopenedReservation = await tx.inventoryReservation.updateMany({
           where: {
             id: existingReservation.id,
-            status: "RELEASED",
+            status: { in: ["RELEASED", "EXPIRED"] },
           },
           data: {
             status: "PENDING",
@@ -593,6 +600,7 @@ export async function createGuestPayment(
 async function markPaymentSuccessfulWithAccess(
   paymentId: string,
   access?: PaymentOrderAccess,
+  verifiedTransaction?: PaystackVerifyData,
 ) {
   // Load the payment and verify ownership.
   const payment = await prisma.payment.findUnique({
@@ -638,7 +646,9 @@ async function markPaymentSuccessfulWithAccess(
   // Verify with Paystack before deciding whether the payment needs recovery.
 
   // 2. Verify the transaction directly with Paystack.
-  const verified = await verifyPaystackTransaction(payment.reference);
+  const verified =
+    verifiedTransaction ??
+    (await verifyPaystackTransaction(payment.reference));
 
   if (
     verified.status !== "success" ||
@@ -813,6 +823,19 @@ async function markPaymentSuccessfulWithAccess(
             },
           });
 
+          await publishNotificationEvent(tx, {
+            eventType: "payment.succeeded",
+            aggregateType: "PAYMENT",
+            aggregateId: updatedPayment.id,
+            payload: {
+              paymentId: updatedPayment.id,
+              orderId: updatedOrder.id,
+              orderNumber: updatedOrder.orderNumber,
+              amount: updatedPayment.amount.toString(),
+              currency: updatedPayment.currency,
+            },
+          });
+
           return {
             payment: updatedPayment,
             order: updatedOrder,
@@ -970,7 +993,7 @@ async function markPaymentSuccessfulWithAccess(
 
           // Create the reconciliation record in the same transaction
           // that marks the payment as successful.
-          await tx.paymentInventoryReconciliation.upsert({
+          const reconciliation = await tx.paymentInventoryReconciliation.upsert({
             where: {
               paymentId: currentPayment.id,
             },
@@ -980,6 +1003,30 @@ async function markPaymentSuccessfulWithAccess(
               reason: error.message,
             },
             update: {},
+          });
+
+          await publishNotificationEvent(tx, {
+            eventType: "payment.succeeded",
+            aggregateType: "PAYMENT",
+            aggregateId: currentPayment.id,
+            payload: {
+              paymentId: currentPayment.id,
+              orderId: currentPayment.orderId,
+              orderNumber: currentPayment.order.orderNumber,
+              amount: currentPayment.amount.toString(),
+              currency: currentPayment.currency,
+            },
+          });
+
+          await publishNotificationEvent(tx, {
+            eventType: "payment.reconciliation_required",
+            aggregateType: "PAYMENT",
+            aggregateId: currentPayment.id,
+            payload: {
+              paymentId: currentPayment.id,
+              orderId: currentPayment.orderId,
+              reconciliationId: reconciliation.id,
+            },
           });
 
           const updatedPayment = await tx.payment.findUnique({
@@ -1087,7 +1134,11 @@ export async function reconcileUnknownPayment(paymentId: string) {
   // Successful payments must use the existing verification
   // and inventory-finalization workflow.
   if (verified.status === "success") {
-    const result = await markPaymentSuccessfulWithAccess(paymentId);
+    const result = await markPaymentSuccessfulWithAccess(
+      paymentId,
+      undefined,
+      verified,
+    );
 
     return {
       reconciled: true,
@@ -1249,6 +1300,209 @@ export async function reconcileUnknownPayment(paymentId: string) {
 
   throw new AppError(
     "Payment reconciliation could not be completed. Please try again.",
+    409,
+  );
+}
+
+/**
+ * Lists aged Paystack payments that still hold pending orders for admin review.
+ */
+export async function listStalePendingPayments(limit = 100) {
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new AppError("Invalid stale payment list limit", 400);
+  }
+
+  const boundedLimit = Math.min(limit, 500);
+  const [cutoffRow] = await prisma.$queryRaw<Array<{ staleBefore: Date }>>`
+    SELECT NOW() - (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond')
+      AS "staleBefore"
+  `;
+  if (!cutoffRow) {
+    throw new AppError("Unable to determine stale payment cutoff", 500);
+  }
+  const staleBefore = cutoffRow.staleBefore;
+
+  return prisma.payment.findMany({
+    where: {
+      provider: "PAYSTACK",
+      status: "PENDING",
+      createdAt: { lte: staleBefore },
+      order: {
+        is: { status: "PENDING" },
+      },
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: boundedLimit,
+    select: {
+      id: true,
+      orderId: true,
+      reference: true,
+      amount: true,
+      currency: true,
+      createdAt: true,
+      order: {
+        select: {
+          orderNumber: true,
+        },
+      },
+    },
+  });
+}
+
+/**
+ * Claims an aged PENDING payment for provider reconciliation.
+ *
+ * A pending checkout is not expired merely because its inventory reservation
+ * elapsed. We first move it to INITIALIZATION_UNKNOWN under the order lock,
+ * then reuse the provider-authoritative reconciliation flow. Inconclusive
+ * Paystack responses therefore keep the reservation protected.
+ */
+export async function reconcileStalePendingPayment(paymentId: string) {
+  const initialPayment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+  });
+
+  if (!initialPayment) {
+    throw new AppError("Payment not found", 404);
+  }
+
+  if (initialPayment.status !== "PENDING") {
+    return {
+      reconciled: false,
+      status: initialPayment.status,
+    };
+  }
+
+  if (initialPayment.provider !== "PAYSTACK") {
+    throw new AppError("Payment provider mismatch", 400);
+  }
+
+  const [initialCutoffRow] = await prisma.$queryRaw<
+    Array<{ staleBefore: Date }>
+  >`
+    SELECT NOW() - (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond')
+      AS "staleBefore"
+  `;
+  if (!initialCutoffRow) {
+    throw new AppError("Unable to determine stale payment cutoff", 500);
+  }
+  const staleBefore = initialCutoffRow.staleBefore;
+
+  if (initialPayment.createdAt > staleBefore) {
+    return {
+      reconciled: false,
+      status: initialPayment.status,
+      stale: false as const,
+    };
+  }
+
+  for (let attempt = 1; attempt <= MAX_TRANSACTION_RETRIES; attempt++) {
+    try {
+      const claim = await prisma.$transaction(
+        async (tx) => {
+          const lockedOrders = await tx.$queryRaw<Array<{ id: string }>>`
+            SELECT id
+            FROM orders
+            WHERE id = ${initialPayment.orderId}::uuid
+            FOR UPDATE
+          `;
+
+          if (lockedOrders.length === 0) {
+            throw new AppError(
+              "Order not found during payment reconciliation",
+              404,
+            );
+          }
+
+          const [transactionCutoffRow] = await tx.$queryRaw<
+            Array<{ staleBefore: Date }>
+          >`
+            SELECT NOW() - (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond')
+              AS "staleBefore"
+          `;
+          if (!transactionCutoffRow) {
+            throw new AppError("Unable to determine stale payment cutoff", 500);
+          }
+          const transactionStaleBefore = transactionCutoffRow.staleBefore;
+
+          const currentPayment = await tx.payment.findUnique({
+            where: { id: paymentId },
+          });
+
+          if (!currentPayment) {
+            throw new AppError("Payment not found", 404);
+          }
+
+          if (currentPayment.status !== "PENDING") {
+            return {
+              claimed: false as const,
+              status: currentPayment.status,
+            };
+          }
+
+          if (currentPayment.createdAt > transactionStaleBefore) {
+            return {
+              claimed: false as const,
+              status: currentPayment.status,
+              stale: false as const,
+            };
+          }
+
+          const updated = await tx.payment.updateMany({
+            where: {
+              id: paymentId,
+              status: "PENDING",
+              createdAt: { lte: transactionStaleBefore },
+            },
+            data: {
+              status: "INITIALIZATION_UNKNOWN",
+            },
+          });
+
+          if (updated.count !== 1) {
+            throw new AppError(
+              "Payment state changed during stale-payment reconciliation",
+              409,
+            );
+          }
+
+          return {
+            claimed: true as const,
+            status: "INITIALIZATION_UNKNOWN" as const,
+          };
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        },
+      );
+
+      if (!claim.claimed) {
+        return {
+          reconciled: false,
+          status: claim.status,
+          ...("stale" in claim ? { stale: claim.stale } : {}),
+        };
+      }
+
+      return reconcileUnknownPayment(paymentId);
+    } catch (error) {
+      if (!isSerializationConflict(error)) {
+        throw error;
+      }
+
+      if (attempt === MAX_TRANSACTION_RETRIES) {
+        throw new AppError(
+          "Stale payment reconciliation encountered a temporary conflict. Please try again.",
+          409,
+        );
+      }
+
+      await sleep(RETRY_DELAY_MS * attempt);
+    }
+  }
+
+  throw new AppError(
+    "Stale payment reconciliation could not be completed. Please try again.",
     409,
   );
 }

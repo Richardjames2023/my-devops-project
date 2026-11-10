@@ -83,14 +83,8 @@ export async function listReconciliations(input: ListReconciliationsInput) {
             providerReference: true,
           },
         },
-        resolvedBy: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
+        resolvedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+        resolvedByStaff: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
       orderBy: {
         createdAt: "desc",
@@ -145,6 +139,9 @@ export async function getReconciliationById(id: string) {
             email: true,
           },
         },
+        resolvedByStaff: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
       },
     },
   );
@@ -186,7 +183,7 @@ export async function markReconciliationUnderReview(
     });
 
     await createAuditLog(tx, {
-      userId: adminId,
+      staffAccountId: adminId,
       action: "INVENTORY_RECONCILIATION_REVIEWED",
       entity: "PaymentInventoryReconciliation",
       entityId: id,
@@ -339,13 +336,13 @@ export async function resolveReconciliationAsFulfilled(
               data: {
                 status: InventoryReconciliationStatus.RESOLVED_FULFILLED,
                 resolutionNotes: notes,
-                resolvedByUserId: adminId,
+                resolvedByStaffAccountId: adminId,
                 resolvedAt: now,
               },
             });
 
           await createAuditLog(tx, {
-            userId: adminId,
+            staffAccountId: adminId,
             action: "INVENTORY_RECONCILIATION_FULFILLED",
             entity: "PaymentInventoryReconciliation",
             entityId: id,
@@ -511,12 +508,12 @@ export async function resolveReconciliationAsRefunded(
           status: InventoryReconciliationStatus.REFUND_PENDING,
           refundId: refund.id,
           resolutionNotes: notes,
-          resolvedByUserId: adminId,
+          resolvedByStaffAccountId: adminId,
         },
       });
 
       await createAuditLog(tx, {
-        userId: adminId,
+        staffAccountId: adminId,
         action: "INVENTORY_RECONCILIATION_REFUND_STARTED",
         entity: "PaymentInventoryReconciliation",
         entityId: id,
@@ -660,11 +657,11 @@ export async function resolveReconciliationAsRefunded(
           status: InventoryReconciliationStatus.RESOLVED_REFUNDED,
           resolvedAt: now,
           resolutionNotes: notes,
-          resolvedByUserId: adminId,
+          resolvedByStaffAccountId: adminId,
         },
       });
       await createAuditLog(tx, {
-        userId: adminId,
+        staffAccountId: adminId,
         action: "INVENTORY_RECONCILIATION_REFUND_COMPLETED",
         entity: "PaymentInventoryReconciliation",
         entityId: id,
@@ -892,12 +889,12 @@ export async function reconcileInventoryRefund(
             data: {
               status: InventoryReconciliationStatus.RESOLVED_REFUNDED,
               resolvedAt: now,
-              resolvedByUserId: adminId,
+              resolvedByStaffAccountId: adminId,
             },
           });
 
           await createAuditLog(tx, {
-            userId: adminId,
+            staffAccountId: adminId,
             action: "INVENTORY_RECONCILIATION_REFUND_RECOVERED",
             entity: "PaymentInventoryReconciliation",
             entityId: id,
@@ -928,7 +925,7 @@ export async function reconcileInventoryRefund(
           });
 
           await createAuditLog(tx, {
-            userId: adminId,
+            staffAccountId: adminId,
             action: "INVENTORY_RECONCILIATION_REFUND_RECOVERY_FAILED",
             entity: "PaymentInventoryReconciliation",
             entityId: id,

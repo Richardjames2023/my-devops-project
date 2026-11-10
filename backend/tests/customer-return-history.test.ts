@@ -1,0 +1,109 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import request from "supertest";
+import jwt from "jsonwebtoken";
+
+const mocks = vi.hoisted(() => ({
+  listCustomerReturnRequests: vi.fn(),
+  findCustomer: vi.fn(),
+}));
+
+vi.mock("../src/infrastructure/prisma/client", () => ({
+  default: { user: { findUnique: mocks.findCustomer } },
+}));
+
+vi.mock("../src/modules/return/return.service", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/modules/return/return.service")>();
+  return {
+    ...actual,
+    listCustomerReturnRequests: mocks.listCustomerReturnRequests,
+  };
+});
+
+import app from "../src/app.ts";
+import { JWT_ACCESS_SECRET } from "../src/config/auth";
+
+function makeToken(subject: string) {
+  return jwt.sign(
+    { roles: [], permissions: [] },
+    JWT_ACCESS_SECRET,
+    { subject, expiresIn: "5m" },
+  );
+}
+
+const customerId = "8a2f4c61-7b39-4d05-9e12-3c6f8a1b2d44";
+const customerToken = makeToken(customerId);
+
+describe("customer return history HTTP endpoint", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.findCustomer.mockResolvedValue({
+      isActive: true,
+      emailVerified: true,
+      sessionVersion: 0,
+      userRoles: [{ role: { name: "CUSTOMER" } }],
+    });
+    mocks.listCustomerReturnRequests.mockResolvedValue({
+      returnRequests: [],
+      pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+    });
+  });
+
+  it("requires authentication", async () => {
+    const response = await request(app).get("/api/v1/returns");
+
+    expect(response.status).toBe(401);
+    expect(mocks.listCustomerReturnRequests).not.toHaveBeenCalled();
+  });
+
+  it("returns the authenticated customer's return history", async () => {
+    const response = await request(app)
+      .get("/api/v1/returns")
+      .set("Authorization", `Bearer ${customerToken}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.returnRequests).toEqual([]);
+    expect(response.body.pagination).toEqual({
+      page: 1,
+      limit: 10,
+      total: 0,
+      totalPages: 0,
+    });
+    expect(mocks.listCustomerReturnRequests).toHaveBeenCalledWith(
+      customerId,
+      { page: 1, limit: 10 },
+    );
+  });
+
+  it("supports pagination and return status filters", async () => {
+    await request(app)
+      .get("/api/v1/returns?page=2&limit=20&status=INSPECTED")
+      .set("Authorization", `Bearer ${customerToken}`)
+      .expect(200);
+
+    expect(mocks.listCustomerReturnRequests).toHaveBeenCalledWith(
+      customerId,
+      { page: 2, limit: 20, status: "INSPECTED" },
+    );
+  });
+
+  it("rejects invalid pagination and return statuses", async () => {
+    const response = await request(app)
+      .get("/api/v1/returns?page=0&limit=100&status=UNKNOWN")
+      .set("Authorization", `Bearer ${customerToken}`);
+
+    expect(response.status).toBe(400);
+    expect(mocks.listCustomerReturnRequests).not.toHaveBeenCalled();
+  });
+
+  it("does not accept a customer ID from the query string", async () => {
+    await request(app)
+      .get("/api/v1/returns?userId=another-customer")
+      .set("Authorization", `Bearer ${customerToken}`)
+      .expect(200);
+
+    expect(mocks.listCustomerReturnRequests).toHaveBeenCalledWith(
+      customerId,
+      { page: 1, limit: 10 },
+    );
+  });
+});

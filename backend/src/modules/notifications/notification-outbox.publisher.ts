@@ -1,0 +1,56 @@
+import { Prisma } from "@prisma/client";
+
+export type NotificationEventType =
+  | "payment.succeeded"
+  | "payment.reconciliation_required"
+  | "delivery.delivered"
+  | "order.created"
+  | "return.requested"
+  | "return.received"
+  | "warranty.claim.created"
+  | "refund.needs_attention"
+  | "inventory.low_stock";
+
+export type NotificationAggregateType = "PAYMENT" | "DELIVERY" | "ORDER" | "RETURN" | "WARRANTY" | "REFUND" | "INVENTORY";
+
+export interface PublishNotificationEventInput {
+  eventType: NotificationEventType;
+  aggregateType: NotificationAggregateType;
+  aggregateId: string;
+  payload: Prisma.InputJsonObject;
+  deduplicationKey?: string;
+}
+
+/**
+ * Persists a notification event using the caller's business transaction.
+ *
+ * By default, the event key is stable for an event type and aggregate. Events
+ * that can recur after a later state transition provide a deduplicationKey.
+ * The empty update intentionally preserves the first committed event payload.
+ */
+export async function publishNotificationEvent(
+  tx: Prisma.TransactionClient,
+  input: PublishNotificationEventInput,
+) {
+  const aggregateId = input.aggregateId.trim();
+
+  if (!aggregateId) {
+    throw new Error("Notification event aggregateId is required");
+  }
+
+  const suffix = input.deduplicationKey?.trim();
+  const eventKey = `v1:${input.eventType}:${input.aggregateType}:${aggregateId}${suffix ? ":" + suffix : ""}`;
+
+  return tx.notificationOutbox.upsert({
+    where: { eventKey },
+    create: {
+      eventKey,
+      eventType: input.eventType,
+      aggregateType: input.aggregateType,
+      aggregateId,
+      payload: input.payload,
+      status: "PENDING",
+    },
+    update: {},
+  });
+}

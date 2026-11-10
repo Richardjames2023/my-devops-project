@@ -7,6 +7,8 @@ import type {
   CreateGuestOrderInput,
 } from "./order.validation";
 import { createAuditLog } from "../../common/utils/audit-log";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
+import { findDeliveryZoneForLocation } from "../delivery-zones/delivery-zone.service";
 
 const MAX_TRANSACTION_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
@@ -187,8 +189,20 @@ async function createOrderFromCart(
     });
 
     const discountAmount = new Prisma.Decimal(0);
-    const deliveryFee = new Prisma.Decimal(0);
+    const deliveryZone = await findDeliveryZoneForLocation(
+      tx,
+      input.shippingAddress.state,
+      input.shippingAddress.city,
+    );
 
+    if (!deliveryZone) {
+      throw new AppError(
+        `We do not currently deliver to ${input.shippingAddress.city}, ${input.shippingAddress.state}`,
+        422,
+      );
+    }
+
+    const deliveryFee = deliveryZone.deliveryFee;
     const totalAmount = subtotal.minus(discountAmount).plus(deliveryFee);
 
     const isGuestOrder = Boolean(guestAccessToken);
@@ -217,6 +231,8 @@ async function createOrderFromCart(
         subtotal,
         discountAmount,
         deliveryFee,
+        deliveryZoneId: deliveryZone.id,
+        deliveryZoneName: deliveryZone.name,
         totalAmount,
         currency: "NGN",
         shippingAddress: input.shippingAddress,
@@ -228,6 +244,13 @@ async function createOrderFromCart(
         items: true,
       },
     });
+    await publishNotificationEvent(tx, {
+      eventType: "order.created",
+      aggregateType: "ORDER",
+      aggregateId: order.id,
+      payload: { orderId: order.id },
+    });
+
     // Clear the cart only after the order has been created successfully.
     await tx.cartItem.deleteMany({
       where: {
@@ -286,6 +309,7 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
       subtotal: true,
       discountAmount: true,
       deliveryFee: true,
+      deliveryZoneName: true,
       totalAmount: true,
       currency: true,
       shippingAddress: true,
@@ -574,4 +598,112 @@ export async function adminCancelOrder(
     enforceOwnership: false,
     ...(auditMeta ? { auditMeta } : {}),
   });
+}
+
+
+export interface CustomerOrderHistoryQuery {
+  page: number;
+  limit: number;
+  status?: import("@prisma/client").OrderStatus | undefined;
+}
+
+export async function listCustomerOrders(
+  userId: string,
+  query: CustomerOrderHistoryQuery,
+) {
+  const where: Prisma.OrderWhereInput = {
+    userId,
+    ...(query.status ? { status: query.status } : {}),
+  };
+
+  const [orders, total] = await prisma.$transaction([
+    prisma.order.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      skip: (query.page - 1) * query.limit,
+      take: query.limit,
+      select: {
+        id: true,
+        orderNumber: true,
+        status: true,
+        subtotal: true,
+        discountAmount: true,
+        deliveryFee: true,
+        deliveryZoneName: true,
+        totalAmount: true,
+        currency: true,
+        createdAt: true,
+        updatedAt: true,
+        items: {
+          select: {
+            id: true,
+            productName: true,
+            variantName: true,
+            sku: true,
+            quantity: true,
+            unitPrice: true,
+            discountAmount: true,
+            totalPrice: true,
+            hasWarranty: true,
+            warrantyStartedAt: true,
+            warrantyExpiresAt: true,
+          },
+        },
+        payments: {
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            provider: true,
+            status: true,
+            amount: true,
+            currency: true,
+            paidAt: true,
+            createdAt: true,
+          },
+        },
+        fulfillment: {
+          select: {
+            status: true,
+            startedAt: true,
+            completedAt: true,
+            packages: {
+              orderBy: { createdAt: "asc" },
+              select: {
+                id: true,
+                trackingNumber: true,
+                status: true,
+                delivery: {
+                  select: {
+                    status: true,
+                    shippedAt: true,
+                    deliveredAt: true,
+                    attempts: {
+                      orderBy: { attemptedAt: "desc" },
+                      take: 1,
+                      select: {
+                        status: true,
+                        attemptedAt: true,
+                        notes: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.order.count({ where }),
+  ]);
+
+  return {
+    orders,
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total,
+      totalPages: Math.ceil(total / query.limit),
+    },
+  };
 }

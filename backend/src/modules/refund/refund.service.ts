@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 import {
   createPaystackRefund,
   fetchPaystackRefund,
@@ -156,17 +157,31 @@ export async function createRefund(
   const status = mapPaystackRefundStatus(providerRefund.status);
 
   try {
-    return await prisma.refund.update({
-      where: { id: refund.id },
-      data: {
-        status,
-        providerReference: String(providerRefund.id),
-        ...(status === RefundStatus.SUCCESS ? { processedAt: new Date() } : {}),
-      },
-      include: {
-        items: true,
-        payment: true,
-      },
+    return await prisma.$transaction(async (tx) => {
+      const updatedRefund = await tx.refund.update({
+        where: { id: refund.id },
+        data: {
+          status,
+          providerReference: String(providerRefund.id),
+          ...(status === RefundStatus.SUCCESS ? { processedAt: new Date() } : {}),
+          ...(status === RefundStatus.NEEDS_ATTENTION ? { needsAttentionAt: new Date(), retryStartedAt: null } : {}),
+        },
+        include: {
+          items: true,
+          payment: true,
+        },
+      });
+      if (status === RefundStatus.NEEDS_ATTENTION) {
+        const occurredAt = updatedRefund.needsAttentionAt ?? new Date();
+        await publishNotificationEvent(tx, {
+          eventType: "refund.needs_attention",
+          aggregateType: "REFUND",
+          aggregateId: updatedRefund.id,
+          deduplicationKey: occurredAt.toISOString(),
+          payload: { refundId: updatedRefund.id, orderId: updatedRefund.orderId },
+        });
+      }
+      return updatedRefund;
     });
   } catch {
     // Paystack may already have accepted the refund.
@@ -743,23 +758,39 @@ export async function reconcileRefund(
     return refund;
   }
 
-  const updated = await prisma.refund.updateMany({
-    where: {
-      id: refund.id,
-      status: refund.status,
-      providerReference: refund.providerReference,
-    },
-    data: {
-      status,
-      providerReference,
-      ...(status === RefundStatus.SUCCESS
-        ? {
-            processedAt: providerRefund.refunded_at
-              ? new Date(providerRefund.refunded_at)
-              : new Date(),
-          }
-        : {}),
-    },
+  const occurredAt = new Date();
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.refund.updateMany({
+      where: {
+        id: refund.id,
+        status: refund.status,
+        providerReference: refund.providerReference,
+      },
+      data: {
+        status,
+        providerReference,
+        ...(status === RefundStatus.NEEDS_ATTENTION
+          ? { needsAttentionAt: occurredAt, retryStartedAt: null }
+          : {}),
+        ...(status === RefundStatus.SUCCESS
+          ? {
+              processedAt: providerRefund.refunded_at
+                ? new Date(providerRefund.refunded_at)
+                : new Date(),
+            }
+          : {}),
+      },
+    });
+    if (result.count === 1 && status === RefundStatus.NEEDS_ATTENTION) {
+      await publishNotificationEvent(tx, {
+        eventType: "refund.needs_attention",
+        aggregateType: "REFUND",
+        aggregateId: refund.id,
+        deduplicationKey: occurredAt.toISOString(),
+        payload: { refundId: refund.id, orderId: refund.orderId },
+      });
+    }
+    return result;
   });
 
   if (updated.count !== 1) {
@@ -934,28 +965,38 @@ export async function processPaystackRefundWebhook(
     return current;
   }
 
-  const updated = await prisma.refund.updateMany({
-    where: {
-      id: current.id,
-      status: current.status,
-    },
-    data: {
-      status,
-      providerReference: String(providerRefund.id),
-      ...(status === RefundStatus.NEEDS_ATTENTION
-        ? {
-            needsAttentionAt: new Date(),
-            retryStartedAt: null,
-          }
-        : {}),
-      ...(status === RefundStatus.SUCCESS
-        ? {
-            processedAt: providerRefund.refunded_at
-              ? new Date(providerRefund.refunded_at)
-              : new Date(),
-          }
-        : {}),
-    },
+  const occurredAt = new Date();
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.refund.updateMany({
+      where: {
+        id: current.id,
+        status: current.status,
+      },
+      data: {
+        status,
+        providerReference: String(providerRefund.id),
+        ...(status === RefundStatus.NEEDS_ATTENTION
+          ? { needsAttentionAt: occurredAt, retryStartedAt: null }
+          : {}),
+        ...(status === RefundStatus.SUCCESS
+          ? {
+              processedAt: providerRefund.refunded_at
+                ? new Date(providerRefund.refunded_at)
+                : new Date(),
+            }
+          : {}),
+      },
+    });
+    if (result.count === 1 && status === RefundStatus.NEEDS_ATTENTION) {
+      await publishNotificationEvent(tx, {
+        eventType: "refund.needs_attention",
+        aggregateType: "REFUND",
+        aggregateId: current.id,
+        deduplicationKey: occurredAt.toISOString(),
+        payload: { refundId: current.id, orderId: current.orderId },
+      });
+    }
+    return result;
   });
 
   if (updated.count === 0) {

@@ -1,0 +1,15 @@
+
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": [
+    "prisma/bootstrap-staff-owner.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
