@@ -19,7 +19,10 @@ const deliveryFeeSchema = z
 
 const locationSchema = z.object({
   state: z.string().trim().min(1).max(100),
-  city: z.string().trim().min(1).max(100),
+  city: z.string().trim().min(1).max(100).refine(
+    (city) => city === "*" || !city.includes("*"),
+    "City may only use * as the complete state-wide fallback value",
+  ),
 }).transform((location) => ({
   state: location.state.toUpperCase(),
   city: location.city.toUpperCase(),
