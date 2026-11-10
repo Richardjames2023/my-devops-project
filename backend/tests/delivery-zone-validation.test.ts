@@ -53,6 +53,22 @@ describe("delivery zone fee validation", () => {
     },
   );
 
+  it("normalizes Abuja aliases to the canonical FCT state", () => {
+    const result = createDeliveryZoneSchema.safeParse({
+      ...validCreateInput,
+      locations: [{ state: "Federal Capital Territory", city: "Central Area" }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.locations[0]).toEqual({ state: "FCT", city: "CENTRAL AREA" });
+    }
+  });
+
+  it("accepts only the complete wildcard city sentinel", () => {
+    expect(createDeliveryZoneSchema.safeParse({ ...validCreateInput, locations: [{ state: "LAGOS", city: "*" }] }).success).toBe(true);
+    expect(createDeliveryZoneSchema.safeParse({ ...validCreateInput, locations: [{ state: "LAGOS", city: "IKE*JA" }] }).success).toBe(false);
+  });
+
   it("continues to reject negative and out-of-range delivery fees", () => {
     expect(
       createDeliveryZoneSchema.safeParse({

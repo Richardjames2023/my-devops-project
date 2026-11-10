@@ -360,6 +360,20 @@ describe("PostgreSQL customer checkout", () => {
     }
   });
 
+  it("uses the state-wide delivery zone fallback during checkout", async () => {
+    const fixture = await createFixture();
+    const orderIds: string[] = [];
+    try {
+      await pool.query('UPDATE delivery_zone_locations SET city = \'*\' WHERE "zoneId" = $1', [fixture.deliveryZoneId]);
+      const order = await createOrder(fixture.userId, { shippingAddress: fixture.shippingAddress });
+      orderIds.push(order.id);
+      expect(order.deliveryFee.toString()).toBe("350");
+      expect(order.deliveryZoneName).toContain("Checkout Zone");
+    } finally {
+      await cleanupFixture(fixture, orderIds);
+    }
+  });
+
   it("rejects an unserved destination without consuming the cart", async () => {
     const fixture = await createFixture();
     try {

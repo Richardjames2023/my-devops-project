@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeDeliveryCity, normalizeDeliveryState } from "./delivery-zone.normalization";
 
 function hasAtMostTwoDecimalPlaces(value: number): boolean {
   const [coefficient, exponentPart] = value.toString().toLowerCase().split("e");
@@ -19,10 +20,13 @@ const deliveryFeeSchema = z
 
 const locationSchema = z.object({
   state: z.string().trim().min(1).max(100),
-  city: z.string().trim().min(1).max(100),
+  city: z.string().trim().min(1).max(100).refine(
+    (city) => city === "*" || !city.includes("*"),
+    "City may only use * as the complete state-wide fallback value",
+  ),
 }).transform((location) => ({
-  state: location.state.toUpperCase(),
-  city: location.city.toUpperCase(),
+  state: normalizeDeliveryState(location.state),
+  city: location.city === "*" ? "*" : normalizeDeliveryCity(location.city),
 }));
 
 const locationsSchema = z.array(locationSchema).min(1).max(200)

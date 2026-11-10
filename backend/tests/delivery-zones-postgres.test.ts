@@ -82,6 +82,34 @@ describe("PostgreSQL delivery zones", () => {
     }
   });
 
+  it("uses a state-wide regional zone as fallback and prefers an exact-city override", async () => {
+    const staffId = randomUUID();
+    const suffix = randomUUID();
+    const state = "REGIONAL STATE " + suffix;
+    const city = "OVERRIDE CITY " + suffix;
+    const regionalName = "Regional Zone " + suffix;
+    const cityName = "City Override " + suffix;
+    let regionalZoneId: string | undefined;
+    let cityZoneId: string | undefined;
+    await pool.query('INSERT INTO staff_accounts (id, email, "firstName", "lastName", status, "createdAt", "updatedAt") VALUES ($1, $2, \'Zone\', \'Administrator\', \'ACTIVE\', NOW(), NOW())', [staffId, suffix + "@regional-zone-test.local"]);
+    try {
+      const regionalZone = await createDeliveryZone(staffId, { name: regionalName, deliveryFee: 4200, locations: [{ state, city: "*" }] });
+      regionalZoneId = regionalZone.id;
+      const fallbackQuote = await quoteDeliveryFee(state.toLowerCase(), "any city");
+      expect(fallbackQuote).toMatchObject({ zoneId: regionalZoneId, zoneName: regionalName });
+      expect(fallbackQuote.deliveryFee.toString()).toBe("4200");
+      const cityZone = await createDeliveryZone(staffId, { name: cityName, deliveryFee: 1800, locations: [{ state, city }] });
+      cityZoneId = cityZone.id;
+      const overrideQuote = await quoteDeliveryFee(state, city.toLowerCase());
+      expect(overrideQuote).toMatchObject({ zoneId: cityZoneId, zoneName: cityName });
+      expect(overrideQuote.deliveryFee.toString()).toBe("1800");
+    } finally {
+      if (cityZoneId) await pool.query("DELETE FROM delivery_zones WHERE id = $1", [cityZoneId]);
+      if (regionalZoneId) await pool.query("DELETE FROM delivery_zones WHERE id = $1", [regionalZoneId]);
+      await pool.query('DELETE FROM audit_logs WHERE "staffAccountId" = $1', [staffId]);
+      await pool.query("DELETE FROM staff_accounts WHERE id = $1", [staffId]);
+    }
+  });
   it("rejects an address that is not assigned to an active delivery zone", async () => {
     await expect(
       quoteDeliveryFee("NON-EXISTENT STATE", `CITY-${randomUUID()}`),

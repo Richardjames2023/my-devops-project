@@ -104,7 +104,35 @@
 // } as const;
 
 
-// async function main(): Promise<void> {
+async function seedNationwideDeliveryZones(
+  configuredFees: ReturnType<typeof getConfiguredNigeriaDeliveryFees>,
+): Promise<void> {
+  if (configuredFees.length === 0) {
+    console.log("Nationwide delivery zones skipped: configure all six regional DELIVERY_FEE_* values to seed them.");
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const { region, deliveryFee } of configuredFees) {
+      const zone = await tx.deliveryZone.upsert({
+        where: { name: region.name },
+        update: { deliveryFee, isActive: true },
+        create: { name: region.name, deliveryFee },
+      });
+      for (const state of region.states) {
+        await tx.deliveryZoneLocation.upsert({
+          where: { state_city: { state, city: "*" } },
+          update: { zoneId: zone.id },
+          create: { zoneId: zone.id, state, city: "*" },
+        });
+      }
+    }
+  }, { timeout: 30_000 });
+
+  for (const { region } of configuredFees) {
+    console.log("Seeded " + region.name + " (" + region.states.length + " states/territory).");
+  }
+}
 //   console.log("Seeding permissions...");
 
 //   const permissionRecords = new Map<string, string>();
@@ -177,6 +205,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { getConfiguredNigeriaDeliveryFees } from "./nigeria-delivery-fees";
 import "dotenv/config";
 
 const adapter = new PrismaPg({
@@ -283,6 +312,9 @@ const roles = {
 } as const;
 
 async function main(): Promise<void> {
+  // Parse every regional fee before any seed writes begin.
+  const configuredDeliveryFees = getConfiguredNigeriaDeliveryFees(process.env);
+
   console.log("Seeding permissions...");
 
   const permissionRecords = new Map<string, string>();
@@ -342,6 +374,8 @@ async function main(): Promise<void> {
   }
 
   console.log("Roles seeded.");
+
+  await seedNationwideDeliveryZones(configuredDeliveryFees);
 
   console.log("Roles and permissions seeded. Run the explicit staff bootstrap command to create the initial owner.");
 }

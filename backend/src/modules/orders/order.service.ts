@@ -8,6 +8,7 @@ import type {
 } from "./order.validation";
 import { createAuditLog } from "../../common/utils/audit-log";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
+import { findDeliveryZoneForLocation } from "../delivery-zones/delivery-zone.service";
 
 const MAX_TRANSACTION_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
@@ -188,21 +189,11 @@ async function createOrderFromCart(
     });
 
     const discountAmount = new Prisma.Decimal(0);
-    const normalizedState = input.shippingAddress.state.trim().toUpperCase();
-    const normalizedCity = input.shippingAddress.city.trim().toUpperCase();
-
-    const deliveryZone = await tx.deliveryZone.findFirst({
-      where: {
-        isActive: true,
-        locations: {
-          some: {
-            state: normalizedState,
-            city: normalizedCity,
-          },
-        },
-      },
-      select: { id: true, name: true, deliveryFee: true },
-    });
+    const deliveryZone = await findDeliveryZoneForLocation(
+      tx,
+      input.shippingAddress.state,
+      input.shippingAddress.city,
+    );
 
     if (!deliveryZone) {
       throw new AppError(
