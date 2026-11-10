@@ -81,7 +81,7 @@ async function createFixture(input: {
 async function getDelivery(deliveryId: string) {
   const result = await pool.query(
     `SELECT status, "attemptCount", "providerMessageId", "acceptedAt",
-            "nextAttemptAt", "lockedAt", "lockedBy", "lastError"
+            "nextAttemptAt", "lockedAt", "lockedBy", "lastError", "templateData"
      FROM notification_email_deliveries WHERE id = $1`,
     [deliveryId],
   );
@@ -166,6 +166,76 @@ describe("PostgreSQL notification email delivery worker", () => {
       lastError: null,
     });
     expect((await getDelivery(fixture.deliveryId)).acceptedAt).toBeTruthy();
+  });
+
+  it("redacts password reset links after provider acceptance", async () => {
+    const token = randomUUID() + randomUUID();
+    const fixture = await createFixture({
+      templateKey: "customer.password-reset",
+      templateData: { firstName: "Reset", actionUrl: "/reset-password?token=" + token },
+    });
+    const send = vi.fn<EmailProvider["send"]>().mockResolvedValue({ messageId: "resend-reset-accepted" });
+
+    const result = await processNotificationEmailBatch({
+      deliveryId: fixture.deliveryId,
+      provider: { send },
+      enabled: true,
+    });
+
+    expect(result.accepted).toBe(1);
+    const delivery = await getDelivery(fixture.deliveryId);
+    expect(delivery.status).toBe("ACCEPTED");
+    expect(delivery.templateData).toEqual({ firstName: "Reset" });
+    expect(JSON.stringify(delivery.templateData)).not.toContain(token);
+  });
+
+  it("retains password reset links after retryable failures so delivery can retry", async () => {
+    const token = randomUUID() + randomUUID();
+    const fixture = await createFixture({
+      templateKey: "customer.password-reset",
+      templateData: { firstName: "Reset", actionUrl: "/reset-password?token=" + token },
+    });
+    const send = vi.fn<EmailProvider["send"]>().mockRejectedValue(new EmailProviderError("Rate limited", true, 429));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const result = await processNotificationEmailBatch({
+        deliveryId: fixture.deliveryId,
+        provider: { send },
+        enabled: true,
+      });
+      expect(result.failed).toBe(1);
+      const delivery = await getDelivery(fixture.deliveryId);
+      expect(delivery.status).toBe("RETRYING");
+      expect(delivery.templateData.actionUrl).toContain(token);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("redacts password reset links when delivery reaches a terminal failure", async () => {
+    const token = randomUUID() + randomUUID();
+    const fixture = await createFixture({
+      templateKey: "customer.password-reset",
+      templateData: { firstName: "Reset", actionUrl: "/reset-password?token=" + token },
+    });
+    const send = vi.fn<EmailProvider["send"]>().mockRejectedValue(new EmailProviderError("Invalid sender", false, 400));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      const result = await processNotificationEmailBatch({
+        deliveryId: fixture.deliveryId,
+        provider: { send },
+        enabled: true,
+      });
+      expect(result.failed).toBe(1);
+      const delivery = await getDelivery(fixture.deliveryId);
+      expect(delivery.status).toBe("DEAD");
+      expect(delivery.templateData).toEqual({ firstName: "Reset" });
+      expect(JSON.stringify(delivery.templateData)).not.toContain(token);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("schedules a retry after a transient provider failure", async () => {
