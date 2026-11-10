@@ -8,6 +8,15 @@ import type {
 } from "./delivery-zone.validation";
 import { normalizeDeliveryCity, normalizeDeliveryState } from "./delivery-zone.normalization";
 
+function normalizeDeliveryLocations(
+  locations: Array<{ state: string; city: string }>,
+) {
+  return locations.map(({ state, city }) => ({
+    state: normalizeDeliveryState(state),
+    city: city === "*" ? "*" : normalizeDeliveryCity(city),
+  }));
+}
+
 function isUniqueConflict(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
@@ -95,7 +104,7 @@ export async function createDeliveryZone(
         data: {
           name: input.name.trim(),
           deliveryFee: new Prisma.Decimal(input.deliveryFee),
-          locations: { create: input.locations },
+          locations: { create: normalizeDeliveryLocations(input.locations) },
         },
         include: { locations: true },
       });
@@ -143,7 +152,7 @@ export async function updateDeliveryZone(
             ? {
                 locations: {
                   deleteMany: {},
-                  create: input.locations,
+                  create: normalizeDeliveryLocations(input.locations),
                 },
               }
             : {}),
