@@ -8,10 +8,6 @@ import type {
 } from "./delivery-zone.validation";
 import { normalizeDeliveryCity, normalizeDeliveryState } from "./delivery-zone.normalization";
 
-function normalizeLocation(value: string): string {
-  return value.trim().toUpperCase();
-}
-
 function isUniqueConflict(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
 }
