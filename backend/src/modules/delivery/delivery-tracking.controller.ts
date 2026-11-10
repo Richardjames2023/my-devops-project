@@ -35,7 +35,10 @@ export async function updateTracking(
 
   if (!req.user) throw new AppError("Authentication required", 401);
 
-  const result = await updateDeliveryTracking(deliveryId.data, body.data);
+  const result = await updateDeliveryTracking(deliveryId.data, body.data, {
+    staffAccountId: req.user.id,
+    canManageAllDeliveries: req.user.permissions.includes("orders.manage"),
+  });
   res.status(200).json({
     message: "Delivery tracking details updated successfully",
     ...result,
