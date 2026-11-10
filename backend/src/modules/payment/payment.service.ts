@@ -136,7 +136,7 @@ async function createPaymentWithAccess(
       throw new AppError("Cannot pay for an empty order", 400);
     }
 
-    if (order.discountAmount.greaterThan(0)) {
+    if (order.couponId) {
       const redemption = await tx.couponRedemption.findUnique({
         where: { orderId: order.id },
       });
