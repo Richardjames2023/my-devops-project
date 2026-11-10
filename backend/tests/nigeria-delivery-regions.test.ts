@@ -5,9 +5,50 @@ import { getConfiguredNigeriaDeliveryFees } from "../prisma/nigeria-delivery-fee
 describe("Nigerian geopolitical delivery regions", () => {
   it("covers all 36 states and the FCT exactly once", () => {
     const states = NIGERIAN_DELIVERY_REGIONS.flatMap((region) => region.states);
-    expect(NIGERIAN_DELIVERY_COVERAGE_COUNT).toBe(37);
-    expect(new Set(states).size).toBe(37);
-    expect(states).toContain("FCT");
+    const expectedStates = [
+      "ABIA",
+      "ADAMAWA",
+      "AKWA IBOM",
+      "ANAMBRA",
+      "BAUCHI",
+      "BAYELSA",
+      "BENUE",
+      "BORNO",
+      "CROSS RIVER",
+      "DELTA",
+      "EBONYI",
+      "EDO",
+      "EKITI",
+      "ENUGU",
+      "FCT",
+      "GOMBE",
+      "IMO",
+      "JIGAWA",
+      "KADUNA",
+      "KANO",
+      "KATSINA",
+      "KEBBI",
+      "KOGI",
+      "KWARA",
+      "LAGOS",
+      "NASARAWA",
+      "NIGER",
+      "OGUN",
+      "ONDO",
+      "OSUN",
+      "OYO",
+      "PLATEAU",
+      "RIVERS",
+      "SOKOTO",
+      "TARABA",
+      "YOBE",
+      "ZAMFARA",
+    ];
+
+    expect(NIGERIAN_DELIVERY_COVERAGE_COUNT).toBe(expectedStates.length);
+    expect(states).toHaveLength(expectedStates.length);
+    expect(new Set(states).size).toBe(expectedStates.length);
+    expect([...states].sort()).toEqual(expectedStates);
   });
 
   it("defines six independently priced geopolitical regions", () => {
@@ -15,7 +56,6 @@ describe("Nigerian geopolitical delivery regions", () => {
     expect(new Set(NIGERIAN_DELIVERY_REGIONS.map((region) => region.feeEnvironmentVariable)).size).toBe(6);
   });
 
-  
   it("validates every regional fee before returning any seedable records", () => {
     const environment = Object.fromEntries(
       NIGERIAN_DELIVERY_REGIONS.map((region, index) => [
