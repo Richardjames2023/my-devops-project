@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import { getCloudinary } from "../../config/cloudinary";
+import { enqueueCloudinaryCleanup, deleteCloudinaryAsset } from "../../infrastructure/cloudinary/cloudinary-cleanup";
 import type { UpdateProductImageInput } from "./product-image.validation";
 import { MAX_PRODUCT_IMAGES } from "./product-image.upload";
 
@@ -53,19 +54,6 @@ function uploadToCloudinary(
 
     stream.end(buffer);
   });
-}
-
-async function deleteCloudinaryAsset(publicId: string): Promise<void> {
-  const cloudinary = getCloudinary();
-  const result = await cloudinary.uploader.destroy(publicId, {
-    resource_type: "image",
-    type: "upload",
-    invalidate: true,
-  });
-
-  if (result.result !== "ok" && result.result !== "not found") {
-    throw new AppError("Cloudinary image cleanup could not be confirmed", 502);
-  }
 }
 
 async function validateImageFiles(files: Express.Multer.File[]) {
@@ -224,9 +212,14 @@ export async function createProductImages(
       uploadedAssets.map((asset) => deleteCloudinaryAsset(asset.publicId)),
     );
 
-    cleanupResults.forEach((result, index) => {
+    for (const [index, result] of cleanupResults.entries()) {
       if (result.status === "rejected") {
         const asset = uploadedAssets[index];
+        try {
+          if (asset) await enqueueCloudinaryCleanup(asset.publicId);
+        } catch (queueError) {
+          console.error("Could not persist Cloudinary cleanup task:", { publicId: asset?.publicId, queueError });
+        }
         console.error(
           "Cloudinary product image cleanup failed after a database write error:",
           {
@@ -238,7 +231,7 @@ export async function createProductImages(
           },
         );
       }
-    });
+    }
 
     throw error;
   }
@@ -345,6 +338,9 @@ export async function deleteProductImage(productId: string, imageId: string) {
       }
     }
 
+    if (image.publicId) {
+      await enqueueCloudinaryCleanup(image.publicId, tx);
+    }
     await tx.productImage.delete({ where: { id: imageId } });
     return image;
   });
@@ -354,6 +350,7 @@ export async function deleteProductImage(productId: string, imageId: string) {
   if (deletedImage.publicId) {
     try {
       await deleteCloudinaryAsset(deletedImage.publicId);
+      await prisma.cloudinaryCleanupTask.deleteMany({ where: { publicId: deletedImage.publicId, status: "PENDING" } });
     } catch (error) {
       cloudinaryCleanupPending = true;
       console.error("Product image was removed from the database but Cloudinary cleanup failed:", {
