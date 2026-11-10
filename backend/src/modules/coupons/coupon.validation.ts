@@ -3,7 +3,7 @@ import { z } from "zod";
 const moneySchema = z
   .string()
   .trim()
-  .regex(/^\\d+(?:\\.\\d{1,2})?$/, "Enter a valid amount with up to two decimal places");
+  .regex(/^\d+(?:\.\d{1,2})?$/, "Enter a valid amount with up to two decimal places");
 
 const couponFields = {
   code: z
