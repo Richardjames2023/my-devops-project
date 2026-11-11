@@ -192,7 +192,7 @@ describe("PostgreSQL product/category lifecycle concurrency", () => {
           basePrice: "100.00",
           hasWarranty: false,
         }),
-      ).rejects.toMatchObject({ statusCode: 400);
+      ).rejects.toMatchObject({ statusCode: 400 });
     } finally {
       await cleanupFixture(fixture);
     }
