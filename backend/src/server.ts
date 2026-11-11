@@ -5,6 +5,7 @@ import { startInventoryReservationExpirationJob } from "./infrastructure/jobs/in
 import { startPaymentInitializationReconciliationJob } from "./infrastructure/jobs/payment-initialization-reconciliation.job";
 import { startNotificationOutboxJob } from "./infrastructure/jobs/notification-outbox.job";
 import { startNotificationEmailJob } from "./infrastructure/jobs/notification-email.job";
+import { startCloudinaryCleanupJob } from "./infrastructure/jobs/cloudinary-cleanup.job";
 
 async function startServer(): Promise<void> {
   try {
@@ -14,6 +15,7 @@ async function startServer(): Promise<void> {
     startPaymentInitializationReconciliationJob();
     startNotificationOutboxJob();
     startNotificationEmailJob();
+    startCloudinaryCleanupJob();
 
     const server = app.listen(env.PORT, () => {
       console.log(`Server is running on port ${env.PORT}`);

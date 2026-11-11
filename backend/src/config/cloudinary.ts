@@ -13,7 +13,7 @@ export function getCloudinary() {
     !CLOUDINARY_API_SECRET
   ) {
     throw new AppError(
-      "Evidence storage is not configured",
+      "Cloudinary storage is not configured",
       503,
     );
   }
