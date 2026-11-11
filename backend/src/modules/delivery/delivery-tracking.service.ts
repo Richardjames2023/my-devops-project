@@ -7,9 +7,15 @@ function hashGuestOrderAccessToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+type DeliveryTrackingActor = {
+  staffAccountId: string;
+  canManageAllDeliveries: boolean;
+};
+
 export async function updateDeliveryTracking(
   deliveryId: string,
   input: UpdateDeliveryTrackingInput,
+  actor?: DeliveryTrackingActor,
 ) {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw`
@@ -22,6 +28,13 @@ export async function updateDeliveryTracking(
     });
 
     if (!delivery) throw new AppError("Delivery not found", 404);
+    if (
+      actor &&
+      !actor.canManageAllDeliveries &&
+      delivery.assignedStaffAccountId !== actor.staffAccountId
+    ) {
+      throw new AppError("Delivery not found", 404);
+    }
     if (["CANCELLED", "DELIVERED", "RETURNED"].includes(delivery.status)) {
       throw new AppError("Tracking details cannot be changed for a closed delivery", 409);
     }

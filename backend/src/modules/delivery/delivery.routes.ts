@@ -1,6 +1,8 @@
 import { Router } from "express";
 import {
   create,
+  assignDeliveryController,
+  listAssignedDeliveriesController,
   updateStatus,
   createDeliveryAttemptController,
 } from "./delivery.controller";
@@ -25,31 +27,45 @@ router.get(
   getGuestTracking,
 );
 
+router.get(
+  "/mine",
+  authenticate,
+  authorize("deliveries.read"),
+  listAssignedDeliveriesController,
+);
+
 router.post(
   "/",
   authenticate,
-  authorize("orders.manage"),
+  authorize("fulfillment.manage"),
   create,
+);
+
+router.patch(
+  "/:deliveryId/assignment",
+  authenticate,
+  authorize("orders.manage"),
+  assignDeliveryController,
 );
 
 router.patch(
   "/:deliveryId/tracking",
   authenticate,
-  authorize("orders.manage"),
+  authorize("deliveries.manage"),
   updateTracking,
 );
 
 router.patch(
   "/:deliveryId/status",
   authenticate,
-  authorize("orders.manage"),
+  authorize("deliveries.manage"),
   updateStatus,
 );
 
 router.post(
   "/:deliveryId/attempts",
   authenticate,
-  authorize("orders.manage"),
+  authorize("deliveries.manage"),
   createDeliveryAttemptController,
 );
 

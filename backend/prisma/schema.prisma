@@ -114,6 +114,7 @@ model StaffAccount {
   createdAt                               DateTime                         @default(now())
   updatedAt                               DateTime                         @updatedAt
   roles                                   StaffAccountRole[]
+  assignedDeliveries                      Delivery[]                        @relation("DeliveryAssignedStaff")
   refreshTokens                           StaffRefreshToken[]
   auditLogs                               AuditLog[]
   createdInvitations                      StaffInvitation[]                @relation("StaffInvitationCreator")
@@ -320,10 +321,28 @@ model Product {
   @@map("products")
 }
 
+
+model CloudinaryCleanupTask {
+  id          String    @id @default(uuid()) @db.Uuid
+  publicId    String    @unique
+  status      String    @default("PENDING")
+  attempts    Int       @default(0)
+  availableAt DateTime  @default(now())
+  lockedAt    DateTime?
+  lockToken   String?   @db.Uuid
+  lastError   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([status, availableAt])
+  @@map("cloudinary_cleanup_tasks")
+}
+
 model ProductImage {
   id        String   @id @default(uuid()) @db.Uuid
   productId String   @db.Uuid
   url       String
+  publicId  String?  @unique
   altText   String?
   sortOrder Int      @default(0)
   isPrimary Boolean  @default(false)
@@ -619,11 +638,14 @@ model Delivery {
   status            DeliveryStatus    @default(PENDING)
   shippedAt         DateTime?
   deliveredAt       DateTime?
+  assignedStaffAccountId String?       @db.Uuid
   package           Package           @relation(fields: [packageId], references: [id])
+  assignedStaff     StaffAccount?     @relation("DeliveryAssignedStaff", fields: [assignedStaffAccountId], references: [id], onDelete: SetNull)
   attempts          DeliveryAttempt[]
 
   @@index([status])
   @@index([provider])
+  @@index([assignedStaffAccountId])
   @@map("deliveries")
 }
 

@@ -166,6 +166,45 @@ describe("staff authorization middleware", () => {
     expect(req.user?.permissions).toEqual(["orders.manage"]);
   });
 
+  it("combines permissions from every assigned staff role", async () => {
+    vi.spyOn(prisma.staffAccount, "findUnique").mockResolvedValue({
+      status: "ACTIVE",
+      roles: [
+        {
+          role: {
+            name: "SUPPORT_STAFF",
+            permissions: [
+              { permission: { name: "returns.manage" } },
+              { permission: { name: "refunds.manage" } },
+            ],
+          },
+        },
+        {
+          role: {
+            name: "ORDER_OPERATOR",
+            permissions: [
+              { permission: { name: "orders.manage" } },
+              { permission: { name: "fulfillment.manage" } },
+            ],
+          },
+        },
+      ],
+    } as never);
+    const req = staffRequest();
+    const next = vi.fn<NextFunction>();
+
+    await authorize("refunds.manage")(req, response, next);
+
+    expect(next).toHaveBeenCalledWith();
+    expect(req.user?.roles).toEqual(["SUPPORT_STAFF", "ORDER_OPERATOR"]);
+    expect(req.user?.permissions).toEqual([
+      "returns.manage",
+      "refunds.manage",
+      "orders.manage",
+      "fulfillment.manage",
+    ]);
+  });
+
   it("rejects a permission removed from the current database roles", async () => {
     vi.spyOn(prisma.staffAccount, "findUnique").mockResolvedValue({
       status: "ACTIVE",
