@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type {
@@ -6,27 +7,41 @@ import type {
 } from "./product-variant.validation";
 
 export async function createProductVariant(input: CreateProductVariantInput) {
-  const product = await prisma.product.findUnique({
-    where: { id: input.productId },
-  });
-  if (!product) throw new AppError("Product not found", 404);
-  if (!product.isActive) throw new AppError("Product is inactive", 400);
+  return prisma.$transaction(async (tx) => {
+    // Product activation/deactivation and variant creation serialize on
+    // the parent product row.
+    const lockedProducts = await tx.$queryRaw<
+      Array<{ id: string; isActive: boolean }>
+    >(
+      Prisma.sql`SELECT id, "isActive" FROM products WHERE id = ${input.productId}::uuid FOR UPDATE`,
+    );
 
-  const existingSku = await prisma.productVariant.findUnique({
-    where: { sku: input.sku },
-  });
-  if (existingSku) throw new AppError("A variant with this SKU already exists", 409);
+    if (lockedProducts.length === 0) {
+      throw new AppError("Product not found", 404);
+    }
+    if (!lockedProducts[0].isActive) {
+      throw new AppError("Product is inactive", 400);
+    }
 
-  return prisma.productVariant.create({
-    data: {
-      productId: input.productId,
-      sku: input.sku,
-      name: input.name,
-      price: input.price,
-      hasWarranty: input.hasWarranty ?? null,
-      warrantyDuration: input.warrantyDuration ?? null,
-      warrantyTerms: input.warrantyTerms ?? null,
-    },
+    const existingSku = await tx.productVariant.findUnique({
+      where: { sku: input.sku },
+    });
+    if (existingSku) {
+      throw new AppError("A variant with this SKU already exists", 409);
+    }
+
+    return tx.productVariant.create({
+      data: {
+        productId: input.productId,
+        sku: input.sku,
+        name: input.name,
+        price: input.price,
+        hasWarranty: input.hasWarranty ?? null,
+        warrantyDuration: input.warrantyDuration ?? null,
+        warrantyTerms: input.warrantyTerms ?? null,
+        isActive: true,
+      },
+    });
   });
 }
 
@@ -86,18 +101,31 @@ export async function setProductVariantActive(
   variantId: string,
   isActive: boolean,
 ) {
-  const variant = await prisma.productVariant.findUnique({
-    where: { id: variantId },
-    select: { id: true, product: { select: { isActive: true } } },
-  });
-  if (!variant) throw new AppError("Product variant not found", 404);
-  if (isActive && !variant.product.isActive) {
-    throw new AppError("Cannot activate a variant while its product is inactive", 400);
-  }
+  return prisma.$transaction(async (tx) => {
+    const variant = await tx.productVariant.findUnique({
+      where: { id: variantId },
+      select: { id: true, productId: true },
+    });
+    if (!variant) throw new AppError("Product variant not found", 404);
 
-  return prisma.productVariant.update({
-    where: { id: variantId },
-    data: { isActive },
+    // Lock the parent before checking its state. Product deactivation uses
+    // the same lock, preventing a stale active-state check.
+    const lockedProducts = await tx.$queryRaw<
+      Array<{ id: string; isActive: boolean }>
+    >(
+      Prisma.sql`SELECT id, "isActive" FROM products WHERE id = ${variant.productId}::uuid FOR UPDATE`,
+    );
+    if (lockedProducts.length === 0) {
+      throw new AppError("Product not found", 404);
+    }
+    if (isActive && !lockedProducts[0].isActive) {
+      throw new AppError("Cannot activate a variant while its product is inactive", 400);
+    }
+
+    return tx.productVariant.update({
+      where: { id: variantId },
+      data: { isActive },
+    });
   });
 }
 

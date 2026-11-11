@@ -116,31 +116,41 @@ function presentProduct(
 }
 
 export async function createProduct(input: CreateProductInput) {
-  const category = await prisma.category.findUnique({
-    where: { id: input.categoryId },
-  });
+  return prisma.$transaction(async (tx) => {
+    // Serialize product creation with category deactivation.
+    const lockedCategories = await tx.$queryRaw<
+      Array<{ id: string; isActive: boolean }>
+    >(
+      Prisma.sql`SELECT id, "isActive" FROM categories WHERE id = ${input.categoryId}::uuid FOR UPDATE`,
+    );
 
-  if (!category) throw new AppError("Category not found", 404);
-  if (!category.isActive) throw new AppError("Category is inactive", 400);
+    if (lockedCategories.length === 0) {
+      throw new AppError("Category not found", 404);
+    }
+    if (!lockedCategories[0].isActive) {
+      throw new AppError("Category is inactive", 400);
+    }
 
-  const existingProduct = await prisma.product.findUnique({
-    where: { slug: input.slug },
-  });
-  if (existingProduct) {
-    throw new AppError("A product with this slug already exists", 409);
-  }
+    const existingProduct = await tx.product.findUnique({
+      where: { slug: input.slug },
+    });
+    if (existingProduct) {
+      throw new AppError("A product with this slug already exists", 409);
+    }
 
-  return prisma.product.create({
-    data: {
-      categoryId: input.categoryId,
-      name: input.name,
-      slug: input.slug,
-      description: input.description ?? null,
-      basePrice: input.basePrice,
-      hasWarranty: input.hasWarranty,
-      warrantyDuration: input.warrantyDuration ?? null,
-      warrantyTerms: input.warrantyTerms ?? null,
-    },
+    return tx.product.create({
+      data: {
+        categoryId: input.categoryId,
+        name: input.name,
+        slug: input.slug,
+        description: input.description ?? null,
+        basePrice: input.basePrice,
+        hasWarranty: input.hasWarranty,
+        warrantyDuration: input.warrantyDuration ?? null,
+        warrantyTerms: input.warrantyTerms ?? null,
+        isActive: true,
+      },
+    });
   });
 }
 
@@ -181,67 +191,114 @@ export async function updateProduct(
   productId: string,
   input: UpdateProductInput,
 ) {
-  const current = await prisma.product.findUnique({ where: { id: productId } });
-  if (!current) throw new AppError("Product not found", 404);
+  return prisma.$transaction(async (tx) => {
+    // Lock the product first. Product lifecycle operations use this same
+    // lock before checking or changing the product.
+    const lockedProducts = await tx.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`SELECT id FROM products WHERE id = ${productId}::uuid FOR UPDATE`,
+    );
+    if (lockedProducts.length === 0) {
+      throw new AppError("Product not found", 404);
+    }
 
-  const categoryId = input.categoryId ?? current.categoryId;
-  if (input.categoryId !== undefined) {
-    const category = await prisma.category.findUnique({ where: { id: categoryId } });
-    if (!category) throw new AppError("Category not found", 404);
-    if (!category.isActive) throw new AppError("Category is inactive", 400);
-  }
+    const current = await tx.product.findUnique({ where: { id: productId } });
+    if (!current) throw new AppError("Product not found", 404);
 
-  if (input.slug && input.slug !== current.slug) {
-    const existing = await prisma.product.findUnique({ where: { slug: input.slug } });
-    if (existing) throw new AppError("A product with this slug already exists", 409);
-  }
+    const categoryId = input.categoryId ?? current.categoryId;
+    if (input.categoryId !== undefined) {
+      // Lock the target category before allowing a product to move into it.
+      const lockedCategories = await tx.$queryRaw<
+        Array<{ id: string; isActive: boolean }>
+      >(
+        Prisma.sql`SELECT id, "isActive" FROM categories WHERE id = ${categoryId}::uuid FOR UPDATE`,
+      );
+      if (lockedCategories.length === 0) {
+        throw new AppError("Category not found", 404);
+      }
+      if (!lockedCategories[0].isActive) {
+        throw new AppError("Category is inactive", 400);
+      }
+    }
 
-  const hasWarranty = input.hasWarranty ?? current.hasWarranty;
-  const warrantyDuration =
-    input.warrantyDuration === undefined
-      ? current.warrantyDuration
-      : input.warrantyDuration;
-  const warrantyTerms =
-    input.warrantyTerms === undefined ? current.warrantyTerms : input.warrantyTerms;
+    if (input.slug && input.slug !== current.slug) {
+      const existing = await tx.product.findUnique({ where: { slug: input.slug } });
+      if (existing) {
+        throw new AppError("A product with this slug already exists", 409);
+      }
+    }
 
-  if (hasWarranty && !warrantyDuration) {
-    throw new AppError("Warranty duration is required when warranty is enabled", 400);
-  }
-  if (
-    !hasWarranty &&
-    ((input.warrantyDuration !== undefined && input.warrantyDuration !== null) ||
-      (input.warrantyTerms !== undefined && input.warrantyTerms !== null))
-  ) {
-    throw new AppError("Warranty details cannot be supplied when warranty is disabled", 400);
-  }
+    const hasWarranty = input.hasWarranty ?? current.hasWarranty;
+    const warrantyDuration =
+      input.warrantyDuration === undefined
+        ? current.warrantyDuration
+        : input.warrantyDuration;
+    const warrantyTerms =
+      input.warrantyTerms === undefined ? current.warrantyTerms : input.warrantyTerms;
 
-  return prisma.product.update({
-    where: { id: productId },
-    data: {
-      ...(input.categoryId !== undefined ? { categoryId } : {}),
-      ...(input.name !== undefined ? { name: input.name } : {}),
-      ...(input.slug !== undefined ? { slug: input.slug } : {}),
-      ...(input.description !== undefined ? { description: input.description } : {}),
-      ...(input.basePrice !== undefined ? { basePrice: input.basePrice } : {}),
-      hasWarranty,
-      warrantyDuration: hasWarranty ? warrantyDuration : null,
-      warrantyTerms: hasWarranty ? warrantyTerms : null,
-    },
+    if (hasWarranty && !warrantyDuration) {
+      throw new AppError("Warranty duration is required when warranty is enabled", 400);
+    }
+    if (
+      !hasWarranty &&
+      ((input.warrantyDuration !== undefined && input.warrantyDuration !== null) ||
+        (input.warrantyTerms !== undefined && input.warrantyTerms !== null))
+    ) {
+      throw new AppError("Warranty details cannot be supplied when warranty is disabled", 400);
+    }
+
+    return tx.product.update({
+      where: { id: productId },
+      data: {
+        ...(input.categoryId !== undefined ? { categoryId } : {}),
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.slug !== undefined ? { slug: input.slug } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.basePrice !== undefined ? { basePrice: input.basePrice } : {}),
+        hasWarranty,
+        warrantyDuration: hasWarranty ? warrantyDuration : null,
+        warrantyTerms: hasWarranty ? warrantyTerms : null,
+      },
+    });
   });
 }
 
 export async function setProductActive(productId: string, isActive: boolean) {
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    select: { id: true, category: { select: { isActive: true } } },
-  });
-  if (!product) throw new AppError("Product not found", 404);
-  if (isActive && !product.category.isActive) {
-    throw new AppError("Cannot activate a product in an inactive category", 400);
-  }
-  return prisma.product.update({
-    where: { id: productId },
-    data: { isActive },
+  return prisma.$transaction(async (tx) => {
+    // Product activation/deactivation shares a lock with variant lifecycle
+    // operations so the parent state cannot change during the check.
+    const lockedProducts = await tx.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`SELECT id FROM products WHERE id = ${productId}::uuid FOR UPDATE`,
+    );
+    if (lockedProducts.length === 0) {
+      throw new AppError("Product not found", 404);
+    }
+
+    const product = await tx.product.findUnique({
+      where: { id: productId },
+      select: { id: true, categoryId: true },
+    });
+    if (!product) throw new AppError("Product not found", 404);
+
+    if (isActive) {
+      // Lock the category before checking it. Category deactivation uses
+      // this same row lock before counting active products.
+      const lockedCategories = await tx.$queryRaw<
+        Array<{ id: string; isActive: boolean }>
+      >(
+        Prisma.sql`SELECT id, "isActive" FROM categories WHERE id = ${product.categoryId}::uuid FOR UPDATE`,
+      );
+      if (lockedCategories.length === 0) {
+        throw new AppError("Category not found", 404);
+      }
+      if (!lockedCategories[0].isActive) {
+        throw new AppError("Cannot activate a product in an inactive category", 400);
+      }
+    }
+
+    return tx.product.update({
+      where: { id: productId },
+      data: { isActive },
+    });
   });
 }
 
