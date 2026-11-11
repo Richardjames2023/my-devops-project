@@ -19,7 +19,7 @@ export async function createProductVariant(input: CreateProductVariantInput) {
     if (lockedProducts.length === 0) {
       throw new AppError("Product not found", 404);
     }
-    if (!lockedProducts[0].isActive) {
+    if (!lockedProducts[0]?.isActive) {
       throw new AppError("Product is inactive", 400);
     }
 
@@ -118,7 +118,7 @@ export async function setProductVariantActive(
     if (lockedProducts.length === 0) {
       throw new AppError("Product not found", 404);
     }
-    if (isActive && !lockedProducts[0].isActive) {
+    if (isActive && !lockedProducts[0]?.isActive) {
       throw new AppError("Cannot activate a variant while its product is inactive", 400);
     }
 
