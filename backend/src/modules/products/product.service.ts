@@ -127,7 +127,7 @@ export async function createProduct(input: CreateProductInput) {
     if (lockedCategories.length === 0) {
       throw new AppError("Category not found", 404);
     }
-    if (!lockedCategories[0].isActive) {
+    if (!lockedCategories[0]?.isActive) {
       throw new AppError("Category is inactive", 400);
     }
 
@@ -215,7 +215,7 @@ export async function updateProduct(
       if (lockedCategories.length === 0) {
         throw new AppError("Category not found", 404);
       }
-      if (!lockedCategories[0].isActive) {
+      if (!lockedCategories[0]?.isActive) {
         throw new AppError("Category is inactive", 400);
       }
     }
@@ -290,7 +290,7 @@ export async function setProductActive(productId: string, isActive: boolean) {
       if (lockedCategories.length === 0) {
         throw new AppError("Category not found", 404);
       }
-      if (!lockedCategories[0].isActive) {
+      if (!lockedCategories[0]?.isActive) {
         throw new AppError("Cannot activate a product in an inactive category", 400);
       }
     }
