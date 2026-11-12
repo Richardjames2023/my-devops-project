@@ -32,27 +32,30 @@ type Draft = {
 type Policy = {
   category: NotificationCategory;
   inAppMandatory: boolean;
-  emailMandatory: boolean;
+  emailMode: "DISABLED" | "GUEST_TRANSACTIONAL" | "MANDATORY";
 };
 
 export function getNotificationEventPolicy(eventType: string): Policy {
   switch (eventType) {
+    // Payment confirmation is a transactional receipt and is sent on both channels.
     case "payment.succeeded":
     case "payment.reconciliation_required":
-      return { category: "PAYMENT", inAppMandatory: true, emailMandatory: true };
+      return { category: "PAYMENT", inAppMandatory: true, emailMode: "MANDATORY" };
     case "delivery.delivered":
-      return { category: "DELIVERY", inAppMandatory: false, emailMandatory: false };
+      return { category: "DELIVERY", inAppMandatory: false, emailMode: "DISABLED" };
     case "order.created":
-      return { category: "ORDER", inAppMandatory: false, emailMandatory: false };
+      // Registered customers receive an inbox notification; guests receive the
+      // transactional confirmation email because they have no inbox identity.
+      return { category: "ORDER", inAppMandatory: false, emailMode: "GUEST_TRANSACTIONAL" };
     case "return.requested":
     case "return.received":
-      return { category: "RETURN", inAppMandatory: false, emailMandatory: false };
+      return { category: "RETURN", inAppMandatory: false, emailMode: "DISABLED" };
     case "warranty.claim.created":
-      return { category: "WARRANTY", inAppMandatory: false, emailMandatory: false };
+      return { category: "WARRANTY", inAppMandatory: false, emailMode: "DISABLED" };
     case "refund.needs_attention":
-      return { category: "REFUND", inAppMandatory: true, emailMandatory: true };
+      return { category: "REFUND", inAppMandatory: true, emailMode: "MANDATORY" };
     case "inventory.low_stock":
-      return { category: "INVENTORY", inAppMandatory: false, emailMandatory: false };
+      return { category: "INVENTORY", inAppMandatory: false, emailMode: "DISABLED" };
     default:
       throw new Error("Unsupported notification event type: " + eventType);
   }
@@ -570,12 +573,14 @@ async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
         }
       }
 
-      // Email delivery is evaluated independently from in-app visibility.
-      // An email-only preference therefore does not create an inbox item.
+      // Email policy is decided by the event, not by a recipient's broad
+      // category preference. Routine events cannot be promoted to email.
       const emailDrafts = drafts.filter((draft) => {
-        const preference = preferenceMap.get(identity(draft));
-        const defaultEnabled = draft.recipientType === "CUSTOMER";
-        return policy.emailMandatory || (preference?.emailEnabled ?? defaultEnabled);
+        if (policy.emailMode === "MANDATORY") return true;
+        if (policy.emailMode === "GUEST_TRANSACTIONAL") {
+          return draft.recipientType === "CUSTOMER" && draft.customerUserId === null;
+        }
+        return false;
       });
       if (emailDrafts.length) {
         await tx.notificationEmailDelivery.createMany({
