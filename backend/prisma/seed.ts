@@ -153,16 +153,22 @@ async function main(): Promise<void> {
       return permissionId;
     });
 
-    // Synchronize each role atomically so a failed insert cannot leave it
-    // without its previously assigned permissions.
+    // Add the permissions declared for this role without deleting
+    // assignments managed separately or granted by other features.
     await prisma.$transaction(async (tx) => {
-      await tx.rolePermission.deleteMany({ where: { roleId: role.id } });
-      if (rolePermissionIds.length) {
-        await tx.rolePermission.createMany({
-          data: rolePermissionIds.map((permissionId) => ({
+      for (const permissionId of rolePermissionIds) {
+        await tx.rolePermission.upsert({
+          where: {
+            roleId_permissionId: {
+              roleId: role.id,
+              permissionId,
+            },
+          },
+          update: {},
+          create: {
             roleId: role.id,
             permissionId,
-          })),
+          },
         });
       }
     });
