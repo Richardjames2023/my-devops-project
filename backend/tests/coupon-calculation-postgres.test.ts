@@ -19,19 +19,20 @@ const {
   updateCoupon,
   disconnectDatabase,
   Prisma,
-} =
-  await import("../src/modules/coupons/coupon.service").then(
-    async (service) => {
-      const database = await import("../src/infrastructure/prisma/client");
-      const prismaTypes = await import("@prisma/client");
-      return {
-        calculateCouponForOrder: service.calculateCouponForOrder,
-        updateCoupon: service.updateCoupon,
-        disconnectDatabase: database.disconnectDatabase,
-        Prisma: prismaTypes.Prisma,
-      };
-    },
-  );
+} = await import("../src/modules/coupons/coupon.service").then(
+  async (service) => {
+    const database = await import("../src/infrastructure/prisma/client");
+    const prismaTypes = await import("@prisma/client");
+
+    return {
+      calculateCouponForOrder: service.calculateCouponForOrder,
+      hashCouponCustomerKey: service.hashCouponCustomerKey,
+      updateCoupon: service.updateCoupon,
+      disconnectDatabase: database.disconnectDatabase,
+      Prisma: prismaTypes.Prisma,
+    };
+  },
+);
 
 interface Fixture {
   couponId: string;
