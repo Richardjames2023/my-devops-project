@@ -169,25 +169,25 @@ async function main(): Promise<void> {
           },
         });
       }
-    });
 
-    // These grants were previously included in the DELIVERY_AGENT seed role.
-    // Revoke only these explicitly retired permissions so existing role
-    // assignments are corrected without disturbing unrelated/manual grants.
-    if (roleName === "DELIVERY_AGENT") {
-      const retiredPermissionIds = ["orders.read", "fulfillment.read"]
-        .map((permissionName) => permissionRecords.get(permissionName))
-        .filter((permissionId): permissionId is string => Boolean(permissionId));
+      // These grants were previously included in the DELIVERY_AGENT seed role.
+      // Revoke only these explicitly retired permissions so existing seeded
+      // assignments are corrected without disturbing unrelated role grants.
+      if (roleName === "DELIVERY_AGENT") {
+        const retiredPermissionIds = ["orders.read", "fulfillment.read"]
+          .map((permissionName) => permissionRecords.get(permissionName))
+          .filter((permissionId): permissionId is string => Boolean(permissionId));
 
-      if (retiredPermissionIds.length > 0) {
-        await prisma.rolePermission.deleteMany({
-          where: {
-            roleId: role.id,
-            permissionId: { in: retiredPermissionIds },
-          },
-        });
+        if (retiredPermissionIds.length > 0) {
+          await tx.rolePermission.deleteMany({
+            where: {
+              roleId: role.id,
+              permissionId: { in: retiredPermissionIds },
+            },
+          });
+        }
       }
-    }
+    });
   }
 
   console.log("Roles seeded.");
