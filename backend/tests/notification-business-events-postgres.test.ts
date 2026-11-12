@@ -264,7 +264,7 @@ describe("PostgreSQL notification business event fan-out", () => {
     );
     expect(emails.rows).toHaveLength(1);
     expect(emails.rows[0]).toMatchObject({
-      recipientEmail: "${recipientStaffId}@notification-business.test",
+      recipientEmail: recipientStaffId + "@notification-business.test",
       templateKey: "staff.security-event",
     });
   });
