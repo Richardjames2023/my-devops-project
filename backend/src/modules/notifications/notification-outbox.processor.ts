@@ -43,6 +43,10 @@ export function getNotificationEventPolicy(eventType: string): Policy {
       return { category: "PAYMENT", inAppMandatory: true, emailMode: "MANDATORY" };
     case "delivery.delivered":
       return { category: "DELIVERY", inAppMandatory: false, emailMode: "DISABLED" };
+    case "delivery.exception":
+      return { category: "DELIVERY", inAppMandatory: true, emailMode: "MANDATORY" };
+    case "staff.security_event":
+      return { category: "SECURITY", inAppMandatory: true, emailMode: "MANDATORY" };
     case "order.created":
       // Registered customers receive an inbox notification; guests receive the
       // transactional confirmation email because they have no inbox identity.
@@ -461,6 +465,123 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       templateKey: "staff.payment-reconciliation-required",
       templateData: { title, body, actionUrl, paymentId: payment.id, orderId: payment.order.id, orderNumber: payment.order.orderNumber },
     }));
+  }
+
+  if (event.eventType === "delivery.exception") {
+    const deliveryId = payloadString(event.payload, "deliveryId") ?? event.aggregateId;
+    const delivery = await tx.delivery.findUnique({
+      where: { id: deliveryId },
+      include: {
+        package: {
+          include: {
+            fulfillment: {
+              include: {
+                order: { include: { user: { select: { id: true, email: true } } } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!delivery) throw new Error("Delivery not found for exception notification: " + deliveryId);
+
+    const order = delivery.package.fulfillment.order;
+    const user = order.user;
+    const customerEmail = user?.email ?? order.customerEmail;
+    const drafts: Draft[] = [];
+
+    if (customerEmail) {
+      const title = "Delivery issue with your order";
+      const body = "Delivery for order " + order.orderNumber + " has encountered an issue. Our team is working to resolve it.";
+      const actionUrl = user ? "/account/orders/" + order.id : "/orders/guest";
+      drafts.push({
+        recipientType: "CUSTOMER", customerUserId: user?.id ?? null, staffAccountId: null,
+        recipientEmail: customerEmail, category: policy.category, title, body, actionUrl,
+        metadata: { deliveryId: delivery.id, orderId: order.id, orderNumber: order.orderNumber },
+        templateKey: "customer.delivery-exception",
+        templateData: { orderNumber: order.orderNumber, actionUrl },
+      });
+    }
+
+    const staff = await tx.staffAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true, email: true,
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: { permission: { select: { name: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const title = "Delivery exception requires attention";
+    const body = "Delivery for order " + order.orderNumber + " has entered FAILED status and requires follow-up.";
+    const actionUrl = "/staff/deliveries/" + delivery.id;
+    drafts.push(...staff.filter((account) => account.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) => permission.name === "deliveries.manage"),
+    )).map((account) => ({
+      recipientType: "STAFF" as const, customerUserId: null, staffAccountId: account.id,
+      recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+      metadata: { deliveryId: delivery.id, orderId: order.id, orderNumber: order.orderNumber },
+      templateKey: "staff.delivery-exception",
+      templateData: { orderNumber: order.orderNumber, actionUrl },
+    })));
+    return drafts;
+  }
+
+  if (event.eventType === "staff.security_event") {
+    const actorId = payloadString(event.payload, "actorStaffAccountId");
+    const targetId = payloadString(event.payload, "targetStaffAccountId");
+    const action = payloadString(event.payload, "action");
+    if (!actorId || !targetId || !action) {
+      throw new Error("Staff security event is missing actor, target, or action");
+    }
+
+    const [actor, target, staff] = await Promise.all([
+      tx.staffAccount.findUnique({ where: { id: actorId }, select: { email: true } }),
+      tx.staffAccount.findUnique({ where: { id: targetId }, select: { email: true } }),
+      tx.staffAccount.findMany({
+        where: { status: "ACTIVE", id: { not: actorId } },
+        select: {
+          id: true, email: true,
+          roles: {
+            select: {
+              role: {
+                select: {
+                  permissions: {
+                    select: { permission: { select: { name: true } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    if (!target) throw new Error("Target staff account not found for security event: " + targetId);
+    const drafts = staff.filter((account) => account.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) =>
+        permission.name === "staff.manage" || permission.name === "audit_logs.read",
+      ),
+    )).map((account) => {
+      const title = "Staff security change";
+      const body = action + " was performed for " + target.email + (actor ? " by " + actor.email : "") + ".";
+      const actionUrl = "/staff/accounts/" + targetId;
+      return {
+        recipientType: "STAFF" as const, customerUserId: null, staffAccountId: account.id,
+        recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+        metadata: { actorStaffAccountId: actorId, targetStaffAccountId: targetId, action },
+        templateKey: "staff.security-event",
+        templateData: { action, targetEmail: target.email, actorEmail: actor?.email ?? "An administrator", actionUrl },
+      };
+    });
+    return drafts;
   }
 
   if (event.eventType === "delivery.delivered") {
