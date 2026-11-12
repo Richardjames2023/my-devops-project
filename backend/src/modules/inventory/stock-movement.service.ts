@@ -1,6 +1,10 @@
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
-import type { CreateStockMovementInput } from "./stock-movement.validation";
+import { createAuditLog } from "../../common/utils/audit-log";
+import type {
+  AdjustStockInput,
+  CreateStockMovementInput,
+} from "./stock-movement.validation";
 import { publishInventoryLowStockIfCrossed } from "./inventory-low-stock.notification";
 
 export async function createStockMovement(
@@ -81,6 +85,106 @@ export async function createStockMovement(
 
     return {
       inventory: updatedInventory,
+      movement,
+    };
+  });
+}
+
+/**
+ * Applies a staff-directed stock correction and records both the movement
+ * and an actor-attributed audit log in the same database transaction.
+ */
+export async function adjustStock(
+  input: AdjustStockInput,
+  staffAccountId: string,
+  auditMeta?: { ipAddress?: string; userAgent?: string },
+) {
+  return prisma.$transaction(async (tx) => {
+    // Lock the row before reading its current counters. This keeps the
+    // available-stock check and resulting audit snapshot consistent.
+    const lockedRows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM inventory
+      WHERE id = ${input.inventoryId}::uuid
+      FOR UPDATE
+    `;
+
+    if (lockedRows.length === 0) {
+      throw new AppError("Inventory not found", 404);
+    }
+
+    const before = await tx.inventory.findUnique({
+      where: { id: input.inventoryId },
+    });
+
+    if (!before) {
+      throw new AppError("Inventory not found", 404);
+    }
+
+    const availableBefore =
+      before.quantity - before.reservedQuantity - before.quarantineQuantity;
+
+    if (input.direction === "DECREASE" && input.quantity > availableBefore) {
+      throw new AppError(
+        "Adjustment exceeds available stock; reserved and quarantined units cannot be removed",
+        409,
+      );
+    }
+
+    const updated = await tx.inventory.update({
+      where: { id: before.id },
+      data: {
+        quantity:
+          input.direction === "INCREASE"
+            ? { increment: input.quantity }
+            : { decrement: input.quantity },
+      },
+    });
+
+    await publishInventoryLowStockIfCrossed(tx, before, updated);
+
+    const movement = await tx.stockMovement.create({
+      data: {
+        inventoryId: before.id,
+        type: "ADJUSTMENT",
+        quantity: input.quantity,
+        reference: input.reference ?? null,
+        reason: input.reason,
+        notes: [
+          `Direction: ${input.direction}`,
+          input.notes,
+        ].filter(Boolean).join("\n"),
+      },
+    });
+
+    await createAuditLog(tx, {
+      staffAccountId,
+      action: "INVENTORY_STOCK_ADJUSTED",
+      entity: "Inventory",
+      entityId: before.id,
+      oldValues: {
+        quantity: before.quantity,
+        reservedQuantity: before.reservedQuantity,
+        quarantineQuantity: before.quarantineQuantity,
+        availableQuantity: availableBefore,
+      },
+      newValues: {
+        quantity: updated.quantity,
+        reservedQuantity: updated.reservedQuantity,
+        quarantineQuantity: updated.quarantineQuantity,
+        availableQuantity:
+          updated.quantity - updated.reservedQuantity - updated.quarantineQuantity,
+        direction: input.direction,
+        adjustmentQuantity: input.quantity,
+        reason: input.reason,
+        reference: input.reference ?? null,
+      },
+      ...(auditMeta?.ipAddress ? { ipAddress: auditMeta.ipAddress } : {}),
+      ...(auditMeta?.userAgent ? { userAgent: auditMeta.userAgent } : {}),
+    });
+
+    return {
+      inventory: updated,
       movement,
     };
   });
