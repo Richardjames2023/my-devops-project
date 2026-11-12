@@ -44,6 +44,18 @@ describe("notification event policy", () => {
     });
   });
 
+  it("requires both channels for delivery exceptions", () => {
+    expect(getNotificationEventPolicy("delivery.exception")).toEqual({
+      category: "DELIVERY", inAppMandatory: true, emailMode: "MANDATORY",
+    });
+  });
+
+  it("requires both channels for staff security events", () => {
+    expect(getNotificationEventPolicy("staff.security_event")).toEqual({
+      category: "SECURITY", inAppMandatory: true, emailMode: "MANDATORY",
+    });
+  });
+
   it("requires both channels for refund intervention alerts", () => {
     expect(getNotificationEventPolicy("refund.needs_attention")).toEqual({
       category: "REFUND", inAppMandatory: true, emailMode: "MANDATORY",
