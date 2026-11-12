@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Prisma } from "@prisma/client";
+import { Prisma, type Coupon } from '@prisma/client';
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import { createAuditLog } from "../../common/utils/audit-log";
@@ -30,7 +30,7 @@ function isUniqueConstraintError(error: unknown): boolean {
   );
 }
 
-function couponAuditValues(coupon: Prisma.Coupon): Prisma.InputJsonObject {
+function couponAuditValues(coupon: Coupon): Prisma.InputJsonObject {
   return {
     code: coupon.code,
     description: coupon.description,
