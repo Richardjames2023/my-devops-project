@@ -26,6 +26,7 @@ This document defines the notification channel policy enforced by the transactio
 - Payment, security, and refund email notifications cannot be disabled.
 - Event-level mandatory policies take precedence over category preferences.
 - Legacy stored email preferences do not override the event policy.
+- Already-queued routine outbox email deliveries are marked `SUPPRESSED` before the email worker claims them; direct transactional emails without an outbox recipient key are unaffected.
 - Guest order confirmation and successful payment receipt are explicit transactional email exceptions.
 
 ## Staff invitations
