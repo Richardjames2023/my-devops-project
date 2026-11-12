@@ -268,9 +268,19 @@ async function createOrderFromCart(
           customerKeyHash: couponResult.customerKeyHash,
           discountAmount: couponResult.discountAmount,
           status: "RESERVED",
-          expiresAt: couponResult.expiresAt,
         },
       });
+
+      // Set reservation expiry using the same database clock used by
+      // expiry cleanup and payment initialization.
+      await tx.$executeRaw`
+        UPDATE coupon_redemptions
+        SET
+          "expiresAt" = CURRENT_TIMESTAMP + INTERVAL '15 minutes',
+          "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "orderId" = ${order.id}::uuid
+          AND status = 'RESERVED'
+      `;
     }
 
     await publishNotificationEvent(tx, {
