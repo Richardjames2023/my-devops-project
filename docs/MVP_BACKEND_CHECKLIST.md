@@ -132,6 +132,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
   - [~] Guest order confirmations remain email-only transactional exceptions because guests have no inbox identity; local validation pending.
   - [~] Successful payment receipts remain mandatory in-app and email; local validation pending.
   - [~] Routine order, delivery-completed, return, warranty, and low-stock events cannot be opted into email through recipient preferences; local validation pending.
+  - [~] Already-queued routine outbox emails are suppressed before the email worker claims them; local validation pending.
   - [~] Delivery status transitions into FAILED publish a transactional delivery-exception event; local validation pending.
   - [~] Staff role/status changes publish transactional security events; local validation pending.
   - [ ] Verify delivery-exception and staff-security events fan out to the intended recipients with mandatory email.
