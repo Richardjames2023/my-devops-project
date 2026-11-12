@@ -46,7 +46,7 @@ async function createFixture(input: {
     `INSERT INTO notification_outbox
      (id, "eventKey", "eventType", "aggregateType", "aggregateId", payload,
       status, "attemptCount", "availableAt", "createdAt", "updatedAt", "processedAt")
-     VALUES ($1, $2, 'test.email', 'TEST', $3, '{}'::jsonb,
+     VALUES ($1, $2, 'payment.reconciliation_required', 'TEST', $3, '{}'::jsonb,
              'PROCESSED', 1, NOW(), NOW(), NOW(), NOW())`,
     [outboxId, `email-test:${outboxId}`, outboxId],
   );
