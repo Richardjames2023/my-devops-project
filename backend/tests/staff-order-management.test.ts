@@ -84,6 +84,19 @@ describe("staff order management HTTP endpoints", () => {
     expect(response.body.pagination.total).toBe(0);
   });
 
+  it("includes the full end date when the to filter is date-only", async () => {
+    const response = await request(app)
+      .get("/api/v1/staff/orders?to=2026-11-01")
+      .set("Authorization", `Bearer ${token(["orders.read"])}`);
+
+    expect(response.status).toBe(200);
+    expect(mocks.listStaffOrders).toHaveBeenCalledWith({
+      page: 1,
+      limit: 20,
+      to: new Date("2026-11-01T23:59:59.999Z"),
+    });
+  });
+
   it("rejects invalid filters and date ranges", async () => {
     const response = await request(app)
       .get("/api/v1/staff/orders?page=0&limit=101&status=UNKNOWN&from=2026-11-20&to=2026-11-01")
