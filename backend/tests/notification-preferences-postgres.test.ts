@@ -121,14 +121,14 @@ describe("PostgreSQL notification preference APIs", () => {
     expect(response.body.preferences.find((item: { category: string }) => item.category === "PAYMENT"))
       .toMatchObject({ inAppEnabled: true, emailEnabled: true, mandatory: { inApp: true, email: true } });
     expect(response.body.preferences.find((item: { category: string }) => item.category === "DELIVERY"))
-      .toMatchObject({ inAppEnabled: true, emailEnabled: true, mandatory: { inApp: false, email: false } });
+      .toMatchObject({ inAppEnabled: true, emailEnabled: false, mandatory: { inApp: false, email: false } });
   });
 
-  it("allows customers to change optional channels and persists the preference", async () => {
+  it("allows customers to change routine in-app preferences but not enable email", async () => {
     await request(app)
       .put("/api/v1/notifications/preferences/ORDER")
       .set("Authorization", `Bearer ${customer.token}`)
-      .send({ inAppEnabled: false, emailEnabled: false })
+      .send({ inAppEnabled: false })
       .expect(200);
 
     const response = await request(app)
@@ -151,6 +151,12 @@ describe("PostgreSQL notification preference APIs", () => {
       .put("/api/v1/notifications/preferences/REFUND")
       .set("Authorization", `Bearer ${customer.token}`)
       .send({ inAppEnabled: false })
+      .expect(400);
+
+    await request(app)
+      .put("/api/v1/notifications/preferences/ORDER")
+      .set("Authorization", `Bearer ${customer.token}`)
+      .send({ emailEnabled: true })
       .expect(400);
 
     await request(app)
@@ -195,7 +201,7 @@ describe("PostgreSQL notification preference APIs", () => {
       .set("Authorization", `Bearer ${otherCustomer.token}`)
       .expect(200);
     expect(otherCustomerSettings.body.preferences.find((item: { category: string }) => item.category === "ORDER"))
-      .toMatchObject({ inAppEnabled: true, emailEnabled: true });
+      .toMatchObject({ inAppEnabled: true, emailEnabled: false });
   });
 
   it("rejects unauthenticated, cross-identity, and inactive staff access", async () => {
