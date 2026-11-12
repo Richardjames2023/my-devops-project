@@ -99,6 +99,14 @@ describe("Delivery Agent route permissions", () => {
     );
   });
 
+  it("does not expose the fulfillment queue to delivery agents", async () => {
+    const response = await request(app)
+      .get("/api/v1/fulfillments/ready-orders")
+      .set("Authorization", "Bearer " + makeToken());
+
+    expect(response.status).toBe(403);
+  });
+
   it("does not grant an agent fulfillment-management access", async () => {
     const response = await request(app)
       .post("/api/v1/fulfillments")
