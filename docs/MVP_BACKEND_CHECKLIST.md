@@ -86,14 +86,15 @@ This checklist is an implementation tracker, not a claim that every item has alr
 
 ## 6. Customer wishlist
 
-- [ ] Implement customer wishlist persistence.
-  - [ ] Authenticated customers can add and remove products.
-  - [ ] Customers can view their wishlist with product and variant availability/status.
-  - [ ] Prevent duplicate entries for the same customer/product (and variant, if wishlist entries are variant-specific).
-  - [ ] Validate that referenced products/variants exist; define behavior for deactivated or unavailable products.
-  - [ ] Enforce customer ownership and prevent cross-account access.
-  - [ ] Decide whether guest wishlists are excluded from MVP or supported through a secure guest session.
-  - [ ] Add database constraints, migration, validation, API documentation, and unit/PostgreSQL integration tests.
+- [~] Customer wishlist implementation is on `feat/customer-wishlist`; pending local migration, build, and test validation before merge.
+  - [x] Authenticated customers can add and remove products.
+  - [x] Customers can view saved products with image, variants, and current availability/status.
+  - [x] Prevent duplicate entries for the same customer/product with a database unique constraint and idempotent upsert.
+  - [x] Validate product existence and allow only active products to be newly added.
+  - [x] Retain previously saved products if later deactivated or unavailable and expose their current status.
+  - [x] Enforce customer ownership; guest and staff identities are excluded.
+  - [x] Add database migration, request validation, route tests, PostgreSQL integration tests, and API documentation.
+  - [ ] Merge to `dev` after local validation.
 - [ ] Decide whether moving a wishlist item into the cart is required for the first MVP release. If included, it must use the existing cart validation and pricing rules.
 
 ## 7. Coupons and discounts
