@@ -508,12 +508,14 @@ async function createPaymentWithAccess(
               );
             }
 
-            await tx.couponRedemption.updateMany({
-              where: { orderId: currentPayment.orderId, status: "RESERVED" },
-              data: {
-                expiresAt: new Date(Date.now() + STALE_PENDING_PAYMENT_GRACE_PERIOD_MS),
-              },
-            });
+            await tx.$executeRaw`
+              UPDATE coupon_redemptions
+              SET
+                "expiresAt" = CURRENT_TIMESTAMP + (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond'),
+                "updatedAt" = CURRENT_TIMESTAMP
+              WHERE "orderId" = ${currentPayment.orderId}::uuid
+                AND status = 'RESERVED'
+            `;
 
             const reservations = await tx.inventoryReservation.findMany({
               where: {
@@ -879,10 +881,16 @@ async function markPaymentSuccessfulWithAccess(
             },
           });
 
-          await tx.couponRedemption.updateMany({
-            where: { orderId: currentPayment.orderId, status: "RESERVED" },
-            data: { status: "REDEEMED", redeemedAt: now, expiresAt: null },
-          });
+          await tx.$executeRaw`
+            UPDATE coupon_redemptions
+            SET
+              status = 'REDEEMED',
+              "redeemedAt" = CURRENT_TIMESTAMP,
+              "expiresAt" = NULL,
+              "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "orderId" = ${currentPayment.orderId}::uuid
+              AND status = 'RESERVED'
+          `;
 
           await publishNotificationEvent(tx, {
             eventType: "payment.succeeded",
@@ -1054,10 +1062,16 @@ async function markPaymentSuccessfulWithAccess(
 
           // A verified successful charge consumes the coupon even when
           // inventory needs separate manual reconciliation.
-          await tx.couponRedemption.updateMany({
-            where: { orderId: currentPayment.orderId, status: "RESERVED" },
-            data: { status: "REDEEMED", redeemedAt: new Date(), expiresAt: null },
-          });
+          await tx.$executeRaw`
+            UPDATE coupon_redemptions
+            SET
+              status = 'REDEEMED',
+              "redeemedAt" = CURRENT_TIMESTAMP,
+              "expiresAt" = NULL,
+              "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "orderId" = ${currentPayment.orderId}::uuid
+              AND status = 'RESERVED'
+          `;
 
           // Create the reconciliation record in the same transaction
           // that marks the payment as successful.
@@ -1293,12 +1307,14 @@ export async function reconcileUnknownPayment(paymentId: string) {
             );
           }
 
-          await tx.couponRedemption.updateMany({
-            where: { orderId: currentPayment.orderId, status: "RESERVED" },
-            data: {
-              expiresAt: new Date(Date.now() + STALE_PENDING_PAYMENT_GRACE_PERIOD_MS),
-            },
-          });
+          await tx.$executeRaw`
+            UPDATE coupon_redemptions
+            SET
+              "expiresAt" = CURRENT_TIMESTAMP + (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond'),
+              "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "orderId" = ${currentPayment.orderId}::uuid
+              AND status = 'RESERVED'
+          `;
 
           const reservations = await tx.inventoryReservation.findMany({
             where: {
