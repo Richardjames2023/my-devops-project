@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -293,6 +293,9 @@ describe("PostgreSQL coupon calculation and reservation limits", () => {
     const different = hashCouponCustomerKey("guest:other@email.com");
     expect(first).toBe(normalized);
     expect(first).not.toBe(different);
+    expect(first).not.toBe(
+      createHash("sha256").update("guest:example@email.com").digest("hex"),
+    );
     expect(first).toMatch(/^[a-f0-9]{64}$/);
   });
 
