@@ -136,6 +136,47 @@ async function createPaymentWithAccess(
       throw new AppError("Cannot pay for an empty order", 400);
     }
 
+    if (order.couponId) {
+      const redemption = await tx.couponRedemption.findUnique({
+        where: { orderId: order.id },
+      });
+      if (!redemption || redemption.status !== "RESERVED") {
+        throw new AppError(
+          "The coupon reservation for this order is no longer valid. Please create a new order and apply the coupon again.",
+          409,
+        );
+      }
+
+      // Use the database clock because redemption expiry is stored as a
+      // timestamp without time zone and must be compared in the DB session's
+      // timezone. Return an outcome instead of throwing so the release commits.
+      const expiredRedemptions = await tx.$queryRaw<Array<{ id: string }>>`
+        UPDATE coupon_redemptions
+        SET
+          status = 'RELEASED',
+          "releasedAt" = CURRENT_TIMESTAMP,
+          "expiresAt" = NULL,
+          "updatedAt" = CURRENT_TIMESTAMP
+        WHERE
+          id = ${redemption.id}::uuid
+          AND status = 'RESERVED'
+          AND "expiresAt" IS NOT NULL
+          AND "expiresAt" <= CURRENT_TIMESTAMP
+        RETURNING id
+      `;
+
+      if (expiredRedemptions.length > 0) {
+        return { outcome: "COUPON_EXPIRED" as const };
+      }
+
+      // Once payment initialization begins, retain the coupon while Paystack
+      // is pending or its outcome is being reconciled.
+      await tx.couponRedemption.update({
+        where: { id: redemption.id },
+        data: { expiresAt: null },
+      });
+    }
+
     if (order.currency !== "NGN") {
       throw new AppError(
         "This Paystack integration currently supports NGN only",
@@ -253,10 +294,18 @@ async function createPaymentWithAccess(
     });
 
     return {
+      outcome: "READY" as const,
       payment,
       email: customerEmail,
     };
   });
+
+  if (paymentContext.outcome === "COUPON_EXPIRED") {
+    throw new AppError(
+      "The coupon reservation for this order has expired. Please create a new order and apply the coupon again.",
+      409,
+    );
+  }
 
   // Phase 2: Contact Paystack outside the database transaction.
   // Paystack expects the amount in the smallest currency unit:
@@ -458,6 +507,15 @@ async function createPaymentWithAccess(
                 409,
               );
             }
+
+            await tx.$executeRaw`
+              UPDATE coupon_redemptions
+              SET
+                "expiresAt" = CURRENT_TIMESTAMP + (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond'),
+                "updatedAt" = CURRENT_TIMESTAMP
+              WHERE "orderId" = ${currentPayment.orderId}::uuid
+                AND status = 'RESERVED'
+            `;
 
             const reservations = await tx.inventoryReservation.findMany({
               where: {
@@ -823,6 +881,17 @@ async function markPaymentSuccessfulWithAccess(
             },
           });
 
+          await tx.$executeRaw`
+            UPDATE coupon_redemptions
+            SET
+              status = 'REDEEMED',
+              "redeemedAt" = CURRENT_TIMESTAMP,
+              "expiresAt" = NULL,
+              "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "orderId" = ${currentPayment.orderId}::uuid
+              AND status = 'RESERVED'
+          `;
+
           await publishNotificationEvent(tx, {
             eventType: "payment.succeeded",
             aggregateType: "PAYMENT",
@@ -990,6 +1059,19 @@ async function markPaymentSuccessfulWithAccess(
               409,
             );
           }
+
+          // A verified successful charge consumes the coupon even when
+          // inventory needs separate manual reconciliation.
+          await tx.$executeRaw`
+            UPDATE coupon_redemptions
+            SET
+              status = 'REDEEMED',
+              "redeemedAt" = CURRENT_TIMESTAMP,
+              "expiresAt" = NULL,
+              "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "orderId" = ${currentPayment.orderId}::uuid
+              AND status = 'RESERVED'
+          `;
 
           // Create the reconciliation record in the same transaction
           // that marks the payment as successful.
@@ -1224,6 +1306,15 @@ export async function reconcileUnknownPayment(paymentId: string) {
               409,
             );
           }
+
+          await tx.$executeRaw`
+            UPDATE coupon_redemptions
+            SET
+              "expiresAt" = CURRENT_TIMESTAMP + (${STALE_PENDING_PAYMENT_GRACE_PERIOD_MS} * INTERVAL '1 millisecond'),
+              "updatedAt" = CURRENT_TIMESTAMP
+            WHERE "orderId" = ${currentPayment.orderId}::uuid
+              AND status = 'RESERVED'
+          `;
 
           const reservations = await tx.inventoryReservation.findMany({
             where: {

@@ -9,6 +9,7 @@ import type {
 import { createAuditLog } from "../../common/utils/audit-log";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 import { findDeliveryZoneForLocation } from "../delivery-zones/delivery-zone.service";
+import { calculateCouponForOrder } from "../coupons/coupon.service";
 
 const MAX_TRANSACTION_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
@@ -188,7 +189,16 @@ async function createOrderFromCart(
       };
     });
 
-    const discountAmount = new Prisma.Decimal(0);
+    const couponResult = input.couponCode
+      ? await calculateCouponForOrder(tx, {
+          code: input.couponCode,
+          subtotal,
+          items: orderItems,
+          customerKey: userId ? `user:${userId}` : `guest:${("customerEmail" in input ? input.customerEmail : "").trim().toLowerCase()}`,
+        })
+      : null;
+    const finalOrderItems = couponResult ? couponResult.items : orderItems;
+    const discountAmount = couponResult?.discountAmount ?? new Prisma.Decimal(0);
     const deliveryZone = await findDeliveryZoneForLocation(
       tx,
       input.shippingAddress.state,
@@ -234,16 +244,45 @@ async function createOrderFromCart(
         deliveryZoneId: deliveryZone.id,
         deliveryZoneName: deliveryZone.name,
         totalAmount,
+        ...(couponResult ? {
+          couponId: couponResult.coupon.id,
+          couponCode: couponResult.coupon.code,
+          couponDiscountType: couponResult.coupon.discountType,
+          couponDiscountValue: couponResult.coupon.discountValue,
+        } : {}),
         currency: "NGN",
         shippingAddress: input.shippingAddress,
         items: {
-          create: orderItems,
+          create: finalOrderItems,
         },
       },
       include: {
         items: true,
       },
     });
+    if (couponResult) {
+      await tx.couponRedemption.create({
+        data: {
+          couponId: couponResult.coupon.id,
+          orderId: order.id,
+          customerKeyHash: couponResult.customerKeyHash,
+          discountAmount: couponResult.discountAmount,
+          status: "RESERVED",
+        },
+      });
+
+      // Set reservation expiry using the same database clock used by
+      // expiry cleanup and payment initialization.
+      await tx.$executeRaw`
+        UPDATE coupon_redemptions
+        SET
+          "expiresAt" = CURRENT_TIMESTAMP + INTERVAL '15 minutes',
+          "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "orderId" = ${order.id}::uuid
+          AND status = 'RESERVED'
+      `;
+    }
+
     await publishNotificationEvent(tx, {
       eventType: "order.created",
       aggregateType: "ORDER",
@@ -308,6 +347,9 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
       customerPhone: true,
       subtotal: true,
       discountAmount: true,
+      couponCode: true,
+      couponDiscountType: true,
+      couponDiscountValue: true,
       deliveryFee: true,
       deliveryZoneName: true,
       totalAmount: true,
@@ -509,6 +551,12 @@ async function cancelOrderTransaction({
             }
           }
 
+          // Release the coupon reservation in the same cancellation transaction.
+          await tx.couponRedemption.updateMany({
+            where: { orderId: order.id, status: "RESERVED" },
+            data: { status: "RELEASED", releasedAt: new Date(), expiresAt: null },
+          });
+
           // Change the order status only after all reservation releases succeed.
           const updatedOrder = await tx.order.update({
             where: {
@@ -628,6 +676,9 @@ export async function listCustomerOrders(
         status: true,
         subtotal: true,
         discountAmount: true,
+        couponCode: true,
+        couponDiscountType: true,
+        couponDiscountValue: true,
         deliveryFee: true,
         deliveryZoneName: true,
         totalAmount: true,

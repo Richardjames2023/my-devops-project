@@ -17,6 +17,11 @@ const envSchema = z.object({
     .string()
     .min(32, "JWT_ACCESS_SECRET must be at least 32 characters"),
 
+  COUPON_CUSTOMER_HASH_SECRET: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(32, "COUPON_CUSTOMER_HASH_SECRET must be at least 32 characters").optional(),
+  ),
+
   PAYSTACK_SECRET_KEY: z.preprocess(
     (value) => value === "" ? undefined : value,
     z.string().min(1, "PAYSTACK_SECRET_KEY cannot be empty").optional(),
@@ -49,6 +54,14 @@ const envSchema = z.object({
       code: "custom",
       path: ["EMAIL_DELIVERY_ENABLED"],
       message: "EMAIL_DELIVERY_ENABLED must be true in production because customer email verification is required",
+    });
+  }
+
+  if (value.NODE_ENV === "production" && !value.COUPON_CUSTOMER_HASH_SECRET) {
+    context.addIssue({
+      code: "custom",
+      path: ["COUPON_CUSTOMER_HASH_SECRET"],
+      message: "COUPON_CUSTOMER_HASH_SECRET is required in production",
     });
   }
 

@@ -36,6 +36,7 @@ import cookieParser from "cookie-parser";
 import healthRoutes from "./modules/health/health.routes";
 import deliveryZoneRoutes from "./modules/delivery-zones/delivery-zone.routes";
 import deliveryZonePublicRoutes from "./modules/delivery-zones/delivery-zone.public.routes";
+import couponRoutes from "./modules/coupons/coupon.routes";
 
 const app = express();
 const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
@@ -93,6 +94,7 @@ app.use("/api/v1/inventory/movements", stockMovementRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/inventory/reservations", inventoryReservationRoutes);
 app.use("/api/v1/orders", orderRoutes);
+app.use("/api/v1/coupons", couponRoutes);
 app.use("/api/v1/fulfillments", fulfillmentRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/deliveries", deliveryRoutes);

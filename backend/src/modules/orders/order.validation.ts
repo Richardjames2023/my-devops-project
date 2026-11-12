@@ -41,6 +41,7 @@ const shippingAddressSchema = z.object({
 // Existing authenticated checkout validation
 export const createOrderSchema = z.object({
   shippingAddress: shippingAddressSchema,
+  couponCode: z.string().trim().min(3).max(40).optional(),
 });
 
 // Guest checkout requires a valid customer email
