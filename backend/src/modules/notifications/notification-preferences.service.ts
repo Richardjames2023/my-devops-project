@@ -21,7 +21,8 @@ function identityWhere(identity: NotificationPreferenceIdentity) {
 /**
  * Payment, security, and refund-intervention notifications are mandatory on
  * both channels. Routine categories are in-app only; recipient preferences
- * cannot opt them into email. Staff invitations use their separate secure flow.
+ * cannot opt them into email. Event-level delivery exceptions are also mandatory.
+ * Staff invitations use their separate secure flow.
  */
 function mandatoryChannels(category: NotificationCategory) {
   if (category === "PAYMENT" || category === "SECURITY" || category === "REFUND") {
