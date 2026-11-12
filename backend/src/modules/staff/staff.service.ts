@@ -620,7 +620,7 @@ export async function updateStaffAccountRoles(
         eventType: "staff.security_event",
         aggregateType: "STAFF",
         aggregateId: staffId,
-        deduplicationKey: new Date().toISOString(),
+        deduplicationKey: crypto.randomUUID(),
         payload: {
           actorStaffAccountId: actorId,
           targetStaffAccountId: staffId,
@@ -689,7 +689,7 @@ export async function updateStaffAccountStatus(
         eventType: "staff.security_event",
         aggregateType: "STAFF",
         aggregateId: staffId,
-        deduplicationKey: new Date().toISOString(),
+        deduplicationKey: crypto.randomUUID(),
         payload: {
           actorStaffAccountId: actorId,
           targetStaffAccountId: staffId,
