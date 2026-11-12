@@ -73,6 +73,25 @@ describe("transactional email templates", () => {
     }).text).toContain("REF-203");
   });
 
+  it("renders delivery exception and staff security alert templates", () => {
+    expect(renderNotificationEmail("customer.delivery-exception", {
+      orderNumber: "ORD-300",
+      actionUrl: "/account/orders/300",
+    }, "https://shop.example.com").text).toContain("ORD-300");
+
+    expect(renderNotificationEmail("staff.delivery-exception", {
+      orderNumber: "ORD-301",
+      actionUrl: "/staff/deliveries/301",
+    }, "https://shop.example.com").subject).toContain("ORD-301");
+
+    expect(renderNotificationEmail("staff.security-event", {
+      action: "Staff roles updated",
+      targetEmail: "target@example.com",
+      actorEmail: "admin@example.com",
+      actionUrl: "/staff/accounts/302",
+    }, "https://shop.example.com").text).toContain("target@example.com");
+  });
+
   it("rejects unsupported template keys and malformed template data", () => {
     expect(() => renderNotificationEmail("unknown.template", {})).toThrow("Unsupported notification email template");
     expect(() => renderNotificationEmail("customer.delivery-delivered", null)).toThrow("must be an object");
