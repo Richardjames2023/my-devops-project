@@ -114,6 +114,44 @@ export function renderNotificationEmail(
         ),
       };
     }
+    case "customer.delivery-exception": {
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("Delivery issue with order " + orderNumber),
+        ...layout(
+          "Delivery issue with your order",
+          "Delivery for order " + orderNumber + " has encountered an issue. Our team is working to resolve it.",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
+    case "staff.delivery-exception": {
+      const orderNumber = requiredString(data, "orderNumber");
+      return {
+        subject: subjectPart("Delivery exception requires attention: " + orderNumber),
+        ...layout(
+          "Delivery exception requires attention",
+          "Delivery for order " + orderNumber + " has entered a failed state and requires follow-up.",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
+    case "staff.security-event": {
+      const action = requiredString(data, "action");
+      const targetEmail = requiredString(data, "targetEmail");
+      const actorEmail = requiredString(data, "actorEmail");
+      return {
+        subject: subjectPart("Staff security alert: " + action),
+        ...layout(
+          "Staff security change",
+          action + " for " + targetEmail + " was performed by " + actorEmail + ". Review this change in the staff dashboard.",
+          actionUrl,
+          appBaseUrl,
+        ),
+      };
+    }
     case "customer.delivery-delivered": {
       const orderNumber = requiredString(data, "orderNumber");
       return {
