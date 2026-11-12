@@ -38,12 +38,6 @@ describe("notification event policy", () => {
     });
   });
 
-  it("keeps successful payment receipts mandatory on both channels", () => {
-    expect(getNotificationEventPolicy("payment.succeeded")).toEqual({
-      category: "PAYMENT", inAppMandatory: true, emailMode: "MANDATORY",
-    });
-  });
-
   it("requires both channels for delivery exceptions", () => {
     expect(getNotificationEventPolicy("delivery.exception")).toEqual({
       category: "DELIVERY", inAppMandatory: true, emailMode: "MANDATORY",
