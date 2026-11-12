@@ -76,6 +76,7 @@ const roles = {
     "returns.read",
     "returns.manage",
     "refunds.read",
+    "refunds.manage",
     "warranty.read",
     "warranty.manage",
   ],
