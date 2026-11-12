@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import prisma from "../../infrastructure/prisma/client";
 
@@ -9,12 +10,18 @@ const wishlistProductSelect = {
   basePrice: true,
   isActive: true,
   images: {
-    orderBy: [{ isPrimary: "desc" as const }, { sortOrder: "asc" as const }],
+    orderBy: [
+      { isPrimary: "desc" },
+      { sortOrder: "asc" },
+    ],
     take: 1,
-    select: { url: true, altText: true },
+    select: {
+      url: true,
+      altText: true,
+    },
   },
   variants: {
-    orderBy: { createdAt: "asc" as const },
+    orderBy: { createdAt: "asc" },
     select: {
       id: true,
       name: true,
@@ -30,29 +37,13 @@ const wishlistProductSelect = {
       },
     },
   },
-} as const;
+} satisfies Prisma.ProductSelect;
 
-function formatWishlistProduct(product: {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  basePrice: { toString(): string };
-  isActive: boolean;
-  images: Array<{ url: string; altText: string | null }>;
-  variants: Array<{
-    id: string;
-    name: string;
-    sku: string;
-    price: { toString(): string };
-    isActive: boolean;
-    inventory: {
-      quantity: number;
-      reservedQuantity: number;
-      quarantineQuantity: number;
-    } | null;
-  }>;
-}) {
+type WishlistProduct = Prisma.ProductGetPayload<{
+  select: typeof wishlistProductSelect;
+}>;
+
+function formatWishlistProduct(product: WishlistProduct) {
   const variants = product.variants.map((variant) => {
     const availableQuantity = variant.inventory
       ? Math.max(
@@ -70,7 +61,10 @@ function formatWishlistProduct(product: {
       price: variant.price.toString(),
       isActive: variant.isActive,
       availableQuantity,
-      isAvailable: product.isActive && variant.isActive && availableQuantity > 0,
+      isAvailable:
+        product.isActive &&
+        variant.isActive &&
+        availableQuantity > 0,
     };
   });
 
@@ -83,7 +77,9 @@ function formatWishlistProduct(product: {
     image: product.images[0] ?? null,
     isActive: product.isActive,
     variants,
-    isAvailable: product.isActive && variants.some((variant) => variant.isAvailable),
+    isAvailable:
+      product.isActive &&
+      variants.some((variant) => variant.isAvailable),
   };
 }
 
@@ -94,7 +90,9 @@ export async function getWishlist(userId: string) {
     select: {
       id: true,
       createdAt: true,
-      product: { select: wishlistProductSelect },
+      product: {
+        select: wishlistProductSelect,
+      },
     },
   });
 
@@ -108,10 +106,18 @@ export async function getWishlist(userId: string) {
   };
 }
 
-export async function addWishlistItem(userId: string, productId: string) {
+export async function addWishlistItem(
+  userId: string,
+  productId: string,
+) {
   const product = await prisma.product.findFirst({
-    where: { id: productId, isActive: true },
-    select: { id: true },
+    where: {
+      id: productId,
+      isActive: true,
+    },
+    select: {
+      id: true,
+    },
   });
 
   if (!product) {
@@ -120,18 +126,30 @@ export async function addWishlistItem(userId: string, productId: string) {
 
   await prisma.wishlistItem.upsert({
     where: {
-      userId_productId: { userId, productId },
+      userId_productId: {
+        userId,
+        productId,
+      },
     },
-    create: { userId, productId },
+    create: {
+      userId,
+      productId,
+    },
     update: {},
   });
 
   return getWishlist(userId);
 }
 
-export async function removeWishlistItem(userId: string, productId: string) {
+export async function removeWishlistItem(
+  userId: string,
+  productId: string,
+) {
   const result = await prisma.wishlistItem.deleteMany({
-    where: { userId, productId },
+    where: {
+      userId,
+      productId,
+    },
   });
 
   if (result.count === 0) {
