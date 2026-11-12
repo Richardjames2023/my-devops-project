@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
@@ -203,7 +204,7 @@ export async function updateDeliveryStatus(
         eventType: "delivery.exception",
         aggregateType: "DELIVERY",
         aggregateId: delivery.id,
-        deduplicationKey: now.toISOString(),
+        deduplicationKey: randomUUID(),
         payload: {
           deliveryId: delivery.id,
           previousStatus: delivery.status,
