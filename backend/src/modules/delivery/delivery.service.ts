@@ -46,9 +46,94 @@ export async function createDelivery(input: CreateDeliveryInput) {
   });
 }
 
+export async function assignDelivery(
+  deliveryId: string,
+  staffAccountId: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw(
+      Prisma.sql`SELECT id FROM deliveries WHERE id = ${deliveryId}::uuid FOR UPDATE`,
+    );
+
+    const delivery = await tx.delivery.findUnique({ where: { id: deliveryId } });
+    if (!delivery) throw new AppError("Delivery not found", 404);
+    if (["DELIVERED", "CANCELLED", "RETURNED"].includes(delivery.status)) {
+      throw new AppError("A closed delivery cannot be assigned", 409);
+    }
+
+    const agent = await tx.staffAccount.findFirst({
+      where: {
+        id: staffAccountId,
+        status: "ACTIVE",
+        roles: { some: { role: { name: "DELIVERY_AGENT" } } },
+      },
+      select: { id: true },
+    });
+    if (!agent) {
+      throw new AppError("An active staff member with the DELIVERY_AGENT role is required", 400);
+    }
+
+    return tx.delivery.update({
+      where: { id: delivery.id },
+      data: {
+        assignedStaffAccountId: agent.id,
+        ...(delivery.status === "PENDING" || delivery.status === "FAILED"
+          ? { status: "ASSIGNED" }
+          : {}),
+      },
+    });
+  });
+}
+
+export async function listAssignedDeliveries(staffAccountId: string) {
+  return prisma.delivery.findMany({
+    where: { assignedStaffAccountId: staffAccountId },
+    orderBy: { package: { fulfillment: { order: { createdAt: "desc" } } } },
+    include: {
+      package: {
+        include: {
+          fulfillment: {
+            include: {
+              order: {
+                select: {
+                  id: true,
+                  orderNumber: true,
+                  status: true,
+                  shippingAddress: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      attempts: { orderBy: { attemptedAt: "desc" } },
+    },
+  });
+}
+
+type DeliveryActor = {
+  staffAccountId: string;
+  canManageAllDeliveries: boolean;
+};
+
+function assertDeliveryAssignment(
+  delivery: { assignedStaffAccountId: string | null },
+  actor?: DeliveryActor,
+): void {
+  if (
+    actor &&
+    !actor.canManageAllDeliveries &&
+    delivery.assignedStaffAccountId !== actor.staffAccountId
+  ) {
+    // Do not disclose whether another agent's delivery exists.
+    throw new AppError("Delivery not found", 404);
+  }
+}
+
 export async function updateDeliveryStatus(
   deliveryId: string,
   status: UpdateDeliveryStatusInput["status"],
+  actor?: DeliveryActor,
 ) {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw(
@@ -65,6 +150,14 @@ export async function updateDeliveryStatus(
 
     if (!delivery) {
       throw new AppError("Delivery not found", 404);
+    }
+    assertDeliveryAssignment(delivery, actor);
+    if (
+      actor &&
+      !actor.canManageAllDeliveries &&
+      !["PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED", "FAILED"].includes(status)
+    ) {
+      throw new AppError("Delivery agents cannot perform this status transition", 403);
     }
 
     const allowedTransitions: Record<string, string[]> = {
@@ -119,6 +212,7 @@ export async function updateDeliveryStatus(
 export async function createDeliveryAttempt(
   deliveryId: string,
   input: CreateDeliveryAttemptInput,
+  actor?: DeliveryActor,
 ) {
   return prisma.$transaction(async (tx) => {
     await tx.$queryRaw(
@@ -136,6 +230,7 @@ export async function createDeliveryAttempt(
     if (!delivery) {
       throw new AppError("Delivery not found", 404);
     }
+    assertDeliveryAssignment(delivery, actor);
 
     if (delivery.status === "CANCELLED") {
       throw new AppError(

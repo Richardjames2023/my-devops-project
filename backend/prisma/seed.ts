@@ -144,26 +144,27 @@ async function main(): Promise<void> {
       create: { name: roleName },
     });
 
-    for (const permissionName of rolePermissions) {
+    const rolePermissionIds = rolePermissions.map((permissionName) => {
       const permissionId = permissionRecords.get(permissionName);
       if (!permissionId) {
         throw new Error(`Permission "${permissionName}" was not found.`);
       }
+      return permissionId;
+    });
 
-      await prisma.rolePermission.upsert({
-        where: {
-          roleId_permissionId: {
+    // Synchronize each role atomically so a failed insert cannot leave it
+    // without its previously assigned permissions.
+    await prisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({ where: { roleId: role.id } });
+      if (rolePermissionIds.length) {
+        await tx.rolePermission.createMany({
+          data: rolePermissionIds.map((permissionId) => ({
             roleId: role.id,
             permissionId,
-          },
-        },
-        update: {},
-        create: {
-          roleId: role.id,
-          permissionId,
-        },
-      });
-    }
+          })),
+        });
+      }
+    });
   }
 
   console.log("Roles seeded.");

@@ -22,10 +22,10 @@ vi.mock("../src/infrastructure/prisma/client", () => ({
 import app from "../src/app.ts";
 import { JWT_ACCESS_SECRET } from "../src/config/auth";
 
-function makeToken(permissions: string[] = ["orders.manage"]) {
-  const subject = permissions.includes("orders.manage")
+function makeToken(permissions: string[] = ["fulfillment.read", "fulfillment.manage"]) {
+  const subject = permissions.includes("fulfillment.manage")
     ? "warehouse-user"
-    : "warehouse-user-without-orders-manage";
+    : "warehouse-user-without-fulfillment-manage";
 
   return jwt.sign(
     { identityType: "STAFF", roles: [], permissions },
@@ -50,7 +50,8 @@ describe("package allocation HTTP endpoint", () => {
                 role: {
                   name: "WAREHOUSE",
                   permissions: [
-                    { permission: { name: "orders.manage" } },
+                    { permission: { name: "fulfillment.read" } },
+                    { permission: { name: "fulfillment.manage" } },
                   ],
                 },
               },
@@ -84,7 +85,7 @@ describe("package allocation HTTP endpoint", () => {
     expect(mocks.allocatePackage).not.toHaveBeenCalled();
   });
 
-  it("requires orders.manage permission", async () => {
+  it("requires fulfillment.manage permission", async () => {
     const response = await request(app)
       .post(`/api/v1/fulfillments/${fulfillmentId}/packages`)
       .set("Authorization", `Bearer ${makeToken([])}`)

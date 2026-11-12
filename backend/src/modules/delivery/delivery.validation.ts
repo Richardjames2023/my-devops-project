@@ -4,6 +4,10 @@ export const createDeliverySchema = z.object({
   packageId: z.uuid("Invalid package ID"),
 });
 
+export const assignDeliverySchema = z.object({
+  staffAccountId: z.uuid("Invalid staff account ID"),
+});
+
 export const updateDeliveryStatusSchema = z.object({
   status: z.enum([
     "ASSIGNED",
