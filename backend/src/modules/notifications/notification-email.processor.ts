@@ -51,7 +51,18 @@ async function suppressPolicyDisallowedOutboxEmails(): Promise<void> {
         "lockedBy" = NULL,
         "updatedAt" = NOW()
     FROM notification_outbox AS event
-    WHERE delivery."eventRecipientKey" LIKE 'v1:' || event.id::text || ':%'
+    WHERE (
+        delivery."eventRecipientKey" LIKE 'v1:' || event.id::text || ':%'
+        OR (
+          delivery."eventRecipientKey" IS NULL
+          AND delivery."notificationId" IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM notifications AS notice
+            WHERE notice.id = delivery."notificationId"
+              AND notice."outboxEventId" = event.id
+          )
+        )
+      )
       AND delivery.status IN ('QUEUED', 'RETRYING')
       AND NOT (
         event."eventType" IN (
