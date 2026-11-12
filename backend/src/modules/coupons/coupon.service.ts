@@ -5,8 +5,6 @@ import { AppError } from "../../common/errors/AppError";
 import { createAuditLog } from "../../common/utils/audit-log";
 import type { CreateCouponInput, UpdateCouponInput } from "./coupon.validation";
 
-const RESERVATION_TTL_MS = 15 * 60 * 1000;
-
 function decimal(value: string | number | Prisma.Decimal): Prisma.Decimal {
   return new Prisma.Decimal(value);
 }
@@ -203,7 +201,6 @@ export async function calculateCouponForOrder<
     customerKeyHash,
     discountAmount: discount,
     items: allocatedItems,
-    expiresAt: new Date(now.getTime() + RESERVATION_TTL_MS),
   };
 }
 
