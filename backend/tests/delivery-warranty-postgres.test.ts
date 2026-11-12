@@ -338,6 +338,34 @@ describe("PostgreSQL delivery and warranty activation", () => {
     }
   });
 
+  it("publishes a transactional notification event when a delivery enters FAILED", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+    try {
+      const result = await updateDeliveryStatus(fixture.deliveryIds[0], "FAILED");
+      expect(result.status).toBe("FAILED");
+
+      const events = await pool.query(
+        `SELECT "eventType", "aggregateType", "aggregateId", payload
+         FROM notification_outbox
+         WHERE "eventType" = 'delivery.exception' AND "aggregateId" = $1`,
+        [fixture.deliveryIds[0]],
+      );
+      expect(events.rows).toHaveLength(1);
+      expect(events.rows[0]).toMatchObject({
+        eventType: "delivery.exception",
+        aggregateType: "DELIVERY",
+        aggregateId: fixture.deliveryIds[0],
+      });
+      expect(events.rows[0].payload).toMatchObject({
+        deliveryId: fixture.deliveryIds[0],
+        previousStatus: "OUT_FOR_DELIVERY",
+        status: "FAILED",
+      });
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
   it("keeps package status synchronized when a delivery enters transit", async () => {
     const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
 
