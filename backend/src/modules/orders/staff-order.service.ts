@@ -119,7 +119,7 @@ export async function getStaffOrder(orderId: string) {
       },
       items: true,
       payments: { orderBy: { createdAt: "desc" } },
-      inventoryReservations: { orderBy: { createdAt: "asc" } },
+      inventoryReservations: { orderBy: [{ expiresAt: "asc" }, { inventoryId: "asc" }] },
       fulfillment: {
         include: {
           packages: {
