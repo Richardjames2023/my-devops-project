@@ -28,6 +28,8 @@ const fixtures: Fixture[] = [];
 async function createFixture(input: {
   templateKey?: string;
   templateData?: Record<string, unknown>;
+  eventType?: string;
+  eventRecipientIdentity?: "CUSTOMER" | "GUEST" | "STAFF";
 } = {}): Promise<Fixture> {
   const staffId = randomUUID();
   const outboxId = randomUUID();
@@ -70,6 +72,9 @@ async function createFixture(input: {
         orderNumber: "ORD-EMAIL-100",
         actionUrl: "/staff/payments/test",
       }),
+      input.eventRecipientIdentity
+        ? `v1:${outboxId}:${input.eventRecipientIdentity}:${staffId}`
+        : null,
     ],
   );
 
@@ -136,6 +141,30 @@ describe("PostgreSQL notification email delivery worker", () => {
     expect(await getDelivery(fixture.deliveryId)).toMatchObject({
       status: "QUEUED",
       attemptCount: 0,
+      lockedAt: null,
+      lockedBy: null,
+    });
+  });
+
+  it("suppresses previously queued routine event emails before sending", async () => {
+    const fixture = await createFixture({
+      eventType: "order.created",
+      eventRecipientIdentity: "CUSTOMER",
+    });
+    const send = vi.fn<EmailProvider["send"]>();
+
+    const result = await processNotificationEmailBatch({
+      deliveryId: fixture.deliveryId,
+      provider: { send },
+      enabled: true,
+    });
+
+    expect(result).toEqual({ claimed: 0, accepted: 0, failed: 0, skipped: false });
+    expect(send).not.toHaveBeenCalled();
+    expect(await getDelivery(fixture.deliveryId)).toMatchObject({
+      status: "SUPPRESSED",
+      attemptCount: 0,
+      lastError: "Suppressed by notification event email policy",
       lockedAt: null,
       lockedBy: null,
     });
