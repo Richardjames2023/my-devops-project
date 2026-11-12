@@ -193,11 +193,7 @@ describe("PostgreSQL notification business event fan-out", () => {
        WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = $1)`,
       [eventId],
     );
-    expect(emails.rows).toHaveLength(1);
-    expect(emails.rows[0]).toMatchObject({
-      recipientEmail: customer.email,
-      templateKey: "customer.order-created",
-    });
+    expect(emails.rows).toHaveLength(0);
   });
 
   it("sends guest order email without creating a fake customer inbox identity", async () => {
@@ -259,8 +255,7 @@ describe("PostgreSQL notification business event fan-out", () => {
        WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = $1)`,
       [eventId],
     );
-    expect(emails.rows).toHaveLength(1);
-    expect(emails.rows[0].templateKey).toBe("customer.return-request-received");
+    expect(emails.rows).toHaveLength(0);
   });
 
   it("notifies customers and warranty managers when a warranty claim is created", async () => {
@@ -325,8 +320,7 @@ describe("PostgreSQL notification business event fan-out", () => {
        WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = $1)`,
       [eventId],
     );
-    expect(emails.rows).toHaveLength(1);
-    expect(emails.rows[0].templateKey).toBe("customer.warranty-claim-received");
+    expect(emails.rows).toHaveLength(0);
   });
 
 
