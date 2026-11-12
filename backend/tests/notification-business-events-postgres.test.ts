@@ -199,8 +199,8 @@ describe("PostgreSQL notification business event fan-out", () => {
       [packageId, fulfillmentId],
     );
     await pool.query(
-      `INSERT INTO deliveries (id, "packageId", status, "createdAt", "updatedAt")
-       VALUES ($1, $2, 'FAILED', NOW(), NOW())`,
+      `INSERT INTO deliveries (id, "packageId", status)
+       VALUES ($1, $2, 'FAILED')`,
       [deliveryId, packageId],
     );
 

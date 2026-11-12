@@ -10,7 +10,7 @@ describe("notification event policy", () => {
 
   it("requires in-app and email for actionable payment reconciliation", () => {
     expect(getNotificationEventPolicy("payment.reconciliation_required")).toEqual({
-      category: "PAYMENT", inAppMandatory: true, emailMandatory: true,
+      category: "PAYMENT", inAppMandatory: true, emailMode: "MANDATORY",
     });
   });
 

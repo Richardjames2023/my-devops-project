@@ -11,7 +11,7 @@ if (new URL(databaseUrl).pathname !== "/shop_db_test") {
 
 process.env.DATABASE_URL = databaseUrl;
 process.env.NODE_ENV = "test";
-process.env.EMAIL_DELIVERY_ENABLED = "true";
+process.env.EMAIL_DELIVERY_ENABLED = "false";
 process.env.APP_BASE_URL ??= "http://localhost:3000";
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });

@@ -46,9 +46,14 @@ async function createFixture(input: {
     `INSERT INTO notification_outbox
      (id, "eventKey", "eventType", "aggregateType", "aggregateId", payload,
       status, "attemptCount", "availableAt", "createdAt", "updatedAt", "processedAt")
-     VALUES ($1, $2, 'payment.reconciliation_required', 'TEST', $3, '{}'::jsonb,
+     VALUES ($1, $2, $3, 'TEST', $4, '{}'::jsonb,
              'PROCESSED', 1, NOW(), NOW(), NOW(), NOW())`,
-    [outboxId, `email-test:${outboxId}`, outboxId],
+    [
+      outboxId,
+      `email-test:${outboxId}`,
+      input.eventType ?? "payment.reconciliation_required",
+      outboxId,
+    ],
   );
   await pool.query(
     `INSERT INTO notifications
@@ -61,8 +66,8 @@ async function createFixture(input: {
   await pool.query(
     `INSERT INTO notification_email_deliveries
      (id, "notificationId", "recipientEmail", "templateKey", "templateData",
-      status, "attemptCount", "nextAttemptAt", "createdAt", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5::jsonb, 'QUEUED', 0, NOW(), NOW(), NOW())`,
+      "eventRecipientKey", status, "attemptCount", "nextAttemptAt", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'QUEUED', 0, NOW(), NOW(), NOW())`,
     [
       deliveryId,
       notificationId,
