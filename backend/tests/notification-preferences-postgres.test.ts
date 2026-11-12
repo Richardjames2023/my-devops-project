@@ -172,7 +172,7 @@ describe("PostgreSQL notification preference APIs", () => {
       .expect(400);
   });
 
-  it("defaults staff routine email notifications to opt-in", async () => {
+  it("keeps staff routine email notifications disabled by default", async () => {
     const response = await request(app)
       .get("/api/v1/staff/notifications/preferences")
       .set("Authorization", `Bearer ${staff.token}`)
