@@ -214,6 +214,49 @@ async function cleanupFixture(fixture: Fixture): Promise<void> {
   await pool.query(`DELETE FROM users WHERE id = $1`, [fixture.userId]);
 }
 
+async function attachCouponToOrder(
+  fixture: Fixture,
+  expired: boolean,
+): Promise<string> {
+  const couponId = randomUUID();
+  const couponCode = `PAYMENT-${couponId.replace(/-/g, "").slice(0, 16).toUpperCase()}`;
+
+  await pool.query(
+    `INSERT INTO coupons
+      (id, code, "discountType", "discountValue", "minimumSubtotal",
+       "isActive", "createdAt", "updatedAt")
+     VALUES ($1, $2, 'PERCENTAGE', 10, 0, true, NOW(), NOW())`,
+    [couponId, couponCode],
+  );
+  await pool.query(
+    `UPDATE orders
+     SET "couponId" = $1,
+         "couponCode" = $2,
+         "couponDiscountType" = 'PERCENTAGE',
+         "couponDiscountValue" = 10
+     WHERE id = $3`,
+    [couponId, couponCode, fixture.orderId],
+  );
+  await pool.query(
+    `INSERT INTO coupon_redemptions
+      (id, "couponId", "orderId", "customerKeyHash", "discountAmount",
+       status, "expiresAt", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, 500.10, 'RESERVED',
+             CASE WHEN $5 THEN NOW() - INTERVAL '1 minute'
+                  ELSE NOW() + INTERVAL '15 minutes' END,
+             NOW(), NOW())`,
+    [
+      randomUUID(),
+      couponId,
+      fixture.orderId,
+      createHash("sha256").update(`user:${fixture.userId}`).digest("hex"),
+      expired,
+    ],
+  );
+
+  return couponId;
+}
+
 describe("PostgreSQL checkout payment initialization", () => {
   beforeAll(async () => {
     const result = await pool.query("SELECT current_database() AS name");
@@ -1024,6 +1067,101 @@ describe("PostgreSQL checkout payment initialization", () => {
       paystackMocks.verify.mockReset();
     }
   });
+
+  it("commits the release of an expired coupon reservation before rejecting payment initialization", async () => {
+    const fixture = await createFixture();
+    let couponId: string | null = null;
+
+    try {
+      couponId = await attachCouponToOrder(fixture, true);
+
+      await expect(
+        createPayment(
+          { orderId: fixture.orderId, provider: "PAYSTACK" },
+          fixture.userId,
+        ),
+      ).rejects.toMatchObject({ statusCode: 409 });
+
+      const redemption = await pool.query(
+        `SELECT status, "expiresAt"
+         FROM coupon_redemptions WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      expect(redemption.rows[0].status).toBe("RELEASED");
+      expect(redemption.rows[0].expiresAt).toBeNull();
+
+      const payments = await pool.query(
+        `SELECT COUNT(*)::int AS count FROM payments WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      expect(payments.rows[0].count).toBe(0);
+      expect(paystackMocks.initialize).not.toHaveBeenCalled();
+    } finally {
+      await pool.query(
+        `DELETE FROM coupon_redemptions WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      await cleanupFixture(fixture);
+      if (couponId) {
+        await pool.query(`DELETE FROM coupons WHERE id = $1`, [couponId]);
+      }
+      paystackMocks.initialize.mockClear();
+    }
+  });
+
+  it("keeps a valid coupon reserved during payment and redeems it after verified success", async () => {
+    const fixture = await createFixture();
+    let couponId: string | null = null;
+
+    try {
+      couponId = await attachCouponToOrder(fixture, false);
+
+      const initialized = await createPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.userId,
+      );
+
+      const pendingRedemption = await pool.query(
+        `SELECT status, "expiresAt"
+         FROM coupon_redemptions WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      expect(pendingRedemption.rows[0].status).toBe("RESERVED");
+      expect(pendingRedemption.rows[0].expiresAt).toBeNull();
+
+      paystackMocks.verify.mockResolvedValue({
+        id: 987654399,
+        status: "success",
+        reference: initialized.payment.reference,
+        amount: 500100,
+        currency: "NGN",
+        paid_at: new Date().toISOString(),
+      });
+
+      await markPaymentSuccessful(initialized.payment.id, fixture.userId);
+
+      const redeemed = await pool.query(
+        `SELECT status, "expiresAt", "redeemedAt"
+         FROM coupon_redemptions WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      expect(redeemed.rows[0].status).toBe("REDEEMED");
+      expect(redeemed.rows[0].expiresAt).toBeNull();
+      expect(redeemed.rows[0].redeemedAt).not.toBeNull();
+    } finally {
+      await pool.query(
+        `DELETE FROM coupon_redemptions WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      await cleanupFixture(fixture);
+      if (couponId) {
+        await pool.query(`DELETE FROM coupons WHERE id = $1`, [couponId]);
+      }
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
 
 
 });
