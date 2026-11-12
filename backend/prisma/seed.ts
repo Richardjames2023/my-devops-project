@@ -81,8 +81,6 @@ const roles = {
     "warranty.manage",
   ],
   DELIVERY_AGENT: [
-    "orders.read",
-    "fulfillment.read",
     "deliveries.read",
     "deliveries.manage",
   ],
