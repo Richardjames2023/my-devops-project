@@ -574,7 +574,9 @@ async function cancelOrderTransaction({
 
           // Record the cancellation in the same transaction.
           await createAuditLog(tx, {
-            userId: actorUserId,
+            ...(enforceOwnership
+              ? { userId: actorUserId }
+              : { staffAccountId: actorUserId }),
             action: "ORDER_CANCELLED",
             entity: "Order",
             entityId: order.id,

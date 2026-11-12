@@ -526,30 +526,24 @@ it("does not release inventory or create duplicate audit logs when cancellation 
   }
 });
 
-it("allows an admin to cancel another customer's unpaid order", async () => {
+it("attributes admin cancellation audit logs to the staff account", async () => {
   const fixture = await createFixture();
-  const adminUserId = randomUUID();
+  const adminStaffId = randomUUID();
 
   try {
-    // Create a separate admin user for the audit log relationship.
     await pool.query(
-      `INSERT INTO users
-      (id, email, "passwordHash", "firstName", "lastName",
-       "createdAt", "updatedAt")
-      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+      `INSERT INTO staff_accounts
+      (id, email, "firstName", "lastName", status, "createdAt", "updatedAt")
+      VALUES ($1, $2, $3, $4, 'ACTIVE', NOW(), NOW())`,
       [
-        adminUserId,
-        `${adminUserId}@cancellation-test.local`,
-        "test-password-hash",
+        adminStaffId,
+        `${adminStaffId}@cancellation-test.local`,
         "Admin",
         "Tester",
       ],
     );
 
-    const result = await adminCancelOrder(
-      fixture.orderId,
-      adminUserId,
-    );
+    const result = await adminCancelOrder(fixture.orderId, adminStaffId);
 
     expect(result.status).toBe("CANCELLED");
     expect(result.alreadyCancelled).toBe(false);
@@ -558,39 +552,33 @@ it("allows an admin to cancel another customer's unpaid order", async () => {
       `SELECT status FROM orders WHERE id = $1`,
       [fixture.orderId],
     );
-
     expect(order.rows[0].status).toBe("CANCELLED");
 
     const reservation = await pool.query(
       `SELECT status FROM inventory_reservations WHERE id = $1`,
       [fixture.reservationId],
     );
-
     expect(reservation.rows[0].status).toBe("RELEASED");
 
     const inventory = await pool.query(
       `SELECT "reservedQuantity" FROM inventory WHERE id = $1`,
       [fixture.inventoryId],
     );
-
     expect(inventory.rows[0].reservedQuantity).toBe(0);
 
     const audit = await pool.query(
-      `SELECT action, "userId"
+      `SELECT action, "userId", "staffAccountId"
        FROM audit_logs
        WHERE "entityId" = $1`,
       [fixture.orderId],
     );
-
     expect(audit.rows).toHaveLength(1);
     expect(audit.rows[0].action).toBe("ORDER_CANCELLED");
-    expect(audit.rows[0].userId).toBe(adminUserId);
+    expect(audit.rows[0].userId).toBeNull();
+    expect(audit.rows[0].staffAccountId).toBe(adminStaffId);
   } finally {
     await cleanupFixture(fixture);
-
-    await pool.query(`DELETE FROM users WHERE id = $1`, [
-      adminUserId,
-    ]);
+    await pool.query(`DELETE FROM staff_accounts WHERE id = $1`, [adminStaffId]);
   }
 });
 });
