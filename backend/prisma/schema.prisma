@@ -52,6 +52,7 @@ model User {
   returnItemInspections                   ReturnItemInspection[]           @relation("ReturnItemInspections")
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("PaymentInventoryReconciliationResolver")
   productReviews                          ProductReview[]
+  wishlistItems                            WishlistItem[]
   notifications                           Notification[]
   notificationPreferences                 NotificationPreference[]
 
@@ -314,6 +315,7 @@ model Product {
   images           ProductImage[]
   variants         ProductVariant[]
   reviews          ProductReview[]
+  wishlistItems    WishlistItem[]
   category         Category         @relation(fields: [categoryId], references: [id])
 
   @@index([categoryId])
@@ -336,6 +338,20 @@ model CloudinaryCleanupTask {
 
   @@index([status, availableAt])
   @@map("cloudinary_cleanup_tasks")
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  productId String   @db.Uuid
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId, createdAt])
+  @@index([productId])
+  @@map("wishlist_items")
 }
 
 model ProductImage {
