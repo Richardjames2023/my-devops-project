@@ -294,4 +294,59 @@ describe("PostgreSQL coupon calculation and reservation limits", () => {
       await cleanup(fixture);
     }
   });
+
+  it("rejects a coupon before its start time using the database clock", async () => {
+    const fixture = await createCouponFixture();
+    try {
+      await pool.query(
+        `UPDATE coupons
+         SET "startsAt" = NOW() + INTERVAL '5 minutes'
+         WHERE id = $1`,
+        [fixture.couponId],
+      );
+
+      await expect(
+        import("../src/infrastructure/prisma/client").then(({ default: prisma }) =>
+          prisma.$transaction((tx) =>
+            calculateCouponForOrder(tx, {
+              code: fixture.couponCode,
+              subtotal: new Prisma.Decimal("100.00"),
+              customerKey: "user:future-coupon",
+              items: [{ totalPrice: new Prisma.Decimal("100.00") }],
+            }),
+          ),
+        ),
+      ).rejects.toMatchObject({ statusCode: 422 });
+    } finally {
+      await cleanup(fixture);
+    }
+  });
+
+  it("rejects a coupon after its expiry time using the database clock", async () => {
+    const fixture = await createCouponFixture();
+    try {
+      await pool.query(
+        `UPDATE coupons
+         SET "expiresAt" = NOW() - INTERVAL '5 minutes'
+         WHERE id = $1`,
+        [fixture.couponId],
+      );
+
+      await expect(
+        import("../src/infrastructure/prisma/client").then(({ default: prisma }) =>
+          prisma.$transaction((tx) =>
+            calculateCouponForOrder(tx, {
+              code: fixture.couponCode,
+              subtotal: new Prisma.Decimal("100.00"),
+              customerKey: "user:expired-coupon",
+              items: [{ totalPrice: new Prisma.Decimal("100.00") }],
+            }),
+          ),
+        ),
+      ).rejects.toMatchObject({ statusCode: 422 });
+    } finally {
+      await cleanup(fixture);
+    }
+  });
+
 });
