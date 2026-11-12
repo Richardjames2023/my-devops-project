@@ -32,6 +32,22 @@ function isUniqueConstraintError(error: unknown): boolean {
   );
 }
 
+function couponAuditValues(coupon: Prisma.Coupon): Prisma.InputJsonObject {
+  return {
+    code: coupon.code,
+    description: coupon.description,
+    discountType: coupon.discountType,
+    discountValue: coupon.discountValue.toString(),
+    maxDiscountAmount: coupon.maxDiscountAmount?.toString() ?? null,
+    minimumSubtotal: coupon.minimumSubtotal.toString(),
+    usageLimit: coupon.usageLimit,
+    perCustomerLimit: coupon.perCustomerLimit,
+    startsAt: coupon.startsAt?.toISOString() ?? null,
+    expiresAt: coupon.expiresAt?.toISOString() ?? null,
+    isActive: coupon.isActive,
+  };
+}
+
 function allocateDiscount<T extends { totalPrice: Prisma.Decimal }>(
   items: T[],
   discountMinor: number,
@@ -102,7 +118,16 @@ export async function calculateCouponForOrder<
   if (!coupon || coupon.code !== code)
     throw new AppError("This coupon code is invalid", 422);
 
-  const now = new Date();
+  const validityRows = await tx.$queryRaw<
+    Array<{ hasStarted: boolean; hasNotExpired: boolean }>
+  >`
+    SELECT
+      ("startsAt" IS NULL OR "startsAt" <= CURRENT_TIMESTAMP) AS "hasStarted",
+      ("expiresAt" IS NULL OR "expiresAt" > CURRENT_TIMESTAMP) AS "hasNotExpired"
+    FROM coupons
+    WHERE id = ${coupon.id}::uuid
+  `;
+  const validity = validityRows[0];
 
   await tx.$executeRaw`
   UPDATE coupon_redemptions
@@ -118,9 +143,9 @@ export async function calculateCouponForOrder<
 
   if (!coupon.isActive)
     throw new AppError("This coupon is no longer active", 422);
-  if (coupon.startsAt && coupon.startsAt > now)
+  if (!validity?.hasStarted)
     throw new AppError("This coupon is not active yet", 422);
-  if (coupon.expiresAt && coupon.expiresAt <= now)
+  if (!validity?.hasNotExpired)
     throw new AppError("This coupon has expired", 422);
   if (input.subtotal.lessThan(coupon.minimumSubtotal)) {
     throw new AppError(
@@ -211,11 +236,7 @@ export async function createCoupon(
         action: "COUPON_CREATED",
         entity: "Coupon",
         entityId: coupon.id,
-        newValues: {
-          code: coupon.code,
-          discountType: coupon.discountType,
-          discountValue: coupon.discountValue.toString(),
-        },
+        newValues: couponAuditValues(coupon),
         ...metadata,
       });
       return coupon;
@@ -382,18 +403,8 @@ export async function updateCoupon(
         action: "COUPON_UPDATED",
         entity: "Coupon",
         entityId: couponId,
-        oldValues: {
-          code: existing.code,
-          isActive: existing.isActive,
-          discountType: existing.discountType,
-          discountValue: existing.discountValue.toString(),
-        },
-        newValues: {
-          code: updated.code,
-          isActive: updated.isActive,
-          discountType: updated.discountType,
-          discountValue: updated.discountValue.toString(),
-        },
+        oldValues: couponAuditValues(existing),
+        newValues: couponAuditValues(updated),
         ...metadata,
       });
       return updated;
