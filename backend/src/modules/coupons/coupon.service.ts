@@ -1,9 +1,10 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { Prisma, type Coupon } from '@prisma/client';
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import { createAuditLog } from "../../common/utils/audit-log";
 import type { CreateCouponInput, UpdateCouponInput } from "./coupon.validation";
+import { env } from "../../config/env";
 
 function decimal(value: string | number | Prisma.Decimal): Prisma.Decimal {
   return new Prisma.Decimal(value);
@@ -19,8 +20,17 @@ function fromMinorUnits(value: number): Prisma.Decimal {
   return new Prisma.Decimal(value).div(100);
 }
 
-function hashCustomerKey(value: string): string {
-  return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
+/**
+ * A keyed digest prevents offline guessing of normalized customer identifiers.
+ * Keep COUPON_CUSTOMER_HASH_SECRET stable: rotating it changes the identity key
+ * used by historical coupon redemptions and can reset per-customer limits.
+ * Non-production environments fall back to the access secret for convenience.
+ */
+export function hashCouponCustomerKey(value: string): string {
+  const secret = env.COUPON_CUSTOMER_HASH_SECRET ?? env.JWT_ACCESS_SECRET;
+  return createHmac("sha256", secret)
+    .update(value.trim().toLowerCase())
+    .digest("hex");
 }
 
 function isUniqueConstraintError(error: unknown): boolean {
@@ -152,7 +162,7 @@ export async function calculateCouponForOrder<
     );
   }
 
-  const customerKeyHash = hashCustomerKey(input.customerKey);
+  const customerKeyHash = hashCouponCustomerKey(input.customerKey);
   const activeRedemptions = await tx.couponRedemption.findMany({
     where: { couponId: coupon.id, status: { in: ["RESERVED", "REDEEMED"] } },
     select: { customerKeyHash: true },
