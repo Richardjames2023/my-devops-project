@@ -40,6 +40,35 @@ function retryDelay(attemptCount: number): number {
   return Math.min(30_000 * 2 ** Math.max(0, attemptCount - 1), MAX_BACKOFF_MS);
 }
 
+async function suppressPolicyDisallowedOutboxEmails(): Promise<void> {
+  // Older deployments may already have queued routine event emails. Suppress
+  // them before claiming work so the new policy also applies to the backlog.
+  await prisma.$executeRaw`
+    UPDATE notification_email_deliveries AS delivery
+    SET status = 'SUPPRESSED',
+        "lastError" = 'Suppressed by notification event email policy',
+        "lockedAt" = NULL,
+        "lockedBy" = NULL,
+        "updatedAt" = NOW()
+    FROM notification_outbox AS event
+    WHERE delivery."eventRecipientKey" LIKE 'v1:' || event.id::text || ':%'
+      AND delivery.status IN ('QUEUED', 'RETRYING')
+      AND NOT (
+        event."eventType" IN (
+          'payment.succeeded',
+          'payment.reconciliation_required',
+          'refund.needs_attention',
+          'delivery.exception',
+          'staff.security_event'
+        )
+        OR (
+          event."eventType" = 'order.created'
+          AND delivery."eventRecipientKey" LIKE 'v1:' || event.id::text || ':GUEST:%'
+        )
+      )
+  `;
+}
+
 async function claimBatch(deliveryId?: string): Promise<ClaimedDelivery[]> {
   const workerId = randomUUID();
   const idFilter = deliveryId
@@ -113,6 +142,7 @@ export async function processNotificationEmailBatch(
   const enabled = options.enabled ?? env.EMAIL_DELIVERY_ENABLED;
   if (!enabled) return { claimed: 0, accepted: 0, failed: 0, skipped: true };
 
+  await suppressPolicyDisallowedOutboxEmails();
   const provider = options.provider ?? getProvider();
   const deliveries = await claimBatch(options.deliveryId);
   let accepted = 0;
