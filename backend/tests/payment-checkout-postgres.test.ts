@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -68,6 +68,8 @@ const {
       };
     },
   );
+
+const { hashCouponCustomerKey } = await import("../src/modules/coupons/coupon.service");
 
 interface Fixture {
   userId: string;
@@ -249,7 +251,7 @@ async function attachCouponToOrder(
       randomUUID(),
       couponId,
       fixture.orderId,
-      createHash("sha256").update(`user:${fixture.userId}`).digest("hex"),
+      hashCouponCustomerKey(`user:${fixture.userId}`),
       expired,
     ],
   );
