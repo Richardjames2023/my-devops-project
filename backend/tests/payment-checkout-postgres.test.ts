@@ -1163,5 +1163,57 @@ describe("PostgreSQL checkout payment initialization", () => {
   });
 
 
+  it("retains a failed payment coupon reservation for the database-clock retry grace period", async () => {
+    const fixture = await createFixture();
+    let couponId: string | null = null;
+
+    try {
+      couponId = await attachCouponToOrder(fixture, false);
+      paystackMocks.initialize.mockRejectedValue(
+        new Error("Paystack initialization failed"),
+      );
+
+      await expect(
+        createPayment(
+          { orderId: fixture.orderId, provider: "PAYSTACK" },
+          fixture.userId,
+        ),
+      ).rejects.toThrow("Paystack initialization failed");
+
+      const redemption = await pool.query(
+        `SELECT
+           status,
+           "expiresAt" > NOW() AS "hasFutureExpiry",
+           "expiresAt" <= NOW() + INTERVAL '16 minutes' AS "withinGracePeriod"
+         FROM coupon_redemptions
+         WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      expect(redemption.rows[0]).toMatchObject({
+        status: "RESERVED",
+        hasFutureExpiry: true,
+        withinGracePeriod: true,
+      });
+
+      const payment = await pool.query(
+        `SELECT status FROM payments WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      expect(payment.rows[0].status).toBe("FAILED");
+    } finally {
+      await pool.query(
+        `DELETE FROM coupon_redemptions WHERE "orderId" = $1`,
+        [fixture.orderId],
+      );
+      await cleanupFixture(fixture);
+      if (couponId) {
+        await pool.query(`DELETE FROM coupons WHERE id = $1`, [couponId]);
+      }
+      paystackMocks.initialize.mockReset();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
+
 
 });
