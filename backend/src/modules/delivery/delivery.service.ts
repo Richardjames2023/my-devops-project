@@ -203,7 +203,7 @@ export async function updateDeliveryStatus(
         eventType: "delivery.exception",
         aggregateType: "DELIVERY",
         aggregateId: delivery.id,
-        deduplicationKey: new Date().toISOString(),
+        deduplicationKey: now.toISOString(),
         payload: {
           deliveryId: delivery.id,
           previousStatus: delivery.status,
