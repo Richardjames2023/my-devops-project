@@ -1,11 +1,7 @@
-import { createHash } from "node:crypto";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type { UpdateDeliveryTrackingInput } from "./delivery-tracking.validation";
-
-function hashGuestOrderAccessToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
+import { hashGuestOrderAccessToken } from "../orders/guest-order-access";
 
 type DeliveryTrackingActor = {
   staffAccountId: string;
@@ -125,5 +121,8 @@ export function getGuestOrderDeliveryTracking(
   return findOrderDeliveryTracking({
     id: orderId,
     guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+    guestAccessTokenExpiresAt: { gt: new Date() },
+    guestAccessTokenRevokedAt: null,
+    userId: null,
   });
 }
