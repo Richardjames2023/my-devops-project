@@ -205,7 +205,7 @@ export async function createReturnRequest(
 
       if (userId !== null) {
         if (order.userId !== userId) {
-          throw new AppError("You are not allowed to access this order", 404);
+          throw new AppError("You are not allowed to access this order", 403);
         }
       } else if (
         order.userId !== null ||
