@@ -52,6 +52,9 @@ export async function createWarrantyClaim(
       item.order.userId !== null ||
       item.order.id !== guestOrderId ||
       !guestAccessToken ||
+      item.order.guestAccessTokenRevokedAt !== null ||
+      !item.order.guestAccessTokenExpiresAt ||
+      item.order.guestAccessTokenExpiresAt <= new Date() ||
       item.order.guestAccessTokenHash !== hashGuestOrderAccessToken(guestAccessToken)
     ) {
       throw new AppError("Warranty claim not found", 404);
@@ -252,6 +255,9 @@ export async function listGuestWarrantyClaims(
             id: orderId,
             userId: null,
             guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+            guestAccessTokenExpiresAt: { gt: new Date() },
+            guestAccessTokenRevokedAt: null,
+            userId: null,
           },
         },
       },
