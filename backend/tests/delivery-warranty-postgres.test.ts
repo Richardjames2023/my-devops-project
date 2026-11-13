@@ -75,6 +75,8 @@ const {
 const {
   createWarrantyClaim,
   reviewWarrantyClaim,
+  listGuestWarrantyClaims,
+  getGuestWarrantyClaim,
 } = await import("../src/modules/warranty-claims/warranty-claim.service");
 
 interface TestFixture {
@@ -893,6 +895,58 @@ describe("PostgreSQL delivery and warranty activation", () => {
       await pool.query(`DELETE FROM users WHERE id = ANY($1::uuid[])`, [
         [userId, otherUserId],
       ]);
+    }
+  });
+
+
+  it("allows guest warranty claims only with the matching guest order token", async () => {
+    const fixture = await createFixture({ quantities: [1], orderQuantity: 1 });
+    const guestToken = randomUUID().replace(/-/g, "").repeat(2);
+    const tokenHash = createHash("sha256").update(guestToken).digest("hex");
+
+    try {
+      await pool.query(
+        'UPDATE orders SET "guestAccessTokenHash" = $2 WHERE id = $1',
+        [fixture.orderId, tokenHash],
+      );
+      await pool.query(
+        `UPDATE order_items
+         SET "warrantyStartedAt" = NOW() - INTERVAL '1 day',
+             "warrantyExpiresAt" = NOW() + INTERVAL '30 days'
+         WHERE id = $1`,
+        [fixture.orderItemId],
+      );
+
+      const claim = await createWarrantyClaim(null, {
+        orderItemId: fixture.orderItemId,
+        quantity: 1,
+        issue: "Guest warranty issue",
+        description: "The item stopped working.",
+      }, guestToken, fixture.orderId);
+
+      expect(claim.status).toBe("PENDING");
+      expect(claim.userId).toBeNull();
+
+      const history = await listGuestWarrantyClaims(fixture.orderId, guestToken);
+      expect(history.claims).toHaveLength(1);
+      expect(history.claims[0]?.id).toBe(claim.id);
+
+      const detail = await getGuestWarrantyClaim(fixture.orderId, claim.id, guestToken);
+      expect(detail.id).toBe(claim.id);
+
+      await expect(
+        createWarrantyClaim(null, {
+          orderItemId: fixture.orderItemId,
+          quantity: 1,
+          issue: "Invalid token attempt",
+        }, "0".repeat(64), fixture.orderId),
+      ).rejects.toThrow("Warranty claim not found");
+
+      await expect(
+        getGuestWarrantyClaim(randomUUID(), claim.id, guestToken),
+      ).rejects.toThrow("Warranty claim not found");
+    } finally {
+      await cleanupFixture(fixture);
     }
   });
 
