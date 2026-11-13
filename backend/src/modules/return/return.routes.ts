@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { guestOrderLimiter, guestOrderRetrievalLimiter } from "../../common/middleware/rate-limit.middleware";
 import {
   listMine,
   getMine,
@@ -20,9 +21,9 @@ import { streamEvidenceFile } from "./return-evidence-file.controller";
 const router = Router();
 
 // Guest after-sales endpoints use the order access token returned at checkout.
-router.get("/guest/:orderId", listGuestReturns);
-router.post("/guest/:orderId", createGuestReturn);
-router.get("/guest/:orderId/:returnRequestId", getGuestReturn);
+router.get("/guest/:orderId", guestOrderRetrievalLimiter, listGuestReturns);
+router.post("/guest/:orderId", guestOrderLimiter, createGuestReturn);
+router.get("/guest/:orderId/:returnRequestId", guestOrderRetrievalLimiter, getGuestReturn);
 
 router.get("/", authenticate, requireCustomer, listMine);
 router.get("/:returnRequestId", authenticate, requireCustomer, getMine);
