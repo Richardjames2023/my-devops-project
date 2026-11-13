@@ -10,6 +10,7 @@ import { createAuditLog } from "../../common/utils/audit-log";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 import { findDeliveryZoneForLocation } from "../delivery-zones/delivery-zone.service";
 import { calculateCouponForOrder } from "../coupons/coupon.service";
+import { hashGuestOrderAccessToken } from "./guest-order-access";
 
 const MAX_TRANSACTION_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
@@ -36,9 +37,6 @@ function generateGuestOrderAccessToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
-function hashGuestOrderAccessToken(token: string): string {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
 
 async function createOrderFromCart(
   cartOwner: Prisma.CartWhereUniqueInput,
