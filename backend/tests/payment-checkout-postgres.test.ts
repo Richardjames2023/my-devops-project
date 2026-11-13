@@ -491,6 +491,65 @@ describe("PostgreSQL checkout payment initialization", () => {
     }
   });
 
+  it.each(["expired", "revoked"] as const)(
+    "rejects guest payment initialization when the order token is %s",
+    async (tokenState) => {
+      const fixture = await createFixture(true);
+
+      try {
+        if (tokenState === "expired") {
+          await pool.query(
+            'UPDATE orders SET "guestAccessTokenExpiresAt" = NOW() - INTERVAL \'1 second\' WHERE id = $1',
+            [fixture.orderId],
+          );
+        } else {
+          await pool.query(
+            'UPDATE orders SET "guestAccessTokenRevokedAt" = NOW() WHERE id = $1',
+            [fixture.orderId],
+          );
+        }
+
+        await expect(
+          createGuestPayment(
+            { orderId: fixture.orderId, provider: "PAYSTACK" },
+            fixture.guestAccessToken,
+          ),
+        ).rejects.toMatchObject({ statusCode: 403 });
+
+        expect(paystackMocks.initialize).not.toHaveBeenCalled();
+      } finally {
+        await cleanupFixture(fixture);
+        paystackMocks.initialize.mockClear();
+      }
+    },
+  );
+
+  it("rejects guest payment verification after the guest order token is revoked", async () => {
+    const fixture = await createFixture(true);
+
+    try {
+      const initialized = await createGuestPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.guestAccessToken,
+      );
+
+      await pool.query(
+        'UPDATE orders SET "guestAccessTokenRevokedAt" = NOW() WHERE id = $1',
+        [fixture.orderId],
+      );
+
+      await expect(
+        markGuestPaymentSuccessful(initialized.payment.id, fixture.guestAccessToken),
+      ).rejects.toMatchObject({ statusCode: 403 });
+
+      expect(paystackMocks.verify).not.toHaveBeenCalled();
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
   it("requires the guest access token to verify and complete a guest payment", async () => {
     const fixture = await createFixture(true);
 
