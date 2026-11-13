@@ -142,6 +142,13 @@ export async function createStaffInvitation(
     // current staff account and role assignments.
     const { roles } = await getDelegableRoles(tx, actorId, input.roleIds);
 
+    // Serialize invitation creation for the same normalized email address.
+    // The pending-invitation check alone is not safe under concurrent requests:
+    // two transactions could both observe no pending row before either inserts.
+    await tx.$queryRaw`
+      SELECT pg_advisory_xact_lock(hashtextextended(${email}, 0))
+    `;
+
     await tx.$executeRaw`
       UPDATE staff_invitations
       SET status = 'EXPIRED', "updatedAt" = NOW()
