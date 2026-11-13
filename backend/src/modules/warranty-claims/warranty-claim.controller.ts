@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import {
@@ -12,7 +12,10 @@ import {
   listCustomerWarrantyClaims,
   listWarrantyClaims,
   reviewWarrantyClaim,
+  listGuestWarrantyClaims,
+  getGuestWarrantyClaim,
 } from "./warranty-claim.service";
+import { isValidGuestOrderAccessToken } from "../orders/guest-order-access";
 
 function sendValidationError(res: Response, error: z.ZodError): void {
   res.status(400).json({ message: "Validation failed", errors: z.flattenError(error).fieldErrors });
@@ -56,4 +59,45 @@ export async function review(req: AuthenticatedRequest, res: Response): Promise<
   if (!body.success) { sendValidationError(res, body.error); return; }
   const claim = await reviewWarrantyClaim(params.data.claimId, body.data);
   res.status(200).json({ message: "Warranty claim updated successfully", claim });
+}
+
+
+function readGuestCredentials(req: Request, res: Response): { orderId: string; token: string } | null {
+  const params = z.object({ orderId: z.uuid("Invalid order ID") }).safeParse(req.params);
+  const token = req.get("x-guest-order-token");
+  if (!params.success || !isValidGuestOrderAccessToken(token)) {
+    res.status(404).json({ message: "Order not found" });
+    return null;
+  }
+  return { orderId: params.data.orderId, token };
+}
+
+export async function createGuestClaim(req: Request, res: Response): Promise<void> {
+  const credentials = readGuestCredentials(req, res);
+  if (!credentials) return;
+  const parsed = createWarrantyClaimSchema.safeParse(req.body);
+  if (!parsed.success) { sendValidationError(res, parsed.error); return; }
+  const claim = await createWarrantyClaim(null, parsed.data, credentials.token, credentials.orderId);
+  res.status(201).json({ message: "Guest warranty claim submitted successfully", claim });
+}
+
+export async function listGuestClaims(req: Request, res: Response): Promise<void> {
+  const credentials = readGuestCredentials(req, res);
+  if (!credentials) return;
+  const result = await listGuestWarrantyClaims(credentials.orderId, credentials.token);
+  res.status(200).json({ message: "Guest warranty claims retrieved successfully", ...result });
+}
+
+export async function getGuestClaim(req: Request, res: Response): Promise<void> {
+  const params = z.object({
+    orderId: z.uuid("Invalid order ID"),
+    claimId: z.uuid("Invalid warranty claim ID"),
+  }).safeParse(req.params);
+  const token = req.get("x-guest-order-token");
+  if (!params.success || !isValidGuestOrderAccessToken(token)) {
+    res.status(404).json({ message: "Warranty claim not found" });
+    return;
+  }
+  const claim = await getGuestWarrantyClaim(params.data.orderId, params.data.claimId, token);
+  res.status(200).json({ message: "Guest warranty claim retrieved successfully", claim });
 }
