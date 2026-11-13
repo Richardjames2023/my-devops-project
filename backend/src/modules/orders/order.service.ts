@@ -26,6 +26,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function addMonthsClamped(date: Date, months: number): Date {
+  const result = new Date(date);
+  const originalDay = result.getDate();
+  result.setDate(1);
+  result.setMonth(result.getMonth() + months);
+  const lastDay = new Date(
+    result.getFullYear(),
+    result.getMonth() + 1,
+    0,
+  ).getDate();
+  result.setDate(Math.min(originalDay, lastDay));
+  return result;
+}
+
 function generateOrderNumber(): string {
   const timestamp = Date.now();
   const random = Math.floor(1000 + Math.random() * 9000);
@@ -221,8 +235,15 @@ async function createOrderFromCart(
       throw new AppError("Customer email is required", 400);
     }
 
+    const maxWarrantyDurationMonths = finalOrderItems.reduce(
+      (maximum, item) => Math.max(maximum, item.warrantyDuration ?? 0),
+      0,
+    );
     const guestAccessTokenExpiresAt = isGuestOrder
-      ? new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000)
+      ? addMonthsClamped(
+          new Date(),
+          Math.max(24, maxWarrantyDurationMonths + 3),
+        )
       : null;
 
     const order = await tx.order.create({
