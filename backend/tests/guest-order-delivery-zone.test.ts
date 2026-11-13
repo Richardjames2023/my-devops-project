@@ -33,6 +33,9 @@ describe("guest order delivery-zone snapshot", () => {
         where: {
           id: orderId,
           guestAccessTokenHash: expect.any(String),
+          guestAccessTokenExpiresAt: { gt: expect.any(Date) },
+          guestAccessTokenRevokedAt: null,
+          userId: null,
         },
         select: expect.objectContaining({
           deliveryFee: true,

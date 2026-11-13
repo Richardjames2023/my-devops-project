@@ -505,6 +505,8 @@ model Order {
   customerEmail            String?
   customerPhone            String?
   guestAccessTokenHash     String?                          @unique
+  guestAccessTokenExpiresAt DateTime?
+  guestAccessTokenRevokedAt DateTime?
   orderNumber              String                           @unique
   status                   OrderStatus                      @default(PENDING)
   subtotal                 Decimal                          @db.Decimal(12, 2)
@@ -538,6 +540,7 @@ model Order {
   @@index([createdAt])
   @@index([deliveryZoneId])
   @@index([couponId])
+  @@index([guestAccessTokenExpiresAt])
   @@map("orders")
 }
 

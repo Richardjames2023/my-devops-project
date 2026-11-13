@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import {
@@ -15,8 +15,11 @@ import {
   inspectReturnRequest,
   listCustomerReturnRequests,
   getCustomerReturnRequest,
+  listGuestReturnRequests,
+  getGuestReturnRequest,
 } from "./return.service";
 import { customerReturnHistoryQuerySchema } from "./return-history.validation";
+import { isValidGuestOrderAccessToken } from "../orders/guest-order-access";
 
 export async function create(
   req: AuthenticatedRequest,
@@ -266,4 +269,52 @@ export async function getMine(
     message: "Return request retrieved successfully",
     returnRequest,
   });
+}
+
+
+function readGuestOrderCredentials(req: Request, res: Response): { orderId: string; token: string } | null {
+  const params = z.object({ orderId: z.uuid("Invalid order ID") }).safeParse(req.params);
+  const token = req.get("x-guest-order-token");
+  if (!params.success || !isValidGuestOrderAccessToken(token)) {
+    res.status(404).json({ message: "Order not found" });
+    return null;
+  }
+  return { orderId: params.data.orderId, token };
+}
+
+export async function createGuestReturn(req: Request, res: Response): Promise<void> {
+  const credentials = readGuestOrderCredentials(req, res);
+  if (!credentials) return;
+  const parsed = createReturnRequestSchema.safeParse({ ...req.body, orderId: credentials.orderId });
+  if (!parsed.success) {
+    res.status(400).json({ message: "Validation failed", errors: z.flattenError(parsed.error).fieldErrors });
+    return;
+  }
+  const returnRequest = await createReturnRequest(null, parsed.data, credentials.token);
+  res.status(201).json({ message: "Guest return request created successfully", returnRequest });
+}
+
+export async function listGuestReturns(req: Request, res: Response): Promise<void> {
+  const credentials = readGuestOrderCredentials(req, res);
+  if (!credentials) return;
+  const result = await listGuestReturnRequests(credentials.orderId, credentials.token);
+  res.status(200).json({ message: "Guest return history retrieved successfully", ...result });
+}
+
+export async function getGuestReturn(req: Request, res: Response): Promise<void> {
+  const params = z.object({
+    orderId: z.uuid("Invalid order ID"),
+    returnRequestId: z.uuid("Invalid return request ID"),
+  }).safeParse(req.params);
+  const token = req.get("x-guest-order-token");
+  if (!params.success || !isValidGuestOrderAccessToken(token)) {
+    res.status(404).json({ message: "Return request not found" });
+    return;
+  }
+  const returnRequest = await getGuestReturnRequest(
+    params.data.orderId,
+    params.data.returnRequestId,
+    token,
+  );
+  res.status(200).json({ message: "Guest return request retrieved successfully", returnRequest });
 }

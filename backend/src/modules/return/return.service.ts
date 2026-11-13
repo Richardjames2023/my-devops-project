@@ -4,6 +4,7 @@ import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 import { publishInventoryLowStockIfCrossed } from "../inventory/inventory-low-stock.notification";
+import { hashGuestOrderAccessToken } from "../orders/guest-order-access";
 
 import type {
   CreateReturnRequestInput,
@@ -157,8 +158,9 @@ async function receiveReturnTransaction(
 }
 
 export async function createReturnRequest(
-  userId: string,
+  userId: string | null,
   input: CreateReturnRequestInput,
+  guestAccessToken?: string,
 ) {
   return prisma.$transaction(
     async (tx) => {
@@ -201,8 +203,19 @@ export async function createReturnRequest(
         throw new AppError("Order not found", 404);
       }
 
-      if (order.userId !== userId) {
-        throw new AppError("You are not allowed to access this order", 403);
+      if (userId !== null) {
+        if (order.userId !== userId) {
+          throw new AppError("You are not allowed to access this order", 403);
+        }
+      } else if (
+        order.userId !== null ||
+        !guestAccessToken ||
+        order.guestAccessTokenRevokedAt !== null ||
+        !order.guestAccessTokenExpiresAt ||
+        order.guestAccessTokenExpiresAt <= new Date() ||
+        order.guestAccessTokenHash !== hashGuestOrderAccessToken(guestAccessToken)
+      ) {
+        throw new AppError("Order not found", 404);
       }
 
       const deliveredAtDates = order.fulfillment?.packages
@@ -313,7 +326,7 @@ export async function createReturnRequest(
       const returnRequest = await tx.returnRequest.create({
         data: {
           orderId: order.id,
-          userId,
+          ...(userId !== null ? { userId } : {}),
           status: "PENDING",
           reason: input.reason,
           ...(input.description !== undefined && {
@@ -917,5 +930,171 @@ export async function getCustomerReturnRequest(
     throw new AppError("Return request not found", 404);
   }
 
+  return returnRequest;
+}
+
+
+/**
+ * Guest after-sales access is scoped to one guest order and verified with the
+ * same high-entropy token issued by guest checkout. A token cannot enumerate
+ * returns belonging to another order.
+ */
+export async function listGuestReturnRequests(
+  orderId: string,
+  guestAccessToken: string,
+) {
+  const where: Prisma.ReturnRequestWhereInput = {
+    orderId,
+    order: {
+      is: {
+        userId: null,
+        guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+        guestAccessTokenExpiresAt: { gt: new Date() },
+        guestAccessTokenRevokedAt: null,
+      },
+    },
+  };
+
+  const returnRequests = await prisma.returnRequest.findMany({
+    where,
+    orderBy: [{ requestedAt: "desc" }, { id: "desc" }],
+    select: {
+      id: true,
+      orderId: true,
+      status: true,
+      reason: true,
+      description: true,
+      requestedAt: true,
+      reviewedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      items: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          quantity: true,
+          receivedQuantity: true,
+          acceptedQuantity: true,
+          condition: true,
+          notes: true,
+          orderItem: {
+            select: { id: true, productName: true, variantName: true, sku: true },
+          },
+        },
+      },
+      evidence: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, type: true, description: true, createdAt: true },
+      },
+    },
+  });
+
+  return { returnRequests };
+}
+
+export async function getGuestReturnRequest(
+  orderId: string,
+  returnRequestId: string,
+  guestAccessToken: string,
+) {
+  const returnRequest = await prisma.returnRequest.findFirst({
+    where: {
+      id: returnRequestId,
+      orderId,
+      order: {
+        is: {
+          userId: null,
+          guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+          guestAccessTokenExpiresAt: { gt: new Date() },
+          guestAccessTokenRevokedAt: null,
+        },
+      },
+    },
+    select: {
+      id: true,
+      orderId: true,
+      status: true,
+      reason: true,
+      description: true,
+      requestedAt: true,
+      reviewedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          currency: true,
+          subtotal: true,
+          discountAmount: true,
+          deliveryFee: true,
+          totalAmount: true,
+          createdAt: true,
+        },
+      },
+      items: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          quantity: true,
+          receivedQuantity: true,
+          acceptedQuantity: true,
+          condition: true,
+          notes: true,
+          createdAt: true,
+          orderItem: {
+            select: {
+              id: true,
+              productName: true,
+              variantName: true,
+              sku: true,
+              quantity: true,
+              unitPrice: true,
+              discountAmount: true,
+              totalPrice: true,
+            },
+          },
+          inspections: {
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true,
+              inspectedQuantity: true,
+              acceptedQuantity: true,
+              rejectedQuantity: true,
+              condition: true,
+              notes: true,
+              createdAt: true,
+            },
+          },
+          refundItems: {
+            select: {
+              id: true,
+              quantity: true,
+              amount: true,
+              refund: {
+                select: {
+                  id: true,
+                  reference: true,
+                  status: true,
+                  amount: true,
+                  currency: true,
+                  reason: true,
+                  processedAt: true,
+                  createdAt: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      evidence: {
+        orderBy: { createdAt: "asc" },
+        select: { id: true, type: true, description: true, createdAt: true },
+      },
+    },
+  });
+
+  if (!returnRequest) throw new AppError("Return request not found", 404);
   return returnRequest;
 }

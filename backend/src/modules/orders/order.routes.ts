@@ -3,6 +3,7 @@ import {
   create,
   createGuest,
   getGuest,
+  revokeGuest,
   cancel,
   adminCancel,
   listMine,
@@ -50,6 +51,13 @@ router.post(
   guestOrderLimiter,
   requireGuestSession,
   createGuest,
+);
+
+// Guest order access revocation
+router.post(
+  "/guest/:orderId/access/revoke",
+  guestOrderRetrievalLimiter,
+  revokeGuest,
 );
 
 // Guest order retrieval

@@ -154,11 +154,11 @@ async function createFixture(guest = false): Promise<Fixture> {
     await pool.query(
       `INSERT INTO orders
        (id, "userId", "customerName", "customerEmail", "customerPhone",
-        "guestAccessTokenHash", "orderNumber", status, subtotal,
+        "guestAccessTokenHash", "guestAccessTokenExpiresAt", "orderNumber", status, subtotal,
         "discountAmount", "deliveryFee", "totalAmount", currency,
         "shippingAddress", "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING',
-               5001.00, 0, 0, 5001.00, 'NGN', $8::jsonb, NOW(), NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING',
+               5001.00, 0, 0, 5001.00, 'NGN', $9::jsonb, NOW(), NOW())`,
       [
         fixture.orderId,
         guest ? null : fixture.userId,
@@ -168,6 +168,7 @@ async function createFixture(guest = false): Promise<Fixture> {
         guest
           ? createHash("sha256").update(fixture.guestAccessToken).digest("hex")
           : null,
+        guest ? new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000) : null,
         `PAYMENT-ORDER-${suffix}`,
         JSON.stringify({ fullName: "Payment Checkout", city: "Gombe" }),
       ],
@@ -483,6 +484,66 @@ describe("PostgreSQL checkout payment initialization", () => {
         reservedQuantity: 3,
       });
       expect(reservation.rows[0].status).toBe("PENDING");
+    } finally {
+      await cleanupFixture(fixture);
+      paystackMocks.initialize.mockClear();
+      paystackMocks.verify.mockReset();
+    }
+  });
+
+  it.each(["expired", "revoked"] as const)(
+    "rejects guest payment initialization when the order token is %s",
+    async (tokenState) => {
+      const fixture = await createFixture(true);
+
+      try {
+        if (tokenState === "expired") {
+          // Match the UTC timestamp convention used by Prisma DateTime fields.
+          await pool.query(
+            'UPDATE orders SET "guestAccessTokenExpiresAt" = timezone(\'UTC\', NOW()) - INTERVAL \'1 second\' WHERE id = $1',
+            [fixture.orderId],
+          );
+        } else {
+          await pool.query(
+            'UPDATE orders SET "guestAccessTokenRevokedAt" = NOW() WHERE id = $1',
+            [fixture.orderId],
+          );
+        }
+
+        await expect(
+          createGuestPayment(
+            { orderId: fixture.orderId, provider: "PAYSTACK" },
+            fixture.guestAccessToken,
+          ),
+        ).rejects.toMatchObject({ statusCode: 403 });
+
+        expect(paystackMocks.initialize).not.toHaveBeenCalled();
+      } finally {
+        await cleanupFixture(fixture);
+        paystackMocks.initialize.mockClear();
+      }
+    },
+  );
+
+  it("rejects guest payment verification after the guest order token is revoked", async () => {
+    const fixture = await createFixture(true);
+
+    try {
+      const initialized = await createGuestPayment(
+        { orderId: fixture.orderId, provider: "PAYSTACK" },
+        fixture.guestAccessToken,
+      );
+
+      await pool.query(
+        'UPDATE orders SET "guestAccessTokenRevokedAt" = NOW() WHERE id = $1',
+        [fixture.orderId],
+      );
+
+      await expect(
+        markGuestPaymentSuccessful(initialized.payment.id, fixture.guestAccessToken),
+      ).rejects.toMatchObject({ statusCode: 403 });
+
+      expect(paystackMocks.verify).not.toHaveBeenCalled();
     } finally {
       await cleanupFixture(fixture);
       paystackMocks.initialize.mockClear();

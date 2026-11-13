@@ -8,12 +8,14 @@ import {
   createOrder,
   createGuestOrder,
   getGuestOrder,
+  revokeGuestOrderAccess,
   cancelOrder,
   adminCancelOrder,
 } from "./order.service";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import type { GuestSessionRequest } from "../guest-session/guest-session.middleware";
 import { AppError } from "../../common/errors/AppError";
+import { isValidGuestOrderAccessToken } from "./guest-order-access";
 import { customerOrderHistoryQuerySchema } from "./order-history.validation";
 import { listCustomerOrders } from "./order.service";
 
@@ -194,6 +196,23 @@ export async function listMine(
 
   res.status(200).json({
     message: "Orders retrieved successfully",
+    ...result,
+  });
+}
+
+
+export async function revokeGuest(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const orderId = z.uuid().safeParse(req.params.orderId);
+  const token = req.get("x-guest-order-token");
+  if (!orderId.success || !isValidGuestOrderAccessToken(token)) {
+    throw new AppError("Order not found", 404);
+  }
+  const result = await revokeGuestOrderAccess(orderId.data, token);
+  res.status(200).json({
+    message: "Guest order access revoked successfully",
     ...result,
   });
 }

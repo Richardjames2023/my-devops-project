@@ -10,6 +10,7 @@ import { createAuditLog } from "../../common/utils/audit-log";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 import { findDeliveryZoneForLocation } from "../delivery-zones/delivery-zone.service";
 import { calculateCouponForOrder } from "../coupons/coupon.service";
+import { hashGuestOrderAccessToken } from "./guest-order-access";
 
 const MAX_TRANSACTION_RETRIES = 3;
 const RETRY_DELAY_MS = 100;
@@ -25,6 +26,20 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function addMonthsClamped(date: Date, months: number): Date {
+  const result = new Date(date);
+  const originalDay = result.getDate();
+  result.setDate(1);
+  result.setMonth(result.getMonth() + months);
+  const lastDay = new Date(
+    result.getFullYear(),
+    result.getMonth() + 1,
+    0,
+  ).getDate();
+  result.setDate(Math.min(originalDay, lastDay));
+  return result;
+}
+
 function generateOrderNumber(): string {
   const timestamp = Date.now();
   const random = Math.floor(1000 + Math.random() * 9000);
@@ -36,9 +51,6 @@ function generateGuestOrderAccessToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
-function hashGuestOrderAccessToken(token: string): string {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
 
 async function createOrderFromCart(
   cartOwner: Prisma.CartWhereUniqueInput,
@@ -223,6 +235,17 @@ async function createOrderFromCart(
       throw new AppError("Customer email is required", 400);
     }
 
+    const maxWarrantyDurationMonths = finalOrderItems.reduce(
+      (maximum, item) => Math.max(maximum, item.warrantyDuration ?? 0),
+      0,
+    );
+    const guestAccessTokenExpiresAt = isGuestOrder
+      ? addMonthsClamped(
+          new Date(),
+          Math.max(24, maxWarrantyDurationMonths + 3),
+        )
+      : null;
+
     const order = await tx.order.create({
       data: {
         userId,
@@ -234,6 +257,7 @@ async function createOrderFromCart(
               guestAccessTokenHash: hashGuestOrderAccessToken(
                 guestAccessToken!,
               ),
+              guestAccessTokenExpiresAt,
             }
           : {}),
         orderNumber: generateOrderNumber(),
@@ -337,6 +361,9 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
     where: {
       id: orderId,
       guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+      guestAccessTokenExpiresAt: { gt: new Date() },
+      guestAccessTokenRevokedAt: null,
+      userId: null,
     },
     select: {
       id: true,
@@ -381,6 +408,32 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
   }
 
   return order;
+}
+
+
+
+/**
+ * Revoke a guest order token. The token hash is retained for auditability,
+ * while the revocation timestamp makes it unusable across guest endpoints.
+ */
+export async function revokeGuestOrderAccess(
+  orderId: string,
+  guestAccessToken: string,
+) {
+  const revokedAt = new Date();
+  const result = await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+      guestAccessTokenExpiresAt: { gt: revokedAt },
+      guestAccessTokenRevokedAt: null,
+      userId: null,
+    },
+    data: { guestAccessTokenRevokedAt: revokedAt },
+  });
+
+  if (result.count !== 1) throw new AppError("Order not found", 404);
+  return { orderId, revokedAt };
 }
 
 interface OrderCancellationAuditMeta {
