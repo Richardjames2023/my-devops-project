@@ -145,7 +145,7 @@ export async function createStaffInvitation(
     // Serialize invitation creation for the same normalized email address.
     // The pending-invitation check alone is not safe under concurrent requests:
     // two transactions could both observe no pending row before either inserts.
-    await tx.$queryRaw`
+    await tx.$executeRaw`
       SELECT pg_advisory_xact_lock(hashtextextended(${email}, 0))
     `;
 
