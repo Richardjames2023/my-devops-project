@@ -228,8 +228,9 @@ describe("PostgreSQL return quantity guards", () => {
     const tokenHash = createHash("sha256").update(guestToken).digest("hex");
 
     try {
+      // Prisma DateTime uses UTC; keep raw SQL fixture timestamps consistent.
       await pool.query(
-        'UPDATE orders SET "userId" = NULL, "guestAccessTokenHash" = $2, "guestAccessTokenExpiresAt" = NOW() + INTERVAL \'2 years\' WHERE id = $1',
+        'UPDATE orders SET "userId" = NULL, "guestAccessTokenHash" = $2, "guestAccessTokenExpiresAt" = timezone(\'UTC\', NOW()) + INTERVAL \'2 years\' WHERE id = $1',
         [fixture.orderId, tokenHash],
       );
 
@@ -258,7 +259,7 @@ describe("PostgreSQL return quantity guards", () => {
       ).rejects.toThrow("Return request not found");
 
       await pool.query(
-        'UPDATE orders SET "guestAccessTokenExpiresAt" = NOW() - INTERVAL \'1 second\' WHERE id = $1',
+        'UPDATE orders SET "guestAccessTokenExpiresAt" = timezone(\'UTC\', NOW()) - INTERVAL \'1 second\' WHERE id = $1',
         [fixture.orderId],
       );
       await expect(listGuestReturnRequests(fixture.orderId, guestToken)).resolves.toEqual({
