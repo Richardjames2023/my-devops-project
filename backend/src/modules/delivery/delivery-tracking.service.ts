@@ -59,7 +59,7 @@ export async function updateDeliveryTracking(
 
 async function findOrderDeliveryTracking(where: {
   id: string;
-  userId?: string;
+  userId?: string | null;
   guestAccessTokenHash?: string;
   guestAccessTokenExpiresAt?: { gt: Date };
   guestAccessTokenRevokedAt?: null;
