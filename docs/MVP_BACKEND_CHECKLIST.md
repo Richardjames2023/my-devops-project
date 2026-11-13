@@ -111,9 +111,12 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Return request and inspection workflow foundation.
 - [x] Refund processing and reconciliation foundation.
 - [x] Warranty claim workflow foundation.
-- [~] Guest after-sales access: current workflows appear to rely on authenticated customer ownership.
-- [ ] Decide and document whether guest orders must support returns and warranty claims in MVP.
-- [ ] If required, implement secure guest-order-token access with strict order-item ownership, expiry/revocation, and abuse protections.
+- [~] Guest after-sales access is being implemented using the existing guest order access token; registered-customer workflows remain unchanged.
+  - [x] Decide to include guest returns and warranty claims in MVP.
+  - [~] Add token-scoped guest return creation/history/detail and warranty claim submission/history/detail.
+  - [~] Add token expiry and explicit revocation, shared token hashing, and rate limits.
+  - [ ] Add guest return evidence upload and secure evidence viewing.
+  - [ ] Run PostgreSQL integration tests, migration validation, build, and full suite before merge.
 - [ ] Verify end-to-end stock restoration, refund state, audit trail, and customer notifications for all return/refund outcomes.
 
 ## 9. Reviews and customer engagement
@@ -166,7 +169,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 | Multiple payment providers | Exclude from MVP |
 | External courier integration | Include; at least one provider |
 | Customer wishlist | Include |
-| Guest returns/warranty claims | Decision required |
+| Guest returns/warranty claims | Include; guest order access token required |
 | Automated courier rate quoting at checkout | Decision required |
 | Move wishlist item to cart | Decision required |
 
