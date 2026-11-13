@@ -1006,6 +1006,9 @@ export async function getGuestReturnRequest(
         is: {
           userId: null,
           guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+          guestAccessTokenExpiresAt: { gt: new Date() },
+          guestAccessTokenRevokedAt: null,
+          userId: null,
         },
       },
     },
