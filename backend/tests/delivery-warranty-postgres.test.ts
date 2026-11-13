@@ -72,6 +72,8 @@ const {
   getGuestOrderDeliveryTracking,
 } = await import("../src/modules/delivery/delivery-tracking.service");
 
+const { revokeGuestOrderAccess } = await import("../src/modules/orders/order.service");
+
 const {
   createWarrantyClaim,
   reviewWarrantyClaim,
@@ -806,6 +808,18 @@ describe("PostgreSQL delivery and warranty activation", () => {
 
       await expect(
         getGuestOrderDeliveryTracking(fixture.orderId, "0".repeat(64)),
+      ).rejects.toThrow("Order not found");
+
+      const revoked = await revokeGuestOrderAccess(fixture.orderId, guestToken);
+      expect(revoked.orderId).toBe(fixture.orderId);
+      expect(revoked.revokedAt).toBeInstanceOf(Date);
+
+      await expect(
+        getGuestOrderDeliveryTracking(fixture.orderId, guestToken),
+      ).rejects.toThrow("Order not found");
+
+      await expect(
+        revokeGuestOrderAccess(fixture.orderId, guestToken),
       ).rejects.toThrow("Order not found");
     } finally {
       await cleanupFixture(fixture);
