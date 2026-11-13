@@ -540,6 +540,7 @@ model Order {
   @@index([createdAt])
   @@index([deliveryZoneId])
   @@index([couponId])
+  @@index([guestAccessTokenExpiresAt])
   @@map("orders")
 }
 
