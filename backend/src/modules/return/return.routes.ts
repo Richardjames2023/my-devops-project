@@ -5,7 +5,10 @@ import {
   create,
   receive,
   review,
-  inspect
+  inspect,
+  createGuestReturn,
+  listGuestReturns,
+  getGuestReturn,
 } from "./return.controller";
 import { authenticate } from "../../common/middleware/authenticate";
 import { authorize, requireCustomer } from "../../common/middleware/authorize";
@@ -15,6 +18,11 @@ import { viewEvidence } from "./return-evidence-view.controller";
 import { streamEvidenceFile } from "./return-evidence-file.controller";
 
 const router = Router();
+
+// Guest after-sales endpoints use the order access token returned at checkout.
+router.get("/guest/:orderId", listGuestReturns);
+router.post("/guest/:orderId", createGuestReturn);
+router.get("/guest/:orderId/:returnRequestId", getGuestReturn);
 
 router.get("/", authenticate, requireCustomer, listMine);
 router.get("/:returnRequestId", authenticate, requireCustomer, getMine);
