@@ -41,7 +41,7 @@ export async function createWarrantyClaim(
 
     const item = await tx.orderItem.findUnique({
       where: { id: input.orderItemId },
-      include: { order: { select: { id: true, userId: true, guestAccessTokenHash: true } } },
+      include: { order: { select: { id: true, userId: true, guestAccessTokenHash: true, guestAccessTokenExpiresAt: true, guestAccessTokenRevokedAt: true } } },
     });
     if (!item) throw new AppError("Order item not found", 404);
     if (userId !== null) {
@@ -257,7 +257,6 @@ export async function listGuestWarrantyClaims(
             guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
             guestAccessTokenExpiresAt: { gt: new Date() },
             guestAccessTokenRevokedAt: null,
-            userId: null,
           },
         },
       },
@@ -286,6 +285,9 @@ export async function getGuestWarrantyClaim(
               id: orderId,
               userId: null,
               guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+              guestAccessTokenExpiresAt: { gt: new Date() },
+              guestAccessTokenRevokedAt: null,
+              userId: null,
             },
           },
         },
