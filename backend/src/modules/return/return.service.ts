@@ -210,6 +210,9 @@ export async function createReturnRequest(
       } else if (
         order.userId !== null ||
         !guestAccessToken ||
+        order.guestAccessTokenRevokedAt !== null ||
+        !order.guestAccessTokenExpiresAt ||
+        order.guestAccessTokenExpiresAt <= new Date() ||
         order.guestAccessTokenHash !== hashGuestOrderAccessToken(guestAccessToken)
       ) {
         throw new AppError("Order not found", 404);
@@ -946,6 +949,9 @@ export async function listGuestReturnRequests(
       is: {
         userId: null,
         guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+        guestAccessTokenExpiresAt: { gt: new Date() },
+        guestAccessTokenRevokedAt: null,
+        userId: null,
       },
     },
   };
