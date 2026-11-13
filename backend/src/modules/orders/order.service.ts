@@ -342,6 +342,7 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
       guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
       guestAccessTokenExpiresAt: { gt: new Date() },
       guestAccessTokenRevokedAt: null,
+      userId: null,
     },
     select: {
       id: true,
