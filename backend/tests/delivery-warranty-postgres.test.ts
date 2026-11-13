@@ -948,6 +948,17 @@ describe("PostgreSQL delivery and warranty activation", () => {
       const detail = await getGuestWarrantyClaim(fixture.orderId, claim.id, guestToken);
       expect(detail.id).toBe(claim.id);
 
+      await pool.query(
+        'UPDATE orders SET "guestAccessTokenRevokedAt" = NOW() WHERE id = $1',
+        [fixture.orderId],
+      );
+      await expect(listGuestWarrantyClaims(fixture.orderId, guestToken)).resolves.toEqual({
+        claims: [],
+      });
+      await expect(
+        getGuestWarrantyClaim(fixture.orderId, claim.id, guestToken),
+      ).rejects.toThrow("Warranty claim not found");
+
       await expect(
         createWarrantyClaim(null, {
           orderItemId: fixture.orderItemId,
