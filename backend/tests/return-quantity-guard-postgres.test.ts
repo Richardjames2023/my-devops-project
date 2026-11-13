@@ -256,6 +256,17 @@ describe("PostgreSQL return quantity guards", () => {
       await expect(
         getGuestReturnRequest(fixture.orderId, created.id, "0".repeat(64)),
       ).rejects.toThrow("Return request not found");
+
+      await pool.query(
+        'UPDATE orders SET "guestAccessTokenExpiresAt" = NOW() - INTERVAL \'1 second\' WHERE id = $1',
+        [fixture.orderId],
+      );
+      await expect(listGuestReturnRequests(fixture.orderId, guestToken)).resolves.toEqual({
+        returnRequests: [],
+      });
+      await expect(
+        getGuestReturnRequest(fixture.orderId, created.id, guestToken),
+      ).rejects.toThrow("Return request not found");
     } finally {
       await cleanupFixture(fixture);
     }
