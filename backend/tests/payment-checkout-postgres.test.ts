@@ -498,8 +498,9 @@ describe("PostgreSQL checkout payment initialization", () => {
 
       try {
         if (tokenState === "expired") {
+          // Match the UTC timestamp convention used by Prisma DateTime fields.
           await pool.query(
-            'UPDATE orders SET "guestAccessTokenExpiresAt" = NOW() - INTERVAL \'1 second\' WHERE id = $1',
+            'UPDATE orders SET "guestAccessTokenExpiresAt" = timezone(\'UTC\', NOW()) - INTERVAL \'1 second\' WHERE id = $1',
             [fixture.orderId],
           );
         } else {
