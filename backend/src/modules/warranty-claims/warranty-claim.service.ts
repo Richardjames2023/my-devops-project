@@ -46,7 +46,7 @@ export async function createWarrantyClaim(
     if (!item) throw new AppError("Order item not found", 404);
     if (userId !== null) {
       if (item.order.userId !== userId) {
-        throw new AppError("Warranty claim not found", 404);
+        throw new AppError("You are not allowed to claim warranty for this order item", 403);
       }
     } else if (
       item.order.userId !== null ||
