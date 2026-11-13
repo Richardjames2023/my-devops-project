@@ -19,8 +19,10 @@ function identityWhere(identity: NotificationPreferenceIdentity) {
 }
 
 /**
- * Payment, security, and refund-intervention notifications are mandatory on both channels.
- * Other categories are configurable by the recipient.
+ * Payment, security, and refund-intervention notifications are mandatory on
+ * both channels. Routine categories are in-app only; recipient preferences
+ * cannot opt them into email. Event-level delivery exceptions are also mandatory.
+ * Staff invitations use their separate secure flow.
  */
 function mandatoryChannels(category: NotificationCategory) {
   if (category === "PAYMENT" || category === "SECURITY" || category === "REFUND") {
@@ -47,7 +49,7 @@ export async function listNotificationPreferences(identity: NotificationPreferen
     return {
       category,
       inAppEnabled: mandatory.inApp || (saved?.inAppEnabled ?? true),
-      emailEnabled: mandatory.email || (saved?.emailEnabled ?? identity.recipientType === "CUSTOMER"),
+      emailEnabled: mandatory.email,
       mandatory,
       updatedAt: saved?.updatedAt ?? null,
     };
@@ -70,6 +72,9 @@ export async function updateNotificationPreference(
   if (mandatory.email && input.emailEnabled === false) {
     throw new AppError("Email notifications for this category cannot be disabled", 400);
   }
+  if (!mandatory.email && input.emailEnabled === true) {
+    throw new AppError("Email notifications are not available for this category", 400);
+  }
 
   const where = { ...identityWhere(identity), category };
   const data = {
@@ -85,7 +90,7 @@ export async function updateNotificationPreference(
         ...identityWhere(identity),
         category,
         inAppEnabled: true,
-        emailEnabled: identity.recipientType === "CUSTOMER",
+        emailEnabled: false,
       }],
       skipDuplicates: true,
     });
@@ -107,7 +112,7 @@ export async function updateNotificationPreference(
   return {
     ...saved,
     inAppEnabled: mandatory.inApp || saved.inAppEnabled,
-    emailEnabled: mandatory.email || saved.emailEnabled,
+    emailEnabled: mandatory.email,
     mandatory,
   };
 }

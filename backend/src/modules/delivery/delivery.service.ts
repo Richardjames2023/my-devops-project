@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
@@ -7,6 +8,7 @@ import type {
   CreateDeliveryAttemptInput,
 } from "./delivery.validation";
 import { completeDelivery } from "./delivery-completion.service";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
 export async function createDelivery(input: CreateDeliveryInput) {
   return prisma.$transaction(async (tx) => {
@@ -196,6 +198,21 @@ export async function updateDeliveryStatus(
         ...(status === "PICKED_UP" && { shippedAt: now }),
       },
     });
+
+    if (status === "FAILED") {
+      await publishNotificationEvent(tx, {
+        eventType: "delivery.exception",
+        aggregateType: "DELIVERY",
+        aggregateId: delivery.id,
+        deduplicationKey: randomUUID(),
+        payload: {
+          deliveryId: delivery.id,
+          previousStatus: delivery.status,
+          status,
+          failedAt: now.toISOString(),
+        },
+      });
+    }
 
     // Once the courier has the parcel moving, mirror that state on the package.
     if (status === "IN_TRANSIT") {

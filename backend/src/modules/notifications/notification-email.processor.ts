@@ -40,23 +40,106 @@ function retryDelay(attemptCount: number): number {
   return Math.min(30_000 * 2 ** Math.max(0, attemptCount - 1), MAX_BACKOFF_MS);
 }
 
+async function suppressPolicyDisallowedOutboxEmails(): Promise<void> {
+  // Older deployments may already have queued routine event emails. Suppress
+  // them before claiming work so the new policy also applies to the backlog.
+  await prisma.$executeRaw`
+    UPDATE notification_email_deliveries AS delivery
+    SET status = 'SUPPRESSED',
+        "lastError" = 'Suppressed by notification event email policy',
+        "lockedAt" = NULL,
+        "lockedBy" = NULL,
+        "updatedAt" = NOW()
+    FROM notification_outbox AS event
+    WHERE (
+        delivery."eventRecipientKey" LIKE 'v1:' || event.id::text || ':%'
+        OR (
+          delivery."eventRecipientKey" IS NULL
+          AND delivery."notificationId" IS NOT NULL
+          AND EXISTS (
+            SELECT 1 FROM notifications AS notice
+            WHERE notice.id = delivery."notificationId"
+              AND notice."outboxEventId" = event.id
+          )
+        )
+      )
+      AND (
+        delivery.status IN ('QUEUED', 'RETRYING')
+        OR (
+          delivery.status = 'PROCESSING'
+          AND delivery."lockedAt" <= NOW() - (${LEASE_MS} * INTERVAL '1 millisecond')
+        )
+      )
+      AND NOT (
+        event."eventType" IN (
+          'payment.succeeded',
+          'payment.reconciliation_required',
+          'refund.needs_attention',
+          'delivery.exception',
+          'staff.security_event'
+        )
+        OR (
+          event."eventType" = 'order.created'
+          AND delivery."eventRecipientKey" LIKE 'v1:' || event.id::text || ':GUEST:%'
+        )
+      )
+  `;
+}
+
 async function claimBatch(deliveryId?: string): Promise<ClaimedDelivery[]> {
   const workerId = randomUUID();
+
   const idFilter = deliveryId
-    ? Prisma.sql`AND id = ${deliveryId}::uuid`
+    ? Prisma.sql`AND delivery.id = ${deliveryId}::uuid`
     : Prisma.empty;
 
   return prisma.$queryRaw<ClaimedDelivery[]>`
     WITH candidates AS (
-      SELECT id
-      FROM notification_email_deliveries
+      SELECT delivery.id
+      FROM notification_email_deliveries AS delivery
       WHERE (
-        (status IN ('QUEUED', 'RETRYING') AND "nextAttemptAt" <= NOW())
-        OR (status = 'PROCESSING' AND "lockedAt" <= NOW() - (${LEASE_MS} * INTERVAL '1 millisecond'))
+        (
+          delivery.status IN ('QUEUED', 'RETRYING')
+          AND delivery."nextAttemptAt" <= NOW()
+        )
+        OR (
+          delivery.status = 'PROCESSING'
+          AND delivery."lockedAt" <= NOW() - (${LEASE_MS} * INTERVAL '1 millisecond')
+        )
       )
       ${idFilter}
-      ORDER BY "nextAttemptAt" ASC, "createdAt" ASC
-      FOR UPDATE SKIP LOCKED
+      AND NOT EXISTS (
+        SELECT 1
+        FROM notification_outbox AS event
+        WHERE (
+          delivery."eventRecipientKey" LIKE 'v1:' || event.id::text || ':%'
+          OR (
+            delivery."eventRecipientKey" IS NULL
+            AND delivery."notificationId" IS NOT NULL
+            AND EXISTS (
+              SELECT 1
+              FROM notifications AS notice
+              WHERE notice.id = delivery."notificationId"
+                AND notice."outboxEventId" = event.id
+            )
+          )
+        )
+        AND NOT (
+          event."eventType" IN (
+            'payment.succeeded',
+            'payment.reconciliation_required',
+            'refund.needs_attention',
+            'delivery.exception',
+            'staff.security_event'
+          )
+          OR (
+            event."eventType" = 'order.created'
+            AND delivery."eventRecipientKey" LIKE 'v1:' || event.id::text || ':GUEST:%'
+          )
+        )
+      )
+      ORDER BY delivery."nextAttemptAt" ASC, delivery."createdAt" ASC
+      FOR UPDATE OF delivery SKIP LOCKED
       LIMIT ${BATCH_SIZE}
     )
     UPDATE notification_email_deliveries AS delivery
@@ -113,6 +196,7 @@ export async function processNotificationEmailBatch(
   const enabled = options.enabled ?? env.EMAIL_DELIVERY_ENABLED;
   if (!enabled) return { claimed: 0, accepted: 0, failed: 0, skipped: true };
 
+  await suppressPolicyDisallowedOutboxEmails();
   const provider = options.provider ?? getProvider();
   const deliveries = await claimBatch(options.deliveryId);
   let accepted = 0;

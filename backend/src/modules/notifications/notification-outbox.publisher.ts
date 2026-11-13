@@ -4,6 +4,8 @@ export type NotificationEventType =
   | "payment.succeeded"
   | "payment.reconciliation_required"
   | "delivery.delivered"
+  | "delivery.exception"
+  | "staff.security_event"
   | "order.created"
   | "return.requested"
   | "return.received"
@@ -11,7 +13,7 @@ export type NotificationEventType =
   | "refund.needs_attention"
   | "inventory.low_stock";
 
-export type NotificationAggregateType = "PAYMENT" | "DELIVERY" | "ORDER" | "RETURN" | "WARRANTY" | "REFUND" | "INVENTORY";
+export type NotificationAggregateType = "PAYMENT" | "DELIVERY" | "ORDER" | "RETURN" | "WARRANTY" | "REFUND" | "INVENTORY" | "STAFF";
 
 export interface PublishNotificationEventInput {
   eventType: NotificationEventType;

@@ -7,6 +7,7 @@ import { generateAccessToken } from "../../common/utils/jwt";
 import { generateRefreshToken, hashRefreshToken } from "../../common/utils/refreshToken";
 import { REFRESH_TOKEN_EXPIRES_IN_DAYS } from "../../config/auth";
 import { createAuditLog } from "../../common/utils/audit-log";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
 const invitationDaysDefault = 7;
 const invitationDaysMax = 30;
@@ -613,6 +614,22 @@ export async function updateStaffAccountRoles(
       newValues: { roleNames: roles.map((role) => role.name) },
       ...metadata,
     });
+    const nextRoles = roles.map((role) => role.name);
+    if (JSON.stringify([...previousRoles].sort()) !== JSON.stringify([...nextRoles].sort())) {
+      await publishNotificationEvent(tx, {
+        eventType: "staff.security_event",
+        aggregateType: "STAFF",
+        aggregateId: staffId,
+        deduplicationKey: crypto.randomUUID(),
+        payload: {
+          actorStaffAccountId: actorId,
+          targetStaffAccountId: staffId,
+          action: "Staff roles updated",
+          previousRoles,
+          newRoles: nextRoles,
+        },
+      });
+    }
     return tx.staffAccount.findUniqueOrThrow({
       where: { id: staffId },
       select: {
@@ -667,6 +684,21 @@ export async function updateStaffAccountStatus(
       newValues: { status },
       ...metadata,
     });
+    if (target.status !== status) {
+      await publishNotificationEvent(tx, {
+        eventType: "staff.security_event",
+        aggregateType: "STAFF",
+        aggregateId: staffId,
+        deduplicationKey: crypto.randomUUID(),
+        payload: {
+          actorStaffAccountId: actorId,
+          targetStaffAccountId: staffId,
+          action: "Staff account status changed to " + status,
+          previousStatus: target.status,
+          newStatus: status,
+        },
+      });
+    }
     return updated;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

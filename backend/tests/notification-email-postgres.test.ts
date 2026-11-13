@@ -28,6 +28,8 @@ const fixtures: Fixture[] = [];
 async function createFixture(input: {
   templateKey?: string;
   templateData?: Record<string, unknown>;
+  eventType?: string;
+  eventRecipientIdentity?: "CUSTOMER" | "GUEST" | "STAFF";
 } = {}): Promise<Fixture> {
   const staffId = randomUUID();
   const outboxId = randomUUID();
@@ -44,9 +46,14 @@ async function createFixture(input: {
     `INSERT INTO notification_outbox
      (id, "eventKey", "eventType", "aggregateType", "aggregateId", payload,
       status, "attemptCount", "availableAt", "createdAt", "updatedAt", "processedAt")
-     VALUES ($1, $2, 'test.email', 'TEST', $3, '{}'::jsonb,
+     VALUES ($1, $2, $3, 'TEST', $4, '{}'::jsonb,
              'PROCESSED', 1, NOW(), NOW(), NOW(), NOW())`,
-    [outboxId, `email-test:${outboxId}`, outboxId],
+    [
+      outboxId,
+      `email-test:${outboxId}`,
+      input.eventType ?? "payment.reconciliation_required",
+      outboxId,
+    ],
   );
   await pool.query(
     `INSERT INTO notifications
@@ -59,8 +66,8 @@ async function createFixture(input: {
   await pool.query(
     `INSERT INTO notification_email_deliveries
      (id, "notificationId", "recipientEmail", "templateKey", "templateData",
-      status, "attemptCount", "nextAttemptAt", "createdAt", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5::jsonb, 'QUEUED', 0, NOW(), NOW(), NOW())`,
+      "eventRecipientKey", status, "attemptCount", "nextAttemptAt", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'QUEUED', 0, NOW(), NOW(), NOW())`,
     [
       deliveryId,
       notificationId,
@@ -70,6 +77,9 @@ async function createFixture(input: {
         orderNumber: "ORD-EMAIL-100",
         actionUrl: "/staff/payments/test",
       }),
+      input.eventRecipientIdentity
+        ? `v1:${outboxId}:${input.eventRecipientIdentity}:${staffId}`
+        : null,
     ],
   );
 
@@ -136,6 +146,30 @@ describe("PostgreSQL notification email delivery worker", () => {
     expect(await getDelivery(fixture.deliveryId)).toMatchObject({
       status: "QUEUED",
       attemptCount: 0,
+      lockedAt: null,
+      lockedBy: null,
+    });
+  });
+
+  it("suppresses previously queued routine event emails before sending", async () => {
+    const fixture = await createFixture({
+      eventType: "order.created",
+      eventRecipientIdentity: "CUSTOMER",
+    });
+    const send = vi.fn<EmailProvider["send"]>();
+
+    const result = await processNotificationEmailBatch({
+      deliveryId: fixture.deliveryId,
+      provider: { send },
+      enabled: true,
+    });
+
+    expect(result).toEqual({ claimed: 0, accepted: 0, failed: 0, skipped: false });
+    expect(send).not.toHaveBeenCalled();
+    expect(await getDelivery(fixture.deliveryId)).toMatchObject({
+      status: "SUPPRESSED",
+      attemptCount: 0,
+      lastError: "Suppressed by notification event email policy",
       lockedAt: null,
       lockedBy: null,
     });

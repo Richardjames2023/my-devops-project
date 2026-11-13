@@ -27,6 +27,9 @@ type Fixture = {
   productIds: string[];
   categoryIds: string[];
   inventoryIds: string[];
+  fulfillmentIds: string[];
+  packageIds: string[];
+  deliveryIds: string[];
   staffIds: string[];
   roleIds: string[];
   outboxIds: string[];
@@ -34,7 +37,9 @@ type Fixture = {
 };
 const fixture: Fixture = {
   userIds: [], orderIds: [], refundIds: [], returnIds: [], warrantyClaimIds: [], orderItemIds: [],
-  variantIds: [], productIds: [], categoryIds: [], inventoryIds: [], staffIds: [], roleIds: [], outboxIds: [], recipientEmails: [],
+  variantIds: [], productIds: [], categoryIds: [], inventoryIds: [],
+  fulfillmentIds: [], packageIds: [], deliveryIds: [],
+  staffIds: [], roleIds: [], outboxIds: [], recipientEmails: [],
 };
 
 async function createCustomer(): Promise<{ id: string; email: string }> {
@@ -136,6 +141,9 @@ async function cleanup() {
   await pool.query(`DELETE FROM warranty_claims WHERE id = ANY($1::uuid[])`, [fixture.warrantyClaimIds]);
   await pool.query(`DELETE FROM return_requests WHERE id = ANY($1::uuid[])`, [fixture.returnIds]);
   await pool.query(`DELETE FROM order_items WHERE id = ANY($1::uuid[])`, [fixture.orderItemIds]);
+  await pool.query(`DELETE FROM deliveries WHERE id = ANY($1::uuid[])`, [fixture.deliveryIds]);
+  await pool.query(`DELETE FROM packages WHERE id = ANY($1::uuid[])`, [fixture.packageIds]);
+  await pool.query(`DELETE FROM fulfillments WHERE id = ANY($1::uuid[])`, [fixture.fulfillmentIds]);
   await pool.query(`DELETE FROM orders WHERE id = ANY($1::uuid[])`, [fixture.orderIds]);
   await pool.query(`DELETE FROM stock_movements WHERE "inventoryId" = ANY($1::uuid[])`, [fixture.inventoryIds]);
   await pool.query(`DELETE FROM inventory WHERE id = ANY($1::uuid[])`, [fixture.inventoryIds]);
@@ -169,6 +177,98 @@ describe("PostgreSQL notification business event fan-out", () => {
     }
   });
 
+  it("routes delivery exceptions to customers and delivery managers with mandatory email", async () => {
+    const customer = await createCustomer();
+    const order = await createOrder(customer);
+    const fulfillmentId = randomUUID();
+    const packageId = randomUUID();
+    const deliveryId = randomUUID();
+    const deliveryStaffId = await createStaff(["deliveries.manage"]);
+    fixture.fulfillmentIds.push(fulfillmentId);
+    fixture.packageIds.push(packageId);
+    fixture.deliveryIds.push(deliveryId);
+
+    await pool.query(
+      `INSERT INTO fulfillments (id, "orderId", status, "createdAt", "updatedAt")
+       VALUES ($1, $2, 'PROCESSING', NOW(), NOW())`,
+      [fulfillmentId, order.id],
+    );
+    await pool.query(
+      `INSERT INTO packages (id, "fulfillmentId", status, "createdAt", "updatedAt")
+       VALUES ($1, $2, 'IN_TRANSIT', NOW(), NOW())`,
+      [packageId, fulfillmentId],
+    );
+    await pool.query(
+      `INSERT INTO deliveries (id, "packageId", status)
+       VALUES ($1, $2, 'FAILED')`,
+      [deliveryId, packageId],
+    );
+
+    const eventId = await createEvent("delivery.exception", "DELIVERY", deliveryId, { deliveryId });
+    expect(await processNotificationOutboxBatch({ eventId }))
+      .toEqual({ claimed: 1, processed: 1, failed: 0 });
+
+    const notices = await pool.query(
+      `SELECT "recipientType", "customerUserId", "staffAccountId", category
+       FROM notifications WHERE "outboxEventId" = $1`,
+      [eventId],
+    );
+    expect(notices.rows).toHaveLength(2);
+    expect(notices.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ recipientType: "CUSTOMER", customerUserId: customer.id, category: "DELIVERY" }),
+      expect.objectContaining({ recipientType: "STAFF", staffAccountId: deliveryStaffId, category: "DELIVERY" }),
+    ]));
+
+    const emails = await pool.query(
+      `SELECT "recipientEmail", "templateKey" FROM notification_email_deliveries
+       WHERE "eventRecipientKey" LIKE $1`,
+      [`v1:${eventId}:%`],
+    );
+    expect(emails.rows).toHaveLength(2);
+    expect(emails.rows.map((item) => item.templateKey)).toEqual(expect.arrayContaining([
+      "customer.delivery-exception", "staff.delivery-exception",
+    ]));
+  });
+
+  it("routes staff security events to active staff managers with mandatory email", async () => {
+    const actorStaffId = await createStaff(["staff.manage"]);
+    const recipientStaffId = await createStaff(["staff.manage"]);
+    const targetStaffId = await createStaff([]);
+    const eventId = await createEvent("staff.security_event", "STAFF", targetStaffId, {
+      actorStaffAccountId: actorStaffId,
+      targetStaffAccountId: targetStaffId,
+      action: "Staff account status changed to SUSPENDED",
+      previousStatus: "ACTIVE",
+      newStatus: "SUSPENDED",
+    });
+
+    expect(await processNotificationOutboxBatch({ eventId }))
+      .toEqual({ claimed: 1, processed: 1, failed: 0 });
+
+    const notices = await pool.query(
+      `SELECT "recipientType", "staffAccountId", category
+       FROM notifications WHERE "outboxEventId" = $1`,
+      [eventId],
+    );
+    expect(notices.rows).toHaveLength(1);
+    expect(notices.rows[0]).toMatchObject({
+      recipientType: "STAFF",
+      staffAccountId: recipientStaffId,
+      category: "SECURITY",
+    });
+
+    const emails = await pool.query(
+      `SELECT "recipientEmail", "templateKey" FROM notification_email_deliveries
+       WHERE "eventRecipientKey" LIKE $1`,
+      [`v1:${eventId}:%`],
+    );
+    expect(emails.rows).toHaveLength(1);
+    expect(emails.rows[0]).toMatchObject({
+      recipientEmail: recipientStaffId + "@notification-business.test",
+      templateKey: "staff.security-event",
+    });
+  });
+
   it("routes a registered order event to the customer and order managers", async () => {
     const customer = await createCustomer();
     const order = await createOrder(customer);
@@ -193,11 +293,7 @@ describe("PostgreSQL notification business event fan-out", () => {
        WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = $1)`,
       [eventId],
     );
-    expect(emails.rows).toHaveLength(1);
-    expect(emails.rows[0]).toMatchObject({
-      recipientEmail: customer.email,
-      templateKey: "customer.order-created",
-    });
+    expect(emails.rows).toHaveLength(0);
   });
 
   it("sends guest order email without creating a fake customer inbox identity", async () => {
@@ -259,8 +355,7 @@ describe("PostgreSQL notification business event fan-out", () => {
        WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = $1)`,
       [eventId],
     );
-    expect(emails.rows).toHaveLength(1);
-    expect(emails.rows[0].templateKey).toBe("customer.return-request-received");
+    expect(emails.rows).toHaveLength(0);
   });
 
   it("notifies customers and warranty managers when a warranty claim is created", async () => {
@@ -325,8 +420,7 @@ describe("PostgreSQL notification business event fan-out", () => {
        WHERE "notificationId" IN (SELECT id FROM notifications WHERE "outboxEventId" = $1)`,
       [eventId],
     );
-    expect(emails.rows).toHaveLength(1);
-    expect(emails.rows[0].templateKey).toBe("customer.warranty-claim-received");
+    expect(emails.rows).toHaveLength(0);
   });
 
 

@@ -124,7 +124,7 @@ describe("PostgreSQL notification channel preference fan-out", () => {
     }
   });
 
-  it("queues email without creating an in-app notification when only email is enabled", async () => {
+  it("does not queue routine delivery email even when a legacy preference enables email", async () => {
     const fixture = await createDeliveryEvent({ inAppEnabled: false, emailEnabled: true });
     expect(await processNotificationOutboxBatch({ eventId: fixture.outboxId }))
       .toEqual({ claimed: 1, processed: 1, failed: 0 });
@@ -139,13 +139,7 @@ describe("PostgreSQL notification channel preference fan-out", () => {
       [fixture.email],
     );
     expect(inbox.rows).toHaveLength(0);
-    expect(email.rows).toHaveLength(1);
-    expect(email.rows[0]).toMatchObject({
-      notificationId: null,
-      recipientEmail: fixture.email,
-      status: "QUEUED",
-    });
-    expect(email.rows[0].eventRecipientKey).toContain(fixture.outboxId);
+    expect(email.rows).toHaveLength(0);
 
     // Simulate an operator re-queuing an already-fanned-out outbox event.
     await pool.query(
@@ -158,10 +152,10 @@ describe("PostgreSQL notification channel preference fan-out", () => {
       `SELECT COUNT(*)::int AS count FROM notification_email_deliveries WHERE "recipientEmail" = $1`,
       [fixture.email],
     );
-    expect(duplicateCheck.rows[0].count).toBe(1);
+    expect(duplicateCheck.rows[0].count).toBe(0);
   });
 
-  it("creates an in-app notification without queuing email when only in-app is enabled", async () => {
+  it("creates an in-app notification without email when in-app is enabled", async () => {
     const fixture = await createDeliveryEvent({ inAppEnabled: true, emailEnabled: false });
     expect(await processNotificationOutboxBatch({ eventId: fixture.outboxId }))
       .toEqual({ claimed: 1, processed: 1, failed: 0 });

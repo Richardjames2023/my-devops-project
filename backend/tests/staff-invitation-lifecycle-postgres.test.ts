@@ -96,6 +96,11 @@ describe("PostgreSQL staff invitation lifecycle", () => {
   afterAll(async () => {
     const staffIds = [actorId, ...acceptedStaffIds, ...auxiliaryStaffIds];
     await pool.query(
+      `DELETE FROM notification_outbox
+       WHERE "aggregateType" = 'STAFF' AND "aggregateId" = ANY($1::text[])`,
+      [staffIds],
+    );
+    await pool.query(
       `DELETE FROM audit_logs
        WHERE "staffAccountId" = ANY($1::uuid[])
           OR "entityId" = ANY($2::text[])`,
@@ -115,6 +120,40 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     );
     await disconnectDatabase();
     await pool.end();
+  });
+
+  it("publishes a security notification event when a staff account is suspended", async () => {
+    const targetId = randomUUID();
+    auxiliaryStaffIds.push(targetId);
+    await pool.query(
+      `INSERT INTO staff_accounts
+       (id, email, "firstName", "lastName", status, "createdAt", "updatedAt")
+       VALUES ($1, $2, 'Security', 'Target', 'ACTIVE', NOW(), NOW())`,
+      [targetId, "security-target-" + suffix + "@test.local"],
+    );
+
+    const updated = await updateStaffAccountStatus(actorId, targetId, "SUSPENDED");
+    expect(updated.status).toBe("SUSPENDED");
+
+    const events = await pool.query(
+      `SELECT "eventType", "aggregateType", "aggregateId", payload
+       FROM notification_outbox
+       WHERE "eventType" = 'staff.security_event' AND "aggregateId" = $1`,
+      [targetId],
+    );
+    expect(events.rows).toHaveLength(1);
+    expect(events.rows[0]).toMatchObject({
+      eventType: "staff.security_event",
+      aggregateType: "STAFF",
+      aggregateId: targetId,
+    });
+    expect(events.rows[0].payload).toMatchObject({
+      actorStaffAccountId: actorId,
+      targetStaffAccountId: targetId,
+      action: "Staff account status changed to SUSPENDED",
+      previousStatus: "ACTIVE",
+      newStatus: "SUSPENDED",
+    });
   });
 
   it("creates a normalized invitation, stores only the token hash, and rejects duplicate pending invitations", async () => {

@@ -32,27 +32,34 @@ type Draft = {
 type Policy = {
   category: NotificationCategory;
   inAppMandatory: boolean;
-  emailMandatory: boolean;
+  emailMode: "DISABLED" | "GUEST_TRANSACTIONAL" | "MANDATORY";
 };
 
 export function getNotificationEventPolicy(eventType: string): Policy {
   switch (eventType) {
+    // Payment confirmation is a transactional receipt and is sent on both channels.
     case "payment.succeeded":
     case "payment.reconciliation_required":
-      return { category: "PAYMENT", inAppMandatory: true, emailMandatory: true };
+      return { category: "PAYMENT", inAppMandatory: true, emailMode: "MANDATORY" };
     case "delivery.delivered":
-      return { category: "DELIVERY", inAppMandatory: false, emailMandatory: false };
+      return { category: "DELIVERY", inAppMandatory: false, emailMode: "DISABLED" };
+    case "delivery.exception":
+      return { category: "DELIVERY", inAppMandatory: true, emailMode: "MANDATORY" };
+    case "staff.security_event":
+      return { category: "SECURITY", inAppMandatory: true, emailMode: "MANDATORY" };
     case "order.created":
-      return { category: "ORDER", inAppMandatory: false, emailMandatory: false };
+      // Registered customers receive an inbox notification; guests receive the
+      // transactional confirmation email because they have no inbox identity.
+      return { category: "ORDER", inAppMandatory: false, emailMode: "GUEST_TRANSACTIONAL" };
     case "return.requested":
     case "return.received":
-      return { category: "RETURN", inAppMandatory: false, emailMandatory: false };
+      return { category: "RETURN", inAppMandatory: false, emailMode: "DISABLED" };
     case "warranty.claim.created":
-      return { category: "WARRANTY", inAppMandatory: false, emailMandatory: false };
+      return { category: "WARRANTY", inAppMandatory: false, emailMode: "DISABLED" };
     case "refund.needs_attention":
-      return { category: "REFUND", inAppMandatory: true, emailMandatory: true };
+      return { category: "REFUND", inAppMandatory: true, emailMode: "MANDATORY" };
     case "inventory.low_stock":
-      return { category: "INVENTORY", inAppMandatory: false, emailMandatory: false };
+      return { category: "INVENTORY", inAppMandatory: false, emailMode: "DISABLED" };
     default:
       throw new Error("Unsupported notification event type: " + eventType);
   }
@@ -460,6 +467,123 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
     }));
   }
 
+  if (event.eventType === "delivery.exception") {
+    const deliveryId = payloadString(event.payload, "deliveryId") ?? event.aggregateId;
+    const delivery = await tx.delivery.findUnique({
+      where: { id: deliveryId },
+      include: {
+        package: {
+          include: {
+            fulfillment: {
+              include: {
+                order: { include: { user: { select: { id: true, email: true } } } },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!delivery) throw new Error("Delivery not found for exception notification: " + deliveryId);
+
+    const order = delivery.package.fulfillment.order;
+    const user = order.user;
+    const customerEmail = user?.email ?? order.customerEmail;
+    const drafts: Draft[] = [];
+
+    if (customerEmail) {
+      const title = "Delivery issue with your order";
+      const body = "Delivery for order " + order.orderNumber + " has encountered an issue. Our team is working to resolve it.";
+      const actionUrl = user ? "/account/orders/" + order.id : "/orders/guest";
+      drafts.push({
+        recipientType: "CUSTOMER", customerUserId: user?.id ?? null, staffAccountId: null,
+        recipientEmail: customerEmail, category: policy.category, title, body, actionUrl,
+        metadata: { deliveryId: delivery.id, orderId: order.id, orderNumber: order.orderNumber },
+        templateKey: "customer.delivery-exception",
+        templateData: { orderNumber: order.orderNumber, actionUrl },
+      });
+    }
+
+    const staff = await tx.staffAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true, email: true,
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: { permission: { select: { name: true } } },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const title = "Delivery exception requires attention";
+    const body = "Delivery for order " + order.orderNumber + " has entered FAILED status and requires follow-up.";
+    const actionUrl = "/staff/deliveries/" + delivery.id;
+    drafts.push(...staff.filter((account) => account.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) => permission.name === "deliveries.manage"),
+    )).map((account) => ({
+      recipientType: "STAFF" as const, customerUserId: null, staffAccountId: account.id,
+      recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+      metadata: { deliveryId: delivery.id, orderId: order.id, orderNumber: order.orderNumber },
+      templateKey: "staff.delivery-exception",
+      templateData: { orderNumber: order.orderNumber, actionUrl },
+    })));
+    return drafts;
+  }
+
+  if (event.eventType === "staff.security_event") {
+    const actorId = payloadString(event.payload, "actorStaffAccountId");
+    const targetId = payloadString(event.payload, "targetStaffAccountId");
+    const action = payloadString(event.payload, "action");
+    if (!actorId || !targetId || !action) {
+      throw new Error("Staff security event is missing actor, target, or action");
+    }
+
+    const [actor, target, staff] = await Promise.all([
+      tx.staffAccount.findUnique({ where: { id: actorId }, select: { email: true } }),
+      tx.staffAccount.findUnique({ where: { id: targetId }, select: { email: true } }),
+      tx.staffAccount.findMany({
+        where: { status: "ACTIVE", id: { not: actorId } },
+        select: {
+          id: true, email: true,
+          roles: {
+            select: {
+              role: {
+                select: {
+                  permissions: {
+                    select: { permission: { select: { name: true } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+    if (!target) throw new Error("Target staff account not found for security event: " + targetId);
+    const drafts = staff.filter((account) => account.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) =>
+        permission.name === "staff.manage" || permission.name === "audit_logs.read",
+      ),
+    )).map((account) => {
+      const title = "Staff security change";
+      const body = action + " was performed for " + target.email + (actor ? " by " + actor.email : "") + ".";
+      const actionUrl = "/staff/accounts/" + targetId;
+      return {
+        recipientType: "STAFF" as const, customerUserId: null, staffAccountId: account.id,
+        recipientEmail: account.email, category: policy.category, title, body, actionUrl,
+        metadata: { actorStaffAccountId: actorId, targetStaffAccountId: targetId, action },
+        templateKey: "staff.security-event",
+        templateData: { action, targetEmail: target.email, actorEmail: actor?.email ?? "An administrator", actionUrl },
+      };
+    });
+    return drafts;
+  }
+
   if (event.eventType === "delivery.delivered") {
     const deliveryId = payloadString(event.payload, "deliveryId") ?? event.aggregateId;
     const delivery = await tx.delivery.findUnique({
@@ -570,12 +694,14 @@ async function fanOut(event: OutboxEvent, workerId: string): Promise<void> {
         }
       }
 
-      // Email delivery is evaluated independently from in-app visibility.
-      // An email-only preference therefore does not create an inbox item.
+      // Email policy is decided by the event, not by a recipient's broad
+      // category preference. Routine events cannot be promoted to email.
       const emailDrafts = drafts.filter((draft) => {
-        const preference = preferenceMap.get(identity(draft));
-        const defaultEnabled = draft.recipientType === "CUSTOMER";
-        return policy.emailMandatory || (preference?.emailEnabled ?? defaultEnabled);
+        if (policy.emailMode === "MANDATORY") return true;
+        if (policy.emailMode === "GUEST_TRANSACTIONAL") {
+          return draft.recipientType === "CUSTOMER" && draft.customerUserId === null;
+        }
+        return false;
       });
       if (emailDrafts.length) {
         await tx.notificationEmailDelivery.createMany({

@@ -127,12 +127,22 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Notification persistence and inbox APIs.
 - [x] Transactional outbox foundation and processing worker.
 - [x] Email delivery worker and retry foundation.
-- [~] Business event publishing across orders, payments, delivery, returns, refunds, warranties, and inventory needs a complete producer-to-inbox/email audit.
-- [ ] Align delivery defaults with the agreed notification policy:
-  - Routine events: in-app only.
-  - Urgent/actionable events: in-app and email.
-  - Staff invitations: dedicated secure invitation email flow.
-- [ ] Verify user preferences cannot accidentally enable email for events that policy defines as in-app only.
+- [~] Business event publishing across orders, payments, delivery, returns, refunds, warranties, inventory, and staff security is being completed through a producer-to-inbox/email audit.
+  - [~] Transactional outbox and event-level email policy distinguish routine notifications from mandatory transactional/urgent email; local validation pending.
+  - [~] Guest order confirmations remain email-only transactional exceptions because guests have no inbox identity; local validation pending.
+  - [~] Successful payment receipts remain mandatory in-app and email; local validation pending.
+  - [~] Routine order, delivery-completed, return, warranty, and low-stock events cannot be opted into email through recipient preferences; local validation pending.
+  - [~] Already-queued routine outbox emails are suppressed before the email worker claims them; local validation pending.
+  - [~] Delivery status transitions into FAILED publish a transactional delivery-exception event; local validation pending.
+  - [~] Staff role/status changes publish transactional security events; local validation pending.
+  - [ ] Verify delivery-exception and staff-security events fan out to the intended recipients with mandatory email.
+  - [ ] Add/verify PostgreSQL coverage for delivery-exception and staff-security fan-out, including recipient permissions and retries.
+- [~] Align notification channels with the agreed policy:
+  - Routine events: in-app only (subject to in-app preferences).
+  - Urgent/actionable events: in-app and email, mandatory.
+  - Guest order confirmation and successful payment receipt: explicit transactional email exceptions.
+  - Staff invitations: dedicated secure invitation email flow, separate from ordinary notifications.
+- [ ] Verify the dedicated staff invitation email adapter actually sends and tracks invitations end-to-end.
 - [ ] Test retries, dead-letter/manual-review paths, duplicate events, and recovery.
 
 ## 11. Platform operations, security, and release readiness
