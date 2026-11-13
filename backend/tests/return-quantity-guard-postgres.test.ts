@@ -229,7 +229,7 @@ describe("PostgreSQL return quantity guards", () => {
 
     try {
       await pool.query(
-        'UPDATE orders SET "userId" = NULL, "guestAccessTokenHash" = $2 WHERE id = $1',
+        'UPDATE orders SET "userId" = NULL, "guestAccessTokenHash" = $2, "guestAccessTokenExpiresAt" = NOW() + INTERVAL \'2 years\' WHERE id = $1',
         [fixture.orderId, tokenHash],
       );
 
