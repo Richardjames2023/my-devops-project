@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import {
   initializePaystackTransaction,
   verifyPaystackTransaction,
@@ -12,6 +12,7 @@ import {
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
+import { hashGuestOrderAccessToken } from "../orders/guest-order-access";
 import type { CreatePaymentInput } from "./payment.validation";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
@@ -36,14 +37,12 @@ function generatePaymentReference(): string {
 
 type PaymentOrderAccess = { userId: string } | { guestAccessToken: string };
 
-function hashGuestOrderAccessToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
 function assertPaymentOrderAccess(
   order: {
     userId: string | null;
     guestAccessTokenHash: string | null;
+    guestAccessTokenExpiresAt: Date | null;
+    guestAccessTokenRevokedAt: Date | null;
   },
   access: PaymentOrderAccess,
 ): void {
@@ -60,7 +59,10 @@ function assertPaymentOrderAccess(
   if (
     order.userId !== null ||
     !order.guestAccessTokenHash ||
-    order.guestAccessTokenHash !== suppliedTokenHash
+    order.guestAccessTokenHash !== suppliedTokenHash ||
+    !order.guestAccessTokenExpiresAt ||
+    order.guestAccessTokenExpiresAt <= new Date() ||
+    order.guestAccessTokenRevokedAt !== null
   ) {
     throw new AppError("You are not allowed to access this order", 403);
   }
@@ -113,7 +115,10 @@ async function createPaymentWithAccess(
       if (
         order.userId !== null ||
         !order.guestAccessTokenHash ||
-        order.guestAccessTokenHash !== suppliedTokenHash
+        order.guestAccessTokenHash !== suppliedTokenHash ||
+        !order.guestAccessTokenExpiresAt ||
+        order.guestAccessTokenExpiresAt <= new Date() ||
+        order.guestAccessTokenRevokedAt !== null
       ) {
         throw new AppError("You are not allowed to access this order", 403);
       }
