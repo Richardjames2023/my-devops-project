@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -20,12 +20,14 @@ process.env.DATABASE_URL = databaseUrl;
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
 
-const { createReturnRequest, disconnectDatabase } = await import(
+const { createReturnRequest, listGuestReturnRequests, getGuestReturnRequest, disconnectDatabase } = await import(
   "../src/modules/return/return.service"
 ).then(async (service) => {
   const database = await import("../src/infrastructure/prisma/client");
   return {
     createReturnRequest: service.createReturnRequest,
+    listGuestReturnRequests: service.listGuestReturnRequests,
+    getGuestReturnRequest: service.getGuestReturnRequest,
     disconnectDatabase: database.disconnectDatabase,
   };
 });
@@ -219,4 +221,44 @@ describe("PostgreSQL return quantity guards", () => {
       await cleanupFixture(fixture);
     }
   });
+
+  it("allows a guest to create and retrieve returns only with the matching order token", async () => {
+    const fixture = await createFixture();
+    const guestToken = randomUUID().replace(/-/g, "").repeat(2);
+    const tokenHash = createHash("sha256").update(guestToken).digest("hex");
+
+    try {
+      await pool.query(
+        'UPDATE orders SET "userId" = NULL, "guestAccessTokenHash" = $2 WHERE id = $1',
+        [fixture.orderId, tokenHash],
+      );
+
+      const created = await createReturnRequest(null, {
+        orderId: fixture.orderId,
+        reason: "Guest return request",
+        items: [{ orderItemId: fixture.orderItemId, quantity: 1, condition: "UNOPENED" }],
+      }, guestToken);
+
+      expect(created.status).toBe("PENDING");
+      expect(created.userId).toBeNull();
+
+      const history = await listGuestReturnRequests(fixture.orderId, guestToken);
+      expect(history.returnRequests).toHaveLength(1);
+      expect(history.returnRequests[0]?.id).toBe(created.id);
+
+      const detail = await getGuestReturnRequest(fixture.orderId, created.id, guestToken);
+      expect(detail.id).toBe(created.id);
+
+      await expect(
+        listGuestReturnRequests(fixture.orderId, "0".repeat(64)),
+      ).resolves.toEqual({ returnRequests: [] });
+
+      await expect(
+        getGuestReturnRequest(fixture.orderId, created.id, "0".repeat(64)),
+      ).rejects.toThrow("Return request not found");
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
 });
