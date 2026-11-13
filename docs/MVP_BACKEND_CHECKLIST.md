@@ -71,18 +71,11 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Delivery assignment and delivery status workflow.
 - [x] Delivery zones and delivery-fee calculation.
 - [x] Delivery completion and delivery exception workflow foundation.
-- [ ] Integrate at least one external courier/logistics provider for MVP.
+- [~] External courier integration is on hold pending business selection of logistics partner(s). The existing manual delivery assignment/status workflow remains available; do not begin provider-specific implementation yet.
   - [ ] Select the initial courier provider(s) and confirm API/credential requirements.
-  - [ ] Define a provider-neutral internal delivery/shipment contract so the application is not tightly coupled to one courier.
-  - [ ] Create shipment/waybill with the courier after the order is eligible for dispatch.
-  - [ ] Persist courier name, external shipment/reference ID, waybill/tracking number, tracking URL (when available), and shipment state.
-  - [ ] Support courier status updates through verified webhooks and/or a controlled polling fallback, depending on provider capabilities.
-  - [ ] Verify webhook authenticity, handle duplicate/out-of-order events, and make updates idempotent.
-  - [ ] Map courier statuses to internal delivery states without allowing invalid state transitions.
-  - [ ] Handle API timeouts, retries, rate limits, cancellation, failed pickup, and delivery exceptions.
-  - [ ] Keep manual assignment/status handling as a documented fallback when the courier API is unavailable.
-  - [ ] Add provider adapter tests and end-to-end integration tests using mocked provider responses.
-- [ ] Decide whether courier rate quoting and booking should be automated at checkout or initiated by staff after fulfillment. Document the MVP decision.
+  - [ ] After provider selection, define a provider-neutral internal delivery/shipment contract and implement the selected adapter.
+  - [ ] After provider selection, implement shipment/waybill creation, verified status updates, idempotency, retries, and provider adapter tests.
+- [ ] Decide whether courier rate quoting and booking should be automated at checkout or initiated by staff after fulfillment, after a provider is selected.
 
 ## 6. Customer wishlist
 
@@ -167,7 +160,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 |---|---|
 | Paystack | Include; current payment provider |
 | Multiple payment providers | Exclude from MVP |
-| External courier integration | Include; at least one provider |
+| External courier integration | On hold pending logistics partner selection; retain manual delivery workflow |
 | Customer wishlist | Include |
 | Guest returns/warranty claims | Include; guest order access token required |
 | Automated courier rate quoting at checkout | Decision required |
