@@ -15,10 +15,11 @@ process.env.EMAIL_DELIVERY_ENABLED = "false";
 process.env.APP_BASE_URL ??= "http://localhost:3000";
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
-const [{ processNotificationEmailBatch }, { disconnectDatabase }] = await Promise.all([
-  import("../src/modules/notifications/notification-email.processor"),
-  import("../src/infrastructure/prisma/client"),
-]);
+const [{ processNotificationEmailBatch }, { default: prisma, disconnectDatabase }] =
+  await Promise.all([
+    import("../src/modules/notifications/notification-email.processor"),
+    import("../src/infrastructure/prisma/client"),
+  ]);
 
 type Fixture = { outboxId: string; deliveryId: string };
 const fixtures: Fixture[] = [];
@@ -116,6 +117,111 @@ describe("notification email backlog policy", () => {
       attemptCount: 0,
       lastError: "Suppressed by notification event email policy",
     });
+  });
+
+  it("suppresses an expired processing registered customer order email", async () => {
+    const fixture = await createQueuedEventEmail({
+      eventType: "order.created",
+      identity: "CUSTOMER:" + randomUUID(),
+      templateKey: "customer.order-created",
+      templateData: { orderNumber: "ORD-POLICY-102", actionUrl: "/account/orders/102" },
+    });
+
+    await pool.query(
+      `UPDATE notification_email_deliveries
+      SET status = 'PROCESSING',
+          "lockedAt" = NOW() - INTERVAL '3 minutes',
+          "lockedBy" = 'stale-notification-worker'
+      WHERE id = $1`,
+      [fixture.deliveryId],
+    );
+
+    const send = vi.fn<EmailProvider["send"]>();
+    const result = await processNotificationEmailBatch({
+      deliveryId: fixture.deliveryId,
+      provider: { send },
+      enabled: true,
+    });
+
+    expect(result).toEqual({ claimed: 0, accepted: 0, failed: 0, skipped: false });
+    expect(send).not.toHaveBeenCalled();
+
+    const row = await pool.query(
+      `SELECT status, "attemptCount", "lastError", "lockedAt", "lockedBy"
+      FROM notification_email_deliveries WHERE id = $1`,
+      [fixture.deliveryId],
+    );
+
+    expect(row.rows[0]).toMatchObject({
+      status: "SUPPRESSED",
+      attemptCount: 0,
+      lastError: "Suppressed by notification event email policy",
+      lockedAt: null,
+      lockedBy: null,
+    });
+  });
+
+  it("does not claim an expired processing registered customer order email when backlog suppression is bypassed", async () => {
+    const fixture = await createQueuedEventEmail({
+      eventType: "order.created",
+      identity: "CUSTOMER:" + randomUUID(),
+      templateKey: "customer.order-created",
+      templateData: {
+        orderNumber: "ORD-POLICY-103",
+        actionUrl: "/account/orders/103",
+      },
+    });
+
+    await pool.query(
+      `UPDATE notification_email_deliveries
+       SET status = 'PROCESSING',
+           "lockedAt" = NOW() - INTERVAL '3 minutes',
+           "lockedBy" = 'stale-notification-worker'
+       WHERE id = $1`,
+      [fixture.deliveryId],
+    );
+
+    const send = vi.fn<EmailProvider["send"]>();
+
+    // Bypass only the backlog suppression UPDATE.
+    // The actual PostgreSQL claimBatch query must still execute.
+    const suppressionSpy = vi
+      .spyOn(prisma, "$executeRaw")
+      .mockResolvedValue(0);
+
+    try {
+      const result = await processNotificationEmailBatch({
+        deliveryId: fixture.deliveryId,
+        provider: { send },
+        enabled: true,
+      });
+
+      expect(result).toEqual({
+        claimed: 0,
+        accepted: 0,
+        failed: 0,
+        skipped: false,
+      });
+
+      expect(send).not.toHaveBeenCalled();
+    } finally {
+      suppressionSpy.mockRestore();
+    }
+
+    const row = await pool.query(
+      `SELECT status, "attemptCount", "lockedAt", "lockedBy"
+       FROM notification_email_deliveries
+       WHERE id = $1`,
+      [fixture.deliveryId],
+    );
+
+    expect(row.rows[0]).toMatchObject({
+      status: "PROCESSING",
+      attemptCount: 0,
+      lockedBy: "stale-notification-worker",
+    });
+
+    expect(row.rows[0].lockedAt).not.toBeNull();
   });
 
   it("continues to send the guest order confirmation transactional exception", async () => {
