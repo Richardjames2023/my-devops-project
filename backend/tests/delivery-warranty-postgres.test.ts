@@ -920,7 +920,7 @@ describe("PostgreSQL delivery and warranty activation", () => {
 
     try {
       await pool.query(
-        'UPDATE orders SET "guestAccessTokenHash" = $2 WHERE id = $1',
+        'UPDATE orders SET "guestAccessTokenHash" = $2, "guestAccessTokenExpiresAt" = NOW() + INTERVAL \'2 years\' WHERE id = $1',
         [fixture.orderId, tokenHash],
       );
       await pool.query(
