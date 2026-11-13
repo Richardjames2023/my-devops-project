@@ -61,6 +61,8 @@ async function findOrderDeliveryTracking(where: {
   id: string;
   userId?: string;
   guestAccessTokenHash?: string;
+  guestAccessTokenExpiresAt?: { gt: Date };
+  guestAccessTokenRevokedAt?: null;
 }) {
   const order = await prisma.order.findFirst({
     where,
