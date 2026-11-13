@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { guestOrderLimiter, guestOrderRetrievalLimiter } from "../../common/middleware/rate-limit.middleware";
 import { authenticate } from "../../common/middleware/authenticate";
 import { authorize, requireCustomer } from "../../common/middleware/authorize";
 import { create, getMine, listAdmin, listMine, review, createGuestClaim, listGuestClaims, getGuestClaim } from "./warranty-claim.controller";
@@ -6,9 +7,9 @@ import { create, getMine, listAdmin, listMine, review, createGuestClaim, listGue
 const router = Router();
 
 // Guest after-sales endpoints use the order access token returned at checkout.
-router.get("/guest/:orderId", listGuestClaims);
-router.post("/guest/:orderId", createGuestClaim);
-router.get("/guest/:orderId/:claimId", getGuestClaim);
+router.get("/guest/:orderId", guestOrderRetrievalLimiter, listGuestClaims);
+router.post("/guest/:orderId", guestOrderLimiter, createGuestClaim);
+router.get("/guest/:orderId/:claimId", guestOrderRetrievalLimiter, getGuestClaim);
 
 router.get("/", authenticate, requireCustomer, listMine);
 router.post("/", authenticate, requireCustomer, create);
