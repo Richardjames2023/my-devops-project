@@ -221,6 +221,10 @@ async function createOrderFromCart(
       throw new AppError("Customer email is required", 400);
     }
 
+    const guestAccessTokenExpiresAt = isGuestOrder
+      ? new Date(Date.now() + 2 * 365 * 24 * 60 * 60 * 1000)
+      : null;
+
     const order = await tx.order.create({
       data: {
         userId,
@@ -232,6 +236,7 @@ async function createOrderFromCart(
               guestAccessTokenHash: hashGuestOrderAccessToken(
                 guestAccessToken!,
               ),
+              guestAccessTokenExpiresAt,
             }
           : {}),
         orderNumber: generateOrderNumber(),
@@ -335,6 +340,8 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
     where: {
       id: orderId,
       guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+      guestAccessTokenExpiresAt: { gt: new Date() },
+      guestAccessTokenRevokedAt: null,
     },
     select: {
       id: true,
@@ -379,6 +386,32 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
   }
 
   return order;
+}
+
+
+
+/**
+ * Revoke a guest order token. The token hash is retained for auditability,
+ * while the revocation timestamp makes it unusable across guest endpoints.
+ */
+export async function revokeGuestOrderAccess(
+  orderId: string,
+  guestAccessToken: string,
+) {
+  const revokedAt = new Date();
+  const result = await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+      guestAccessTokenExpiresAt: { gt: revokedAt },
+      guestAccessTokenRevokedAt: null,
+      userId: null,
+    },
+    data: { guestAccessTokenRevokedAt: revokedAt },
+  });
+
+  if (result.count !== 1) throw new AppError("Order not found", 404);
+  return { orderId, revokedAt };
 }
 
 interface OrderCancellationAuditMeta {
