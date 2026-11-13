@@ -202,11 +202,11 @@ export async function listMine(
 
 
 export async function revokeGuest(
-  req: Request<{ orderId: string }, unknown, unknown, unknown, {}> & { headers: { "x-guest-order-token"?: string } },
+  req: Request,
   res: Response,
 ): Promise<void> {
   const orderId = z.uuid().safeParse(req.params.orderId);
-  const token = req.headers["x-guest-order-token"];
+  const token = req.get("x-guest-order-token");
   if (!orderId.success || !isValidGuestOrderAccessToken(token)) {
     throw new AppError("Order not found", 404);
   }
