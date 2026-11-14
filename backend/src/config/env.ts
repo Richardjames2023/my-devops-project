@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { z } from "zod";
-import { isSecureProductionEmailUrl, isValidStaffInvitationAcceptanceUrl } from "./url-validation";
+import { isHttpOrHttpsUrl, isSecureProductionEmailUrl, isValidStaffInvitationAcceptanceUrl } from "./url-validation";
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -113,7 +113,7 @@ const envSchema = z.object({
     context.addIssue({
       code: "custom",
       path: ["STAFF_INVITATION_ENCRYPTION_KEY"],
-      message: "STAFF_INVITATION_ENCRYPTION_KEY is required in production when email delivery is enabled",
+      message: "A staff invitation encryption key or keyring is required in production when email delivery is enabled",
     });
   }
   const configuredKeys: Record<string, string> = {};
@@ -170,6 +170,13 @@ const envSchema = z.object({
       code: "custom",
       path: ["EMAIL_FROM"],
       message: "EMAIL_FROM is required when email delivery is enabled",
+    });
+  }
+  if (value.APP_BASE_URL && !isHttpOrHttpsUrl(value.APP_BASE_URL)) {
+    context.addIssue({
+      code: "custom",
+      path: ["APP_BASE_URL"],
+      message: "APP_BASE_URL must use HTTP or HTTPS",
     });
   }
   if (
