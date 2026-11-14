@@ -275,6 +275,35 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
       newValues: Prisma.DbNull,
     },
   });
+  // Retain after-sales and review records for their operational history, but
+  // remove customer-authored free text that may contain names, contact details,
+  // addresses or other identifying information.
+  const redactedText = "[redacted after account deletion]";
+  await tx.returnRequest.updateMany({
+    where: { userId: user.id },
+    data: { reason: redactedText, description: redactedText },
+  });
+  await tx.returnEvidence.updateMany({
+    where: { returnRequest: { userId: user.id } },
+    data: {
+      url: redactedText,
+      publicId: null,
+      description: redactedText,
+    },
+  });
+  await tx.returnItem.updateMany({
+    where: { returnRequest: { userId: user.id } },
+    data: { notes: redactedText },
+  });
+  await tx.warrantyClaim.updateMany({
+    where: { userId: user.id },
+    data: { issue: redactedText, description: redactedText },
+  });
+  await tx.productReview.updateMany({
+    where: { userId: user.id },
+    data: { title: redactedText, comment: redactedText },
+  });
+
   await tx.order.updateMany({
     where: { userId: user.id },
     data: {
