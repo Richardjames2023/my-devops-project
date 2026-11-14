@@ -206,6 +206,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
     const customer = await createCustomer("deletion-shared-email");
     const staffId = randomUUID();
     const customerEventId = randomUUID();
+    const customerEventOnlyOutboxId = randomUUID();
     const staffEventId = randomUUID();
     const customerNotificationId = randomUUID();
     const staffNotificationId = randomUUID();
@@ -226,8 +227,13 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         `INSERT INTO notification_outbox (id, "eventKey", "eventType", "aggregateType", "aggregateId", payload, status, "createdAt", "updatedAt")
          VALUES
            ($1, $2, 'customer.account.test', 'CUSTOMER', $3, '{}'::jsonb, 'PROCESSED', NOW(), NOW()),
-           ($4, $5, 'staff.security_event', 'STAFF', $6, '{}'::jsonb, 'PROCESSED', NOW(), NOW())`,
-        [customerEventId, `test:customer:${customer.id}`, customer.id, staffEventId, `test:staff:${staffId}`, staffId],
+           ($4, $5, 'customer.payment.test', 'CUSTOMER', $6, '{}'::jsonb, 'PROCESSED', NOW(), NOW()),
+           ($7, $8, 'staff.security_event', 'STAFF', $9, '{}'::jsonb, 'PROCESSED', NOW(), NOW())`,
+        [
+          customerEventId, `test:customer:${customer.id}`, customer.id,
+          customerEventOnlyOutboxId, `test:customer-event-only:${customer.id}`, customer.id,
+          staffEventId, `test:staff:${staffId}`, staffId,
+        ],
       );
       await pool.query(
         `INSERT INTO notifications
@@ -253,7 +259,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         `INSERT INTO notification_email_deliveries
           (id, "notificationId", "eventRecipientKey", "recipientEmail", "templateKey", "templateData", status, "createdAt", "updatedAt")
          VALUES ($1, NULL, $2, $3, 'customer-payment-event', '{}'::jsonb, 'SENT', NOW(), NOW())`,
-        [customerEventOnlyDeliveryId, `v1:${customerEventId}:CUSTOMER:${customer.id}`, customer.email],
+        [customerEventOnlyDeliveryId, `v1:${customerEventOnlyOutboxId}:CUSTOMER:${customer.id}`, customer.email],
       );
       await pool.query(
         `INSERT INTO notification_email_events
@@ -296,7 +302,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       await pool.query('DELETE FROM notification_email_events WHERE "providerEventId" = ANY($1::text[])', [[customerProviderEventId, customerEventOnlyProviderEventId, staffProviderEventId]]);
       await pool.query('DELETE FROM notification_email_deliveries WHERE id = ANY($1::uuid[])', [[customerDeliveryId, customerEventOnlyDeliveryId, staffDeliveryId]]);
       await pool.query('DELETE FROM notifications WHERE id = ANY($1::uuid[])', [[customerNotificationId, staffNotificationId]]);
-      await pool.query('DELETE FROM notification_outbox WHERE id = ANY($1::uuid[])', [[customerEventId, staffEventId]]);
+      await pool.query('DELETE FROM notification_outbox WHERE id = ANY($1::uuid[])', [[customerEventId, customerEventOnlyOutboxId, staffEventId]]);
       await pool.query("DELETE FROM staff_accounts WHERE id = $1", [staffId]);
       await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
     }
