@@ -195,6 +195,32 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
+  it("allows only one pending invitation when concurrent requests target the same email", async () => {
+    const email = `concurrent-create-${suffix}@test.local`;
+    const attempts = await Promise.allSettled([
+      createInvitation(email),
+      createInvitation(email),
+    ]);
+
+    const successful = attempts.filter(
+      (attempt): attempt is PromiseFulfilledResult<Awaited<ReturnType<typeof createInvitation>>> =>
+        attempt.status === "fulfilled",
+    );
+    const rejected = attempts.filter((attempt) => attempt.status === "rejected");
+
+    expect(successful).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toMatchObject({ statusCode: 409 });
+
+    const pending = await pool.query(
+      `SELECT COUNT(*)::int AS count
+       FROM staff_invitations
+       WHERE email = $1 AND status = 'PENDING' AND "expiresAt" > NOW()`,
+      [email],
+    );
+    expect(pending.rows[0]?.count).toBe(1);
+  });
+
   it("updates pending roles, rotates the token on resend, accepts the latest roles, and prevents replay", async () => {
     const created = await createInvitation(`accept-${suffix}@test.local`);
     const originalToken = created.invitationToken;
