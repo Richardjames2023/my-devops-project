@@ -138,7 +138,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       await pool.query(
         `INSERT INTO return_evidence
           (id, "returnRequestId", url, type, description, "publicId", "resourceType", "createdAt")
-         VALUES ($1, $2, 'https://cdn.test/private-evidence.jpg', 'IMAGE', 'Photo contains my address', 'private/evidence', 'image', NOW())`,
+         VALUES ($1, $2, 'https://cdn.test/private-evidence.mp4', 'VIDEO', 'Video contains my address', 'private/evidence', 'video', NOW())`,
         [randomUUID(), returnRequestId],
       );
       await pool.query(
@@ -160,19 +160,24 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         description: "[redacted after account deletion]",
       });
       const evidence = await pool.query(
-        'SELECT url, description, "publicId" FROM return_evidence WHERE "returnRequestId" = $1',
+        'SELECT url, description, "publicId", "resourceType" FROM return_evidence WHERE "returnRequestId" = $1',
         [returnRequestId],
       );
       expect(evidence.rows[0]).toMatchObject({
         url: "[redacted after account deletion]",
         description: "[redacted after account deletion]",
         publicId: null,
+        resourceType: "video",
       });
       const cleanupTask = await pool.query(
-        'SELECT status FROM cloudinary_cleanup_tasks WHERE "publicId" = $1',
+        'SELECT status, "resourceType", "deliveryType" FROM cloudinary_cleanup_tasks WHERE "publicId" = $1',
         ["private/evidence"],
       );
-      expect(cleanupTask.rows[0]?.status).toBe("PENDING");
+      expect(cleanupTask.rows[0]).toMatchObject({
+        status: "PENDING",
+        resourceType: "video",
+        deliveryType: "authenticated",
+      });
       const deletion = await pool.query('SELECT status, "completedAt" FROM customer_account_deletions WHERE "userId" = $1', [customer.id]);
       expect(deletion.rows[0].status).toBe("COMPLETED");
       expect(deletion.rows[0].completedAt).toBeTruthy();
@@ -660,8 +665,11 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       await pool.query("CREATE OR REPLACE FUNCTION test_reject_customer_anonymization() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN IF NEW.email LIKE ''deleted+%@deleted.invalid'' THEN RAISE EXCEPTION ''simulated transient anonymization failure''; END IF; RETURN NEW; END;'");
       await pool.query("CREATE TRIGGER test_reject_customer_anonymization_trigger BEFORE UPDATE OF email ON users FOR EACH ROW EXECUTE FUNCTION test_reject_customer_anonymization()");
 
-      const processed = await processCustomerAccountDeletionBatch();
-      expect(processed.failed).toBe(1);
+      const concurrentResults = await Promise.all([
+        processCustomerAccountDeletionBatch(),
+        processCustomerAccountDeletionBatch(),
+      ]);
+      expect(concurrentResults.reduce((total, result) => total + result.failed, 0)).toBeGreaterThanOrEqual(1);
       const deletion = await pool.query(
         'SELECT "failureCount", "lastError", EXTRACT(EPOCH FROM ("scheduledFor" - (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\')) ) AS "retryDelaySeconds" FROM customer_account_deletions WHERE "userId" = $1',
         [customer.id],
