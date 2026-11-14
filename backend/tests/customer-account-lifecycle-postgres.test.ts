@@ -216,6 +216,20 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
          VALUES ($1, $2, $3, 'Warranty Test Product', 'Standard', $4, 1, 100, 0, 100, TRUE, 12, NOW() - INTERVAL '30 days', NOW() + INTERVAL '30 days', NOW())`,
         [orderItemId, orderId, variantId, `SKU-${variantId}`],
       );
+      const warrantyClaimId = randomUUID();
+      const reviewId = randomUUID();
+      await pool.query(
+        `INSERT INTO warranty_claims
+          (id, "orderItemId", quantity, "userId", status, "claimNumber", issue, description, "submittedAt", "createdAt", "updatedAt")
+         VALUES ($1, $2, 1, $3, 'RESOLVED', $4, $5, $6, NOW(), NOW(), NOW())`,
+        [warrantyClaimId, orderItemId, customer.id, `WC-${warrantyClaimId}`, "My phone number is +2348012345678", "Please visit my home at Private Street"],
+      );
+      await pool.query(
+        `INSERT INTO product_reviews
+          (id, "productId", "userId", "orderItemId", rating, title, comment, status, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, 5, $5, $6, 'APPROVED', NOW(), NOW())`,
+        [reviewId, productId, customer.id, orderItemId, "Contact me at +2348012345678", "My address is Private Street"],
+      );
       await pool.query(
         `INSERT INTO payments (id, "orderId", reference, provider, status, amount, currency, "createdAt", "updatedAt")
          VALUES ($1, $2, $3, 'PAYSTACK', 'SUCCESS', 100, 'NGN', NOW(), NOW())`,
@@ -253,6 +267,22 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       );
       const completed = await processCustomerAccountDeletionBatch();
       expect(completed.completed).toBe(1);
+      const claim = await pool.query(
+        'SELECT issue, description FROM warranty_claims WHERE id = $1',
+        [warrantyClaimId],
+      );
+      expect(claim.rows[0]).toMatchObject({
+        issue: "[redacted after account deletion]",
+        description: "[redacted after account deletion]",
+      });
+      const review = await pool.query(
+        'SELECT title, comment FROM product_reviews WHERE id = $1',
+        [reviewId],
+      );
+      expect(review.rows[0]).toMatchObject({
+        title: "[redacted after account deletion]",
+        comment: "[redacted after account deletion]",
+      });
       const user = await pool.query('SELECT email, "firstName" FROM users WHERE id = $1', [customer.id]);
       expect(user.rows[0]).toMatchObject({
         email: `deleted+${customer.id}@deleted.invalid`,
