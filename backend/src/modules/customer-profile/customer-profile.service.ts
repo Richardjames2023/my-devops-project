@@ -17,6 +17,7 @@ export interface UpdateCustomerProfileInput {
 export async function updateCustomerProfile(userId: string, input: UpdateCustomerProfileInput) {
   try {
     return await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}::text, 0))`;
       const user = await tx.user.findUnique({
         where: { id: userId },
         select: { id: true, firstName: true, lastName: true, phone: true, isActive: true },
@@ -68,9 +69,12 @@ export async function requestCustomerAccountDeletion(userId: string, password: s
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${userId}::text, 0))`;
     const user = await tx.user.findUnique({
       where: { id: userId },
-      select: { id: true, isActive: true },
+      select: { id: true, isActive: true, passwordHash: true },
     });
     if (!user) throw new AppError("Customer account is unavailable", 403);
+    if (user.passwordHash !== current.passwordHash) {
+      throw new AppError("Password changed during this request. Please try again.", 409);
+    }
 
     const existing = await tx.customerAccountDeletion.findUnique({ where: { userId } });
     if (!user.isActive && existing?.status === "REQUESTED") {
