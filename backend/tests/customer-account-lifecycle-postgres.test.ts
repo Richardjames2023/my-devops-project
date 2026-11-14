@@ -242,6 +242,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
   it("serializes email verification with account deletion without a token/user lock-order deadlock", async () => {
     const customer = await createCustomer("verification-deletion-race");
     const verificationToken = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
+    const lockHolder = await pool.connect();
     try {
       await pool.query(
         `INSERT INTO customer_email_verification_tokens
@@ -250,12 +251,38 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         [randomUUID(), customer.id, hashRefreshToken(verificationToken)],
       );
 
+      // Hold the shared lock until both operations are demonstrably waiting on
+      // it, forcing their critical sections to overlap rather than merely
+      // running one after the other.
+      await lockHolder.query("BEGIN");
+      await lockHolder.query(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))",
+        [customer.id],
+      );
+      const verification = verifyCustomerEmail(verificationToken);
+      const deletion = requestCustomerAccountDeletion(
+        customer.id,
+        "Customer-Lifecycle-Password-2026!",
+      );
+      let waiting = 0;
+      const deadline = Date.now() + 5_000;
+      while (waiting < 2 && Date.now() < deadline) {
+        const result = await pool.query(
+          `SELECT COUNT(*)::int AS count
+           FROM pg_stat_activity
+           WHERE wait_event_type = 'Lock'
+             AND query LIKE '%pg_advisory_xact_lock%'
+             AND pid <> pg_backend_pid()`,
+        );
+        waiting = result.rows[0].count;
+        if (waiting < 2) await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(waiting).toBe(2);
+      await lockHolder.query("COMMIT");
+
       const [verificationResult, deletionResult] = await Promise.allSettled([
-        verifyCustomerEmail(verificationToken),
-        requestCustomerAccountDeletion(
-          customer.id,
-          "Customer-Lifecycle-Password-2026!",
-        ),
+        verification,
+        deletion,
       ]);
       expect(deletionResult.status).toBe("fulfilled");
       if (verificationResult.status === "rejected") {
@@ -273,6 +300,12 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       );
       expect(token.rows[0].consumedAt).toBeTruthy();
     } finally {
+      try {
+        await lockHolder.query("ROLLBACK");
+      } catch {
+        // The transaction may already have been committed.
+      }
+      lockHolder.release();
       await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
     }
   });
