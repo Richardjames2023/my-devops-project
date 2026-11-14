@@ -107,6 +107,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
 
   it("defers deletion while an order remains operational, then anonymizes personal data and preserves the order", async () => {
     const customer = await createCustomer("deletion-retention");
+    const returnRequestId = randomUUID();
     try {
       await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
       await pool.query(
@@ -175,9 +176,29 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       expect(deletion.rows[0].status).toBe("COMPLETED");
       expect(deletion.rows[0].completedAt).toBeTruthy();
     } finally {
-      await pool.query('DELETE FROM cloudinary_cleanup_tasks WHERE "publicId" = $1', ["private/evidence"]);
-      await pool.query("DELETE FROM return_requests WHERE id = $1", [returnRequestId]);
-      await pool.query('DELETE FROM orders WHERE "userId" = $1', [customer.id]);
+      await pool.query(
+        'DELETE FROM cloudinary_cleanup_tasks WHERE "publicId" = $1',
+        ["private/evidence"],
+      );
+
+      await pool.query(
+        `DELETE FROM return_evidence
+         WHERE "returnRequestId" IN (
+           SELECT id FROM return_requests WHERE "userId" = $1
+         )`,
+        [customer.id],
+      );
+
+      await pool.query(
+        'DELETE FROM return_requests WHERE "userId" = $1',
+        [customer.id],
+      );
+
+      await pool.query(
+        'DELETE FROM orders WHERE "userId" = $1',
+        [customer.id],
+      );
+
       await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
     }
   });
@@ -190,6 +211,9 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
     const orderId = randomUUID();
     const paymentId = randomUUID();
     const orderItemId = randomUUID();
+    const warrantyClaimId = randomUUID();
+    const reviewId = randomUUID();
+
     try {
       await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
       await pool.query(
@@ -223,8 +247,6 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
          VALUES ($1, $2, $3, 'Warranty Test Product', 'Standard', $4, 1, 100, 0, 100, TRUE, 12, NOW() - INTERVAL '30 days', NOW() + INTERVAL '30 days', NOW())`,
         [orderItemId, orderId, variantId, `SKU-${variantId}`],
       );
-      const warrantyClaimId = randomUUID();
-      const reviewId = randomUUID();
       await pool.query(
         `INSERT INTO warranty_claims
           (id, "orderItemId", quantity, "userId", status, "claimNumber", issue, description, "resolutionNotes", "submittedAt", "createdAt", "updatedAt")
