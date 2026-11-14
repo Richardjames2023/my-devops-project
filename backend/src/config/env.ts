@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { z } from "zod";
-import { isSecureProductionEmailUrl } from "./url-validation";
+import { isHttpOrHttpsUrl, isSecureProductionEmailUrl, isValidStaffInvitationAcceptanceUrl } from "./url-validation";
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -48,6 +48,21 @@ const envSchema = z.object({
     return z.string().email().safeParse(address.trim()).success;
   }).optional()),
   APP_BASE_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
+  STAFF_INVITATION_ENCRYPTION_KEY: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().optional(),
+  ),
+  STAFF_INVITATION_ENCRYPTION_KEYRING: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().optional(),
+  ),
+  STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID: z.string().min(1).default("v1"),
+  STAFF_INVITATION_ACCEPTANCE_URL: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().url().optional(),
+  ),
+  STAFF_INVITATION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(48),
+  STAFF_INVITATION_ACCEPTANCE_SESSION_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
 }).superRefine((value, context) => {
   if (value.NODE_ENV === "production" && !value.EMAIL_DELIVERY_ENABLED) {
     context.addIssue({
@@ -94,11 +109,74 @@ const envSchema = z.object({
       message: "APP_BASE_URL is required when email delivery is enabled",
     });
   }
+  if (value.EMAIL_DELIVERY_ENABLED && value.NODE_ENV === "production" && !value.STAFF_INVITATION_ENCRYPTION_KEY && !value.STAFF_INVITATION_ENCRYPTION_KEYRING) {
+    context.addIssue({
+      code: "custom",
+      path: ["STAFF_INVITATION_ENCRYPTION_KEY"],
+      message: "A staff invitation encryption key or keyring is required in production when email delivery is enabled",
+    });
+  }
+  const configuredKeys: Record<string, string> = {};
+  if (value.STAFF_INVITATION_ENCRYPTION_KEY) configuredKeys.v1 = value.STAFF_INVITATION_ENCRYPTION_KEY;
+  if (value.STAFF_INVITATION_ENCRYPTION_KEYRING) {
+    try {
+      const parsed: unknown = JSON.parse(value.STAFF_INVITATION_ENCRYPTION_KEYRING);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid keyring");
+      for (const [id, key] of Object.entries(parsed)) {
+        if (!/^[A-Za-z0-9._-]{1,64}$/.test(id) || typeof key !== "string") throw new Error("invalid key entry");
+        configuredKeys[id] = key;
+      }
+    } catch {
+      context.addIssue({
+        code: "custom",
+        path: ["STAFF_INVITATION_ENCRYPTION_KEYRING"],
+        message: "STAFF_INVITATION_ENCRYPTION_KEYRING must be a JSON object mapping key IDs to base64 keys",
+      });
+    }
+  }
+  for (const [id, key] of Object.entries(configuredKeys)) {
+    const decoded = /^[A-Za-z0-9+/]{43}=$/.test(key) ? Buffer.from(key, "base64") : Buffer.alloc(0);
+    if (decoded.length !== 32 || decoded.toString("base64") !== key) {
+      context.addIssue({
+        code: "custom",
+        path: [id === "v1" && value.STAFF_INVITATION_ENCRYPTION_KEY ? "STAFF_INVITATION_ENCRYPTION_KEY" : "STAFF_INVITATION_ENCRYPTION_KEYRING"],
+        message: "Every invitation encryption key must be a canonical base64-encoded 32-byte key",
+      });
+    }
+  }
+  if ((value.STAFF_INVITATION_ENCRYPTION_KEY || value.STAFF_INVITATION_ENCRYPTION_KEYRING) &&
+      !configuredKeys[value.STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID]) {
+    context.addIssue({
+      code: "custom",
+      path: ["STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID"],
+      message: "The active invitation encryption key ID must exist in the configured keyring",
+    });
+  }
+  if (value.STAFF_INVITATION_ACCEPTANCE_URL) {
+    try {
+      if (!isValidStaffInvitationAcceptanceUrl(value.STAFF_INVITATION_ACCEPTANCE_URL, value.NODE_ENV)) {
+        throw new Error("invalid acceptance URL");
+      }
+    } catch {
+      context.addIssue({
+        code: "custom",
+        path: ["STAFF_INVITATION_ACCEPTANCE_URL"],
+        message: "STAFF_INVITATION_ACCEPTANCE_URL must use HTTP or HTTPS (HTTPS in production) and must not contain credentials, query, or fragment",
+      });
+    }
+  }
   if (value.EMAIL_DELIVERY_ENABLED && !value.EMAIL_FROM) {
     context.addIssue({
       code: "custom",
       path: ["EMAIL_FROM"],
       message: "EMAIL_FROM is required when email delivery is enabled",
+    });
+  }
+  if (value.APP_BASE_URL && !isHttpOrHttpsUrl(value.APP_BASE_URL)) {
+    context.addIssue({
+      code: "custom",
+      path: ["APP_BASE_URL"],
+      message: "APP_BASE_URL must use HTTP or HTTPS",
     });
   }
   if (

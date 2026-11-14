@@ -1,13 +1,16 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { env } from "../../config/env";
+import { isValidStaffInvitationAcceptanceUrl } from "../../config/url-validation";
 import {
   createResendEmailProvider,
   EmailProviderError,
   type EmailProvider,
 } from "./email/email-provider";
-import { renderNotificationEmail } from "./email/email-templates";
+import { renderNotificationEmail, renderStaffInvitationEmail } from "./email/email-templates";
+import { decryptInvitationSecret, getInvitationEncryptionKeyring, type EncryptedSecretEnvelope } from "../staff/staff-invitation-encryption";
+import { hashRefreshToken } from "../../common/utils/refreshToken";
 
 const BATCH_SIZE = 10;
 const LEASE_MS = 2 * 60 * 1000;
@@ -155,6 +158,123 @@ async function claimBatch(deliveryId?: string): Promise<ClaimedDelivery[]> {
   `;
 }
 
+
+class StaleStaffInvitationDeliveryError extends Error {
+  constructor() {
+    super("Staff invitation is no longer deliverable");
+    this.name = "StaleStaffInvitationDeliveryError";
+  }
+}
+
+function isEncryptedSecretEnvelope(value: unknown): value is EncryptedSecretEnvelope {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Record<string, unknown>;
+  return candidate.version === 1 &&
+    candidate.algorithm === "aes-256-gcm" &&
+    typeof candidate.keyId === "string" &&
+    typeof candidate.nonce === "string" &&
+    typeof candidate.authTag === "string" &&
+    typeof candidate.ciphertext === "string";
+}
+
+async function renderStaffInvitationDelivery(delivery: ClaimedDelivery, tx: Prisma.TransactionClient) {
+  const data = delivery.templateData;
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("Invalid staff invitation email payload");
+  }
+  const payload = data as Record<string, unknown>;
+  if (typeof payload.invitationId !== "string" || !isEncryptedSecretEnvelope(payload.encryptedToken)) {
+    throw new Error("Invalid staff invitation email payload");
+  }
+  if (!env.STAFF_INVITATION_ENCRYPTION_KEY && !env.STAFF_INVITATION_ENCRYPTION_KEYRING) {
+    throw new Error("Staff invitation email encryption is not configured");
+  }
+  const keyring = getInvitationEncryptionKeyring(
+    env.STAFF_INVITATION_ENCRYPTION_KEY,
+    env.STAFF_INVITATION_ENCRYPTION_KEYRING,
+    env.STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID,
+  );
+  const token = decryptInvitationSecret(payload.encryptedToken, keyring);
+  const [invitation] = await tx.$queryRaw<Array<{
+    email: string;
+    tokenHash: string;
+    isValid: boolean;
+  }>>`
+    SELECT email, "tokenHash", status = 'PENDING' AND "expiresAt" > NOW() AS "isValid"
+    FROM staff_invitations
+    WHERE id = ${payload.invitationId}::uuid
+    FOR UPDATE
+  `;
+  if (!invitation?.isValid || invitation.email !== delivery.recipientEmail) {
+    throw new StaleStaffInvitationDeliveryError();
+  }
+
+  const expectedHash = hashRefreshToken(token);
+  const expected = Buffer.from(expectedHash, "hex");
+  const current = Buffer.from(invitation.tokenHash, "hex");
+  if (expected.length !== current.length || !timingSafeEqual(expected, current)) {
+    throw new StaleStaffInvitationDeliveryError();
+  }
+
+  const configuredUrl = env.STAFF_INVITATION_ACCEPTANCE_URL ??
+    (env.APP_BASE_URL ? new URL("/staff/accept-invitation", env.APP_BASE_URL).toString() : undefined);
+  if (!configuredUrl) throw new Error("Staff invitation acceptance URL is not configured");
+  const url = new URL(configuredUrl);
+  if (!isValidStaffInvitationAcceptanceUrl(url.toString(), env.NODE_ENV)) {
+    throw new Error("Staff invitation acceptance URL is invalid");
+  }
+  url.hash = new URLSearchParams({ token }).toString();
+  return renderStaffInvitationEmail(invitation.email, url.toString());
+}
+
+async function sendStaffInvitationDelivery(
+  delivery: ClaimedDelivery,
+  provider: EmailProvider,
+): Promise<void> {
+  // Lock the invitation row until the provider has accepted the message and
+  // the delivery is marked ACCEPTED. Resend/revoke use the same row lock, so
+  // either this send linearizes first or the state change wins and this send
+  // observes a stale invitation. The delivery row itself is not locked here,
+  // avoiding a lock-order cycle with resend's invitation-then-delivery updates.
+  await prisma.$transaction(async (tx) => {
+    const rendered = await renderStaffInvitationDelivery(delivery, tx);
+    const result = await provider.send({
+      to: delivery.recipientEmail,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      idempotencyKey: "notification-email:" + delivery.id,
+    });
+    const updated = await tx.notificationEmailDelivery.updateMany({
+      where: { id: delivery.id, status: "PROCESSING", lockedBy: delivery.lockedBy },
+      data: {
+        status: "ACCEPTED",
+        providerMessageId: result.messageId,
+        acceptedAt: new Date(),
+        lockedAt: null,
+        lockedBy: null,
+        lastError: null,
+      },
+    });
+    if (updated.count !== 1) {
+      throw new Error("Notification email delivery lease was lost");
+    }
+  }, { maxWait: 10_000, timeout: 45_000 });
+}
+
+async function markSuppressed(delivery: ClaimedDelivery): Promise<void> {
+  await prisma.notificationEmailDelivery.updateMany({
+    where: { id: delivery.id, status: "PROCESSING", lockedBy: delivery.lockedBy },
+    data: {
+      status: "SUPPRESSED",
+      suppressedAt: new Date(),
+      lockedAt: null,
+      lockedBy: null,
+      lastError: "Staff invitation is no longer current",
+    },
+  });
+}
+
 async function markAccepted(
   delivery: ClaimedDelivery,
   messageId: string,
@@ -203,6 +323,29 @@ export async function processNotificationEmailBatch(
   let failed = 0;
 
   for (const delivery of deliveries) {
+    if (delivery.templateKey === "staff.invitation") {
+      try {
+        await sendStaffInvitationDelivery(delivery, provider);
+        accepted += 1;
+      } catch (error) {
+        if (error instanceof StaleStaffInvitationDeliveryError) {
+          await markSuppressed(delivery);
+          continue;
+        }
+        failed += 1;
+        try {
+          const safeError = error instanceof EmailProviderError
+            ? new EmailProviderError("Staff invitation email delivery failed", error.retryable, error.statusCode)
+            : new Error("Staff invitation email could not be prepared or sent");
+          await markFailed(delivery, safeError);
+        } catch (recordError) {
+          console.error("[NOTIFICATION EMAIL] Failed to record delivery failure", delivery.id, recordError);
+        }
+        console.error("[NOTIFICATION EMAIL] Delivery failed", delivery.id, "Staff invitation email failed");
+      }
+      continue;
+    }
+
     let messageId: string;
     try {
       const rendered = renderNotificationEmail(
@@ -215,7 +358,6 @@ export async function processNotificationEmailBatch(
         subject: rendered.subject,
         html: rendered.html,
         text: rendered.text,
-        // Stable across retries so provider-side idempotency can prevent duplicates.
         idempotencyKey: "notification-email:" + delivery.id,
       });
       messageId = result.messageId;
@@ -234,8 +376,6 @@ export async function processNotificationEmailBatch(
       await markAccepted(delivery, messageId);
       accepted += 1;
     } catch (error) {
-      // The provider may already have accepted this email. Leave the lease for
-      // recovery and retry with the same idempotency key; do not mark it DEAD.
       failed += 1;
       console.error("[NOTIFICATION EMAIL] Provider accepted email but acceptance could not be recorded", delivery.id, error);
     }

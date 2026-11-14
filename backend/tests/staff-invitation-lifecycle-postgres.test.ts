@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hashRefreshToken } from "../src/common/utils/refreshToken";
@@ -9,6 +9,8 @@ if (new URL(databaseUrl).pathname !== "/shop_db_test") {
   throw new Error("Staff invitation tests may only use shop_db_test");
 }
 process.env.DATABASE_URL = databaseUrl;
+process.env.STAFF_INVITATION_ENCRYPTION_KEY ??= randomBytes(32).toString("base64");
+process.env.APP_BASE_URL ??= "http://localhost:3000";
 
 const pool = new Pool({ connectionString: databaseUrl, max: 3 });
 const suffix = randomUUID();
@@ -25,13 +27,15 @@ const invitationIds: string[] = [];
 const acceptedStaffIds: string[] = [];
 const auxiliaryStaffIds: string[] = [];
 
-const [{ default: prisma, disconnectDatabase }, staffService] = await Promise.all([
+const [{ default: prisma, disconnectDatabase }, staffService, encryption] = await Promise.all([
   import("../src/infrastructure/prisma/client"),
   import("../src/modules/staff/staff.service"),
+  import("../src/modules/staff/staff-invitation-encryption"),
 ]);
 
 const {
-  acceptStaffInvitation,
+  acceptStaffInvitation: completeStaffInvitation,
+  exchangeStaffInvitationToken,
   createStaffInvitation,
   listStaffInvitations,
   resendStaffInvitation,
@@ -47,8 +51,64 @@ async function createInvitation(email: string, roleIds = [roleAId]) {
     { email, roleIds },
     { ipAddress: "127.0.0.1", userAgent: "staff-invitation-integration-test" },
   );
+  expect(result).not.toHaveProperty("invitationToken");
   invitationIds.push(result.invitation.id);
-  return result;
+  const delivery = await prisma.notificationEmailDelivery.findFirst({
+    where: {
+      templateKey: "staff.invitation",
+      eventRecipientKey: { startsWith: `staff-invitation:${result.invitation.id}:` },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { templateData: true },
+  });
+  if (!delivery || !delivery.templateData || typeof delivery.templateData !== "object" ||
+      Array.isArray(delivery.templateData)) {
+    throw new Error("Encrypted staff invitation email delivery was not queued");
+  }
+  const payload = delivery.templateData as Record<string, unknown>;
+  const encryptedToken = payload.encryptedToken as Parameters<typeof encryption.decryptInvitationSecret>[0];
+  const invitationToken = encryption.decryptInvitationSecret(
+    encryptedToken,
+    process.env.STAFF_INVITATION_ENCRYPTION_KEY!,
+  );
+  return { ...result, invitationToken };
+}
+
+
+async function getQueuedInvitationToken(invitationId: string): Promise<string> {
+  const delivery = await prisma.notificationEmailDelivery.findFirst({
+    where: {
+      templateKey: "staff.invitation",
+      eventRecipientKey: { startsWith: `staff-invitation:${invitationId}:` },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { templateData: true },
+  });
+  if (!delivery?.templateData || typeof delivery.templateData !== "object" ||
+      Array.isArray(delivery.templateData)) {
+    throw new Error("Encrypted staff invitation email delivery was not queued");
+  }
+  const payload = delivery.templateData as Record<string, unknown>;
+  const encryptedToken = payload.encryptedToken as Parameters<typeof encryption.decryptInvitationSecret>[0];
+  return encryption.decryptInvitationSecret(
+    encryptedToken,
+    process.env.STAFF_INVITATION_ENCRYPTION_KEY!,
+  );
+}
+
+async function acceptStaffInvitation(input: {
+  token: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}) {
+  const session = await exchangeStaffInvitationToken(input.token);
+  return completeStaffInvitation({
+    sessionToken: session.sessionToken,
+    password: input.password,
+    firstName: input.firstName,
+    lastName: input.lastName,
+  });
 }
 
 describe("PostgreSQL staff invitation lifecycle", () => {
@@ -105,6 +165,11 @@ describe("PostgreSQL staff invitation lifecycle", () => {
        WHERE "staffAccountId" = ANY($1::uuid[])
           OR "entityId" = ANY($2::text[])`,
       [staffIds, invitationIds],
+    );
+    await pool.query(
+      `DELETE FROM notification_email_deliveries
+       WHERE "eventRecipientKey" LIKE ANY($1::text[])`,
+      [invitationIds.map((id) => `staff-invitation:${id}:%`)],
     );
     await pool.query(
       `DELETE FROM staff_invitations WHERE id = ANY($1::uuid[])`,
@@ -168,6 +233,20 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     );
     expect(created.invitation).not.toHaveProperty("tokenHash");
     expect(created.invitationToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(created).toHaveProperty("delivery.id");
+    const queued = await pool.query(
+      `SELECT "templateKey", "templateData", "eventRecipientKey", status
+       FROM notification_email_deliveries
+       WHERE "eventRecipientKey" LIKE $1`,
+      [`staff-invitation:${created.invitation.id}:%`],
+    );
+    expect(queued.rows).toHaveLength(1);
+    expect(queued.rows[0]).toMatchObject({
+      templateKey: "staff.invitation",
+      status: "QUEUED",
+    });
+    expect(JSON.stringify(queued.rows[0].templateData)).not.toContain(created.invitationToken);
+    expect(queued.rows[0].templateData).toHaveProperty("encryptedToken.algorithm", "aes-256-gcm");
 
     const stored = await pool.query(
       `SELECT "tokenHash", status FROM staff_invitations WHERE id = $1`,
@@ -224,6 +303,7 @@ describe("PostgreSQL staff invitation lifecycle", () => {
   it("updates pending roles, rotates the token on resend, accepts the latest roles, and prevents replay", async () => {
     const created = await createInvitation(`accept-${suffix}@test.local`);
     const originalToken = created.invitationToken;
+    const originalSession = await exchangeStaffInvitationToken(originalToken);
 
     const updated = await updateStaffInvitationRoles(
       actorId,
@@ -234,8 +314,22 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     expect(updated.roles.map(({ role }) => role.id)).toEqual([roleBId]);
 
     const resent = await resendStaffInvitation(actorId, created.invitation.id);
-    expect(resent.invitationToken).not.toBe(originalToken);
+    expect(resent).not.toHaveProperty("invitationToken");
     expect(resent.invitation).not.toHaveProperty("tokenHash");
+    const resentToken = await getQueuedInvitationToken(created.invitation.id);
+    expect(resentToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(resentToken).not.toBe(originalToken);
+    const oldDelivery = await pool.query(
+      `SELECT status FROM notification_email_deliveries WHERE "eventRecipientKey" = $1`,
+      [`staff-invitation:${created.invitation.id}:${hashRefreshToken(originalToken)}`],
+    );
+    expect(oldDelivery.rows[0]?.status).toBe("SUPPRESSED");
+    await expect(completeStaffInvitation({
+      sessionToken: originalSession.sessionToken,
+      password: "A-strong-staff-password-2026",
+      firstName: "Taylor",
+      lastName: "Superseded",
+    })).rejects.toMatchObject({ statusCode: 400 });
     const resendExpiry = await pool.query(
       `SELECT "expiresAt" > NOW() AS is_future
        FROM staff_invitations WHERE id = $1`,
@@ -253,7 +347,7 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
 
     const staff = await acceptStaffInvitation({
-      token: resent.invitationToken,
+      token: resentToken,
       password: "A-strong-staff-password-2026",
       firstName: "Taylor",
       lastName: "Staff",
@@ -302,7 +396,7 @@ describe("PostgreSQL staff invitation lifecycle", () => {
 
     await expect(
       acceptStaffInvitation({
-        token: resent.invitationToken,
+        token: resentToken,
         password: "Another-strong-password-2026",
         firstName: "Taylor",
         lastName: "Replay",
@@ -312,9 +406,16 @@ describe("PostgreSQL staff invitation lifecycle", () => {
 
   it("revokes a pending invitation and rejects its token", async () => {
     const created = await createInvitation(`revoke-${suffix}@test.local`);
+    const session = await exchangeStaffInvitationToken(created.invitationToken);
     const revoked = await revokeStaffInvitation(actorId, created.invitation.id);
 
     expect(revoked.status).toBe("REVOKED");
+    await expect(completeStaffInvitation({
+      sessionToken: session.sessionToken,
+      password: "A-strong-staff-password-2026",
+      firstName: "Revoked",
+      lastName: "Session",
+    })).rejects.toMatchObject({ statusCode: 400 });
     expect(revoked.revokedAt).toBeTruthy();
 
     await expect(
@@ -368,17 +469,75 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
+  it("locks the invitation before its acceptance session when resend/revoke is in flight", async () => {
+    const created = await createInvitation(`lock-order-${suffix}@test.local`);
+    const session = await exchangeStaffInvitationToken(created.invitationToken);
+    const blocker = await pool.connect();
+
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query(
+        `SELECT id FROM staff_invitations WHERE id = $1 FOR UPDATE`,
+        [created.invitation.id],
+      );
+
+      const accepting = completeStaffInvitation({
+        sessionToken: session.sessionToken,
+        password: "A-strong-staff-password-2026",
+        firstName: "Lock",
+        lastName: "Ordering",
+      }).then(
+        (value) => ({ status: "fulfilled" as const, value }),
+        (error: unknown) => ({ status: "rejected" as const, error }),
+      );
+
+      // Give acceptance time to reach its first contended row lock. With the
+      // correct order it waits on the invitation without holding the session.
+      await new Promise((resolve) => setTimeout(resolve, 75));
+      await blocker.query("SET LOCAL lock_timeout = '500ms'");
+      const revoked = await blocker.query(
+        `UPDATE staff_invitation_acceptance_sessions
+         SET "revokedAt" = NOW(), "updatedAt" = NOW()
+         WHERE "invitationId" = $1 AND "tokenHash" = $2
+           AND "revokedAt" IS NULL AND "consumedAt" IS NULL`,
+        [created.invitation.id, hashRefreshToken(session.sessionToken)],
+      );
+      expect(revoked.rowCount).toBe(1);
+      await blocker.query("COMMIT");
+
+      const outcome = await accepting;
+      expect(outcome.status).toBe("rejected");
+      if (outcome.status === "fulfilled") {
+        acceptedStaffIds.push(outcome.value.id);
+        throw new Error("Acceptance unexpectedly succeeded after its session was revoked");
+      }
+      expect(outcome.error).toMatchObject({ statusCode: 400 });
+    } catch (error) {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      blocker.release();
+    }
+
+    const persisted = await pool.query(
+      `SELECT status FROM staff_invitations WHERE id = $1`,
+      [created.invitation.id],
+    );
+    expect(persisted.rows[0]?.status).toBe("PENDING");
+  });
+
   it("allows only one concurrent acceptance of the same invitation", async () => {
     const created = await createInvitation(`concurrent-${suffix}@test.local`);
+    const session = await exchangeStaffInvitationToken(created.invitationToken);
     const attempts = await Promise.allSettled([
-      acceptStaffInvitation({
-        token: created.invitationToken,
+      completeStaffInvitation({
+        sessionToken: session.sessionToken,
         password: "A-strong-staff-password-2026",
         firstName: "Concurrent",
         lastName: "Winner",
       }),
-      acceptStaffInvitation({
-        token: created.invitationToken,
+      completeStaffInvitation({
+        sessionToken: session.sessionToken,
         password: "Another-strong-password-2026",
         firstName: "Concurrent",
         lastName: "Loser",

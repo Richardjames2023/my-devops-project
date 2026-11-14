@@ -8,8 +8,10 @@ import { generateRefreshToken, hashRefreshToken } from "../../common/utils/refre
 import { REFRESH_TOKEN_EXPIRES_IN_DAYS } from "../../config/auth";
 import { createAuditLog } from "../../common/utils/audit-log";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
+import { env } from "../../config/env";
+import { isValidStaffInvitationAcceptanceUrl } from "../../config/url-validation";
+import { encryptInvitationSecret, getInvitationEncryptionKeyring } from "./staff-invitation-encryption";
 
-const invitationDaysDefault = 7;
 const invitationDaysMax = 30;
 
 type RequestMetadata = { ipAddress?: string; userAgent?: string };
@@ -30,6 +32,17 @@ async function invitationExpiryFromDays(
 ): Promise<Date> {
   const [row] = await tx.$queryRaw<Array<{ expiresAt: Date }>>`
     SELECT NOW() + (${days} * INTERVAL '1 day') AS "expiresAt"
+  `;
+  if (!row?.expiresAt) throw new Error("Could not calculate invitation expiry");
+  return row.expiresAt;
+}
+
+async function invitationExpiryFromHours(
+  tx: Prisma.TransactionClient,
+  hours: number,
+): Promise<Date> {
+  const [row] = await tx.$queryRaw<Array<{ expiresAt: Date }>>`
+    SELECT NOW() + (${hours} * INTERVAL '1 hour') AS "expiresAt"
   `;
   if (!row?.expiresAt) throw new Error("Could not calculate invitation expiry");
   return row.expiresAt;
@@ -124,14 +137,85 @@ async function getDelegableRoles(
   return { roles, actorRoleNames };
 }
 
+async function queueStaffInvitationEmail(
+  tx: Prisma.TransactionClient,
+  input: { invitationId: string; email: string; token: string; tokenHash: string },
+) {
+  if (!env.STAFF_INVITATION_ENCRYPTION_KEY && !env.STAFF_INVITATION_ENCRYPTION_KEYRING) {
+    throw new AppError("Staff invitation email encryption is not configured", 503);
+  }
+  const configuredUrl = env.STAFF_INVITATION_ACCEPTANCE_URL ??
+    (env.APP_BASE_URL ? new URL("/staff/accept-invitation", env.APP_BASE_URL).toString() : undefined);
+  if (!configuredUrl) {
+    throw new AppError("Staff invitation acceptance URL is not configured", 503);
+  }
+  const acceptanceUrl = new URL(configuredUrl);
+  if (!isValidStaffInvitationAcceptanceUrl(acceptanceUrl.toString(), env.NODE_ENV)) {
+    throw new AppError("Staff invitation acceptance URL is invalid", 503);
+  }
+  const encryptionKeyring = getInvitationEncryptionKeyring(
+    env.STAFF_INVITATION_ENCRYPTION_KEY,
+    env.STAFF_INVITATION_ENCRYPTION_KEYRING,
+    env.STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID,
+  );
+  const encryptedToken = encryptInvitationSecret(input.token, encryptionKeyring);
+  const templateData: Prisma.InputJsonObject = {
+    invitationId: input.invitationId,
+    encryptedToken: {
+      version: encryptedToken.version,
+      algorithm: encryptedToken.algorithm,
+      keyId: encryptedToken.keyId,
+      nonce: encryptedToken.nonce,
+      authTag: encryptedToken.authTag,
+      ciphertext: encryptedToken.ciphertext,
+    },
+  };
+  const delivery = await tx.notificationEmailDelivery.create({
+    data: {
+      recipientEmail: input.email,
+      templateKey: "staff.invitation",
+      templateData,
+      eventRecipientKey: `staff-invitation:${input.invitationId}:${input.tokenHash}`,
+      status: "QUEUED",
+      nextAttemptAt: new Date(),
+    },
+    select: { id: true, status: true },
+  });
+  return delivery;
+}
+
+async function suppressStaffInvitationDeliveries(
+  tx: Prisma.TransactionClient,
+  invitationId: string,
+) {
+  await tx.staffInvitationAcceptanceSession.updateMany({
+    where: { invitationId, consumedAt: null, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  await tx.notificationEmailDelivery.updateMany({
+    where: {
+      templateKey: "staff.invitation",
+      eventRecipientKey: { startsWith: `staff-invitation:${invitationId}:` },
+      status: { in: ["QUEUED", "RETRYING", "PROCESSING"] },
+    },
+    data: {
+      status: "SUPPRESSED",
+      suppressedAt: new Date(),
+      lockedAt: null,
+      lockedBy: null,
+      lastError: "Invitation token was rotated or invalidated",
+    },
+  });
+}
+
 export async function createStaffInvitation(
   actorId: string,
   input: { email: string; roleIds: string[]; expiresInDays?: number | undefined },
   metadata: RequestMetadata = {},
 ) {
   const email = normalizeEmail(input.email);
-  const days = input.expiresInDays ?? invitationDaysDefault;
-  if (days < 1 || days > invitationDaysMax) {
+  if (input.expiresInDays !== undefined &&
+      (input.expiresInDays < 1 || input.expiresInDays > invitationDaysMax)) {
     throw new AppError(`Invitation expiry must be between 1 and ${invitationDaysMax} days`, 400);
   }
   if (!input.roleIds.length) throw new AppError("At least one staff role is required", 400);
@@ -176,7 +260,9 @@ export async function createStaffInvitation(
       throw new AppError("A pending invitation already exists for this email address", 409);
     }
 
-    const expiresAt = await invitationExpiryFromDays(tx, days);
+    const expiresAt = input.expiresInDays === undefined
+      ? await invitationExpiryFromHours(tx, env.STAFF_INVITATION_TTL_HOURS)
+      : await invitationExpiryFromDays(tx, input.expiresInDays);
     const createdBase = await tx.staffInvitation.create({
       data: {
         email,
@@ -187,6 +273,12 @@ export async function createStaffInvitation(
     });
     await tx.staffInvitationRole.createMany({
       data: roles.map((role) => ({ invitationId: createdBase.id, roleId: role.id })),
+    });
+    const delivery = await queueStaffInvitationEmail(tx, {
+      invitationId: createdBase.id,
+      email,
+      token,
+      tokenHash: hashRefreshToken(token),
     });
     const created = await tx.staffInvitation.findUniqueOrThrow({
       where: { id: createdBase.id },
@@ -200,14 +292,12 @@ export async function createStaffInvitation(
       newValues: { email, roleNames: roles.map((role) => role.name), expiresAt: created.expiresAt.toISOString() },
       ...metadata,
     });
-    return created;
+    return { invitation: created, delivery };
   });
 
-  // The raw token is returned once so the trusted admin UI can hand it to the
-  // configured email-delivery adapter. Only the hash is persisted.
-  const { tokenHash: _tokenHash, ...safeInvitation } = invitation;
+  const { tokenHash: _tokenHash, ...safeInvitation } = invitation.invitation;
   void _tokenHash;
-  return { invitation: safeInvitation, invitationToken: token };
+  return { invitation: safeInvitation, delivery: invitation.delivery };
 }
 
 export async function listStaffInvitations() {
@@ -255,10 +345,18 @@ export async function resendStaffInvitation(
       throw new AppError("Only unexpired pending invitations can be resent", 409);
     }
 
-    const expiresAt = await invitationExpiryFromDays(tx, invitationDaysDefault);
+    const expiresAt = await invitationExpiryFromHours(tx, env.STAFF_INVITATION_TTL_HOURS);
+    const tokenHash = hashRefreshToken(token);
     const result = await tx.staffInvitation.update({
       where: { id: invitationId },
-      data: { tokenHash: hashRefreshToken(token), expiresAt },
+      data: { tokenHash, expiresAt },
+    });
+    await suppressStaffInvitationDeliveries(tx, invitationId);
+    const delivery = await queueStaffInvitationEmail(tx, {
+      invitationId,
+      email: invitation.email,
+      token,
+      tokenHash,
     });
     await createAuditLog(tx, {
       staffAccountId: actorId,
@@ -269,11 +367,11 @@ export async function resendStaffInvitation(
       newValues: { expiresAt: result.expiresAt.toISOString() },
       ...metadata,
     });
-    return result;
+    return { invitation: result, delivery };
   });
-  const { tokenHash: _tokenHash, ...safeInvitation } = updated;
+  const { tokenHash: _tokenHash, ...safeInvitation } = updated.invitation;
   void _tokenHash;
-  return { invitation: safeInvitation, invitationToken: token };
+  return { invitation: safeInvitation, delivery: updated.delivery };
 }
 
 export async function updateStaffInvitationRoles(
@@ -343,6 +441,7 @@ export async function revokeStaffInvitation(actorId: string, invitationId: strin
       where: { id: invitationId },
       data: { status: "REVOKED", revokedAt: new Date() },
     });
+    await suppressStaffInvitationDeliveries(tx, invitationId);
     await createAuditLog(tx, {
       staffAccountId: actorId,
       action: "STAFF_INVITATION_REVOKED",
@@ -358,13 +457,10 @@ export async function revokeStaffInvitation(actorId: string, invitationId: strin
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
-export async function acceptStaffInvitation(input: {
-  token: string; password: string; firstName: string; lastName: string;
-}) {
-  const tokenHash = hashRefreshToken(input.token);
-  return prisma.$transaction(async (tx) => {
-    // The row lock and expiry predicate both use PostgreSQL's clock. A token
-    // cannot be accepted based on a skewed application-server clock.
+export async function exchangeStaffInvitationToken(token: string) {
+  const tokenHash = hashRefreshToken(token);
+  const sessionToken = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = await prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT id FROM staff_invitations
       WHERE "tokenHash" = ${tokenHash}
@@ -372,12 +468,83 @@ export async function acceptStaffInvitation(input: {
         AND "expiresAt" > NOW()
       FOR UPDATE
     `;
-    if (!locked.length) {
-      throw new AppError("This staff invitation is invalid, expired, or already used", 400);
+    const lockedInvitation = locked[0];
+    if (!lockedInvitation) {
+      throw new AppError("This staff invitation is invalid or expired", 400);
+    }
+
+    await tx.staffInvitationAcceptanceSession.updateMany({
+      where: { invitationId: lockedInvitation.id, consumedAt: null, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    const [expiry] = await tx.$queryRaw<Array<{ expiresAt: Date }>>`
+      SELECT NOW() + (${env.STAFF_INVITATION_ACCEPTANCE_SESSION_TTL_MINUTES} * INTERVAL '1 minute') AS "expiresAt"
+    `;
+    if (!expiry?.expiresAt) throw new Error("Could not calculate invitation session expiry");
+    await tx.staffInvitationAcceptanceSession.create({
+      data: {
+        invitationId: lockedInvitation.id,
+        tokenHash: hashRefreshToken(sessionToken),
+        expiresAt: expiry.expiresAt,
+      },
+    });
+    return expiry.expiresAt;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  return { sessionToken, expiresAt };
+}
+
+export async function acceptStaffInvitation(input: {
+  sessionToken: string; password: string; firstName: string; lastName: string;
+}) {
+  const sessionHash = hashRefreshToken(input.sessionToken);
+  return prisma.$transaction(async (tx) => {
+    // Always acquire locks in the same order as resend/revoke/exchange:
+    // invitation first, then acceptance session. Locking both sides of a JOIN
+    // leaves PostgreSQL free to acquire them in either order and can deadlock
+    // against resend/revoke (which lock the invitation before updating sessions).
+    // The initial lookup is intentionally unlocked; every security predicate is
+    // rechecked while holding the corresponding row lock below.
+    const candidate = await tx.$queryRaw<Array<{ sessionId: string; invitationId: string }>>`
+      SELECT id AS "sessionId", "invitationId"
+      FROM staff_invitation_acceptance_sessions
+      WHERE "tokenHash" = ${sessionHash}
+      LIMIT 1
+    `;
+    const candidateSession = candidate[0];
+    if (!candidateSession) {
+      throw new AppError("This staff invitation session is invalid or expired", 400);
+    }
+
+    const lockedInvitation = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM staff_invitations
+      WHERE id = ${candidateSession.invitationId}::uuid
+        AND status = 'PENDING'
+        AND "expiresAt" > NOW()
+      FOR UPDATE
+    `;
+    if (!lockedInvitation.length) {
+      throw new AppError("This staff invitation session is invalid or expired", 400);
+    }
+
+    const lockedSession = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM staff_invitation_acceptance_sessions
+      WHERE id = ${candidateSession.sessionId}::uuid
+        AND "invitationId" = ${candidateSession.invitationId}::uuid
+        AND "tokenHash" = ${sessionHash}
+        AND "consumedAt" IS NULL
+        AND "revokedAt" IS NULL
+        AND "expiresAt" > NOW()
+      FOR UPDATE
+    `;
+    const lockedSessionId = lockedSession[0]?.id;
+    if (!lockedSessionId) {
+      throw new AppError("This staff invitation session is invalid or expired", 400);
     }
 
     const invitation = await tx.staffInvitation.findUnique({
-      where: { tokenHash },
+      where: { id: candidateSession.invitationId },
       include: { roles: { select: { roleId: true, role: { select: { name: true } } } } },
     });
     if (!invitation || invitation.status !== "PENDING") {
@@ -395,6 +562,19 @@ export async function acceptStaffInvitation(input: {
     `;
     if (claimed.length !== 1) {
       throw new AppError("This staff invitation has already been used", 409);
+    }
+
+    const consumedSession = await tx.$executeRaw`
+      UPDATE staff_invitation_acceptance_sessions
+      SET "consumedAt" = NOW(), "updatedAt" = NOW()
+      WHERE id = ${lockedSessionId}::uuid
+        AND "tokenHash" = ${sessionHash}
+        AND "consumedAt" IS NULL
+        AND "revokedAt" IS NULL
+        AND "expiresAt" > NOW()
+    `;
+    if (consumedSession !== 1) {
+      throw new AppError("This staff invitation session has already been used", 409);
     }
 
     const passwordHash = await hashPassword(input.password);
@@ -448,7 +628,7 @@ export async function acceptStaffInvitation(input: {
       status: staff.status,
       roles: invitation.roles.map(({ role }) => role.name),
     };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 }
 
 async function staffAuthContext(staffId: string) {

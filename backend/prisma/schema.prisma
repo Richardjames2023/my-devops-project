@@ -159,11 +159,29 @@ model StaffInvitation {
   createdByStaffAccountId String?               @db.Uuid
   createdBy               StaffAccount?         @relation("StaffInvitationCreator", fields: [createdByStaffAccountId], references: [id], onDelete: SetNull)
   roles                   StaffInvitationRole[]
+  acceptanceSessions      StaffInvitationAcceptanceSession[]
 
   @@index([email, status])
   @@index([expiresAt, status])
   @@index([createdByStaffAccountId])
   @@map("staff_invitations")
+}
+
+
+model StaffInvitationAcceptanceSession {
+  id           String          @id @default(uuid()) @db.Uuid
+  invitationId String          @db.Uuid
+  tokenHash    String          @unique
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  invitation   StaffInvitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@index([invitationId, expiresAt])
+  @@index([expiresAt, consumedAt, revokedAt])
+  @@map("staff_invitation_acceptance_sessions")
 }
 
 model StaffInvitationRole {
