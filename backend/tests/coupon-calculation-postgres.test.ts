@@ -192,6 +192,52 @@ describe("PostgreSQL coupon calculation and reservation limits", () => {
     }
   });
 
+  it("caps a fixed discount at the order subtotal", async () => {
+    const fixture = await createCouponFixture({
+      discountType: "FIXED_AMOUNT",
+      discountValue: "150.00",
+    });
+    try {
+      const result = await import("../src/infrastructure/prisma/client").then(
+        ({ default: prisma }) =>
+          prisma.$transaction((tx) =>
+            calculateCouponForOrder(tx, {
+              code: fixture.couponCode,
+              subtotal: new Prisma.Decimal("100.00"),
+              customerKey: "user:fixed-discount-over-subtotal",
+              items: [
+                { totalPrice: new Prisma.Decimal("40.00") },
+                { totalPrice: new Prisma.Decimal("60.00") },
+              ],
+            }),
+          ),
+      );
+
+      expect(result.discountAmount.toFixed(2)).toBe("100.00");
+      expect(
+        result.items
+          .reduce(
+            (sum, item) => sum.plus(item.discountAmount),
+            new Prisma.Decimal(0),
+          )
+          .toFixed(2),
+      ).toBe("100.00");
+      expect(
+        result.items
+          .reduce(
+            (sum, item) => sum.plus(item.totalPrice),
+            new Prisma.Decimal(0),
+          )
+          .toFixed(2),
+      ).toBe("0.00");
+      expect(
+        result.items.every((item) => item.totalPrice.greaterThanOrEqualTo(0)),
+      ).toBe(true);
+    } finally {
+      await cleanup(fixture);
+    }
+  });
+
   it("caps percentage discounts at maxDiscountAmount", async () => {
     const fixture = await createCouponFixture({
       discountType: "PERCENTAGE",
