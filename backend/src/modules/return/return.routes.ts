@@ -21,6 +21,7 @@ import {
   uploadGuestEvidence,
   viewGuestEvidence,
   streamGuestEvidenceFile,
+  requireGuestReturnEvidenceAccess,
 } from "./guest-return-evidence.controller";
 
 const router = Router();
@@ -32,6 +33,7 @@ router.get("/guest/:orderId/:returnRequestId", guestOrderRetrievalLimiter, getGu
 router.post(
   "/guest/:orderId/:returnRequestId/evidence",
   guestOrderLimiter,
+  requireGuestReturnEvidenceAccess,
   uploadReturnEvidence,
   uploadGuestEvidence,
 );
