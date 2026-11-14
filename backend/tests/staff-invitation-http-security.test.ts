@@ -138,7 +138,10 @@ describe("staff invitation HTTP security boundaries", () => {
     expect(mocks.acceptStaffInvitation).not.toHaveBeenCalled();
   });
 
-  it("consumes the session and clears the HttpOnly cookie after successful acceptance", async () => {
+  it("consumes the session and clears the Secure, HttpOnly cookie after successful acceptance", async () => {
+    mocks.env.NODE_ENV = "production";
+    mocks.env.COOKIE_SAME_SITE = "strict";
+
     const response = await supertest(createApp())
       .post("/api/v1/staff-auth/accept-invitation")
       .set("Origin", expectedOrigin)
@@ -155,7 +158,8 @@ describe("staff invitation HTTP security boundaries", () => {
     expect(cookies).toHaveLength(1);
     expect(cookies[0]).toContain("staff_invitation_session=;");
     expect(cookies[0]).toContain("HttpOnly");
-    expect(cookies[0]).toContain("SameSite=Lax");
+    expect(cookies[0]).toContain("Secure");
+    expect(cookies[0]).toContain("SameSite=Strict");
     expect(cookies[0]).toContain("Path=/api/v1/staff-auth");
     expect(cookies[0]).toMatch(/Expires=.*1970/);
   });
