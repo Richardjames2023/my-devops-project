@@ -18,6 +18,7 @@ const [
   { registerUser, loginUser, verifyCustomerEmail },
   { hashRefreshToken },
   { updateCustomerProfile, requestCustomerAccountDeletion, cancelCustomerAccountDeletion, processCustomerAccountDeletionBatch },
+  { verifyPassword },
   { disconnectDatabase },
   { authenticate },
   { requireCustomer },
@@ -25,6 +26,7 @@ const [
   import("../src/modules/auth/auth.service"),
   import("../src/common/utils/refreshToken"),
   import("../src/modules/customer-profile/customer-profile.service"),
+  import("../src/common/utils/password"),
   import("../src/infrastructure/prisma/client"),
   import("../src/common/middleware/authenticate"),
   import("../src/common/middleware/identity"),
@@ -568,4 +570,110 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
     }
   });
+  it("removes direct customer verification and reset emails without deleting staff mail to the same address", async () => {
+    const customer = await createCustomer("deletion-auth-email");
+    const staffId = randomUUID();
+    const verificationDeliveryId = randomUUID();
+    const resetDeliveryId = randomUUID();
+    const staffDeliveryId = randomUUID();
+    const verificationProviderEventId = randomUUID();
+    const resetProviderEventId = randomUUID();
+    const staffProviderEventId = randomUUID();
+
+    try {
+      await pool.query(
+        `INSERT INTO staff_accounts (id, email, "firstName", "lastName", status, "createdAt", "updatedAt")
+         VALUES ($1, $2, 'Shared', 'Staff', 'ACTIVE', NOW(), NOW())`,
+        [staffId, customer.email],
+      );
+      await pool.query(
+        `INSERT INTO notification_email_deliveries
+          (id, "recipientEmail", "templateKey", "templateData", status, "createdAt", "updatedAt")
+         VALUES
+          ($1, $2, 'customer.email-verification', '{"firstName":"Lifecycle","actionUrl":"/verify-email?token=secret"}'::jsonb, 'QUEUED', NOW(), NOW()),
+          ($3, $2, 'customer.password-reset', '{"firstName":"Lifecycle","actionUrl":"/reset-password?token=secret"}'::jsonb, 'QUEUED', NOW(), NOW()),
+          ($4, $2, 'staff.invitation', '{"firstName":"Shared"}'::jsonb, 'SENT', NOW(), NOW())`,
+        [verificationDeliveryId, customer.email, resetDeliveryId, staffDeliveryId],
+      );
+      await pool.query(
+        `INSERT INTO notification_email_events
+          (id, "providerEventId", "providerMessageId", "eventType", payload, "deliveryId", "receivedAt")
+         VALUES
+          ($1, $2, $3, 'delivered', '{"recipient":"customer-verification"}'::jsonb, $4, NOW()),
+          ($5, $6, $7, 'delivered', '{"recipient":"customer-reset"}'::jsonb, $8, NOW()),
+          ($9, $10, $11, 'delivered', '{"recipient":"staff"}'::jsonb, $12, NOW())`,
+        [
+          randomUUID(), verificationProviderEventId, "provider-" + verificationDeliveryId, verificationDeliveryId,
+          randomUUID(), resetProviderEventId, "provider-" + resetDeliveryId, resetDeliveryId,
+          randomUUID(), staffProviderEventId, "provider-" + staffDeliveryId, staffDeliveryId,
+        ],
+      );
+
+      await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
+      await pool.query("UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute' WHERE "userId" = $1", [customer.id]);
+      const processed = await processCustomerAccountDeletionBatch();
+      expect(processed.completed).toBe(1);
+
+      const deliveries = await pool.query(
+        "SELECT id FROM notification_email_deliveries WHERE id = ANY($1::uuid[])",
+        [[verificationDeliveryId, resetDeliveryId, staffDeliveryId]],
+      );
+      expect(deliveries.rows.map((row) => row.id)).toEqual([staffDeliveryId]);
+      const events = await pool.query(
+        'SELECT "providerEventId", payload, "deliveryId" FROM notification_email_events WHERE "providerEventId" = ANY($1::text[])',
+        [[verificationProviderEventId, resetProviderEventId, staffProviderEventId]],
+      );
+      expect(events.rows.find((row) => row.providerEventId === verificationProviderEventId))
+        .toMatchObject({ payload: { anonymized: true }, deliveryId: null });
+      expect(events.rows.find((row) => row.providerEventId === resetProviderEventId))
+        .toMatchObject({ payload: { anonymized: true }, deliveryId: null });
+      expect(events.rows.find((row) => row.providerEventId === staffProviderEventId))
+        .toMatchObject({ payload: { recipient: "staff" }, deliveryId: staffDeliveryId });
+    } finally {
+      await pool.query('DELETE FROM notification_email_events WHERE "providerEventId" = ANY($1::text[])', [[verificationProviderEventId, resetProviderEventId, staffProviderEventId]]);
+      await pool.query('DELETE FROM notification_email_deliveries WHERE id = ANY($1::uuid[])', [[verificationDeliveryId, resetDeliveryId, staffDeliveryId]]);
+      await pool.query("DELETE FROM staff_accounts WHERE id = $1", [staffId]);
+      await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
+    }
+  });
+
+  it("replaces the customer's password hash when anonymizing the retained user row", async () => {
+    const customer = await createCustomer("deletion-password-scrub");
+    try {
+      await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
+      await pool.query("UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute' WHERE "userId" = $1", [customer.id]);
+      const processed = await processCustomerAccountDeletionBatch();
+      expect(processed.completed).toBe(1);
+      const user = await pool.query('SELECT "passwordHash" FROM users WHERE id = $1', [customer.id]);
+      expect(user.rows[0].passwordHash).toBeTruthy();
+      expect(await verifyPassword("Customer-Lifecycle-Password-2026!", user.rows[0].passwordHash)).toBe(false);
+    } finally {
+      await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
+    }
+  });
+
+  it("persists an exponential retry schedule when anonymization fails", async () => {
+    const customer = await createCustomer("deletion-retry");
+    try {
+      await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
+      await pool.query("UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute' WHERE "userId" = $1", [customer.id]);
+      await pool.query("CREATE OR REPLACE FUNCTION test_reject_customer_anonymization() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN IF NEW.email LIKE ''deleted+%@deleted.invalid'' THEN RAISE EXCEPTION ''simulated transient anonymization failure''; END IF; RETURN NEW; END;'");
+      await pool.query("CREATE TRIGGER test_reject_customer_anonymization_trigger BEFORE UPDATE OF email ON users FOR EACH ROW EXECUTE FUNCTION test_reject_customer_anonymization()");
+
+      const processed = await processCustomerAccountDeletionBatch();
+      expect(processed.failed).toBe(1);
+      const deletion = await pool.query(
+        'SELECT "failureCount", "lastError", "scheduledFor" FROM customer_account_deletions WHERE "userId" = $1',
+        [customer.id],
+      );
+      expect(deletion.rows[0].failureCount).toBe(1);
+      expect(deletion.rows[0].lastError).toContain("simulated transient anonymization failure");
+      expect(new Date(deletion.rows[0].scheduledFor).getTime()).toBeGreaterThan(Date.now());
+    } finally {
+      await pool.query("DROP TRIGGER IF EXISTS test_reject_customer_anonymization_trigger ON users");
+      await pool.query("DROP FUNCTION IF EXISTS test_reject_customer_anonymization()");
+      await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
+    }
+  });
+
 });
