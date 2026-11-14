@@ -190,9 +190,9 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         [paymentId, orderId, `PAY-${paymentId}`],
       );
       await pool.query(
-        `INSERT INTO payment_inventory_reconciliations ("paymentId", "orderId", status, reason, "createdAt", "updatedAt")
-         VALUES ($1, $2, 'PENDING', 'Test reconciliation', NOW(), NOW())`,
-        [paymentId, orderId],
+        `INSERT INTO payment_inventory_reconciliations (id, "paymentId", "orderId", status, reason, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, 'PENDING', 'Test reconciliation', NOW(), NOW())`,
+        [randomUUID(), paymentId, orderId],
       );
 
       const reconciliationDeferred = await processCustomerAccountDeletionBatch();
