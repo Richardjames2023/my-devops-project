@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { z } from "zod";
-import { isSecureProductionEmailUrl } from "./url-validation";
+import { isSecureProductionEmailUrl, isValidStaffInvitationAcceptanceUrl } from "./url-validation";
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -124,16 +124,14 @@ const envSchema = z.object({
   }
   if (value.STAFF_INVITATION_ACCEPTANCE_URL) {
     try {
-      const url = new URL(value.STAFF_INVITATION_ACCEPTANCE_URL);
-      if (url.username || url.password || url.search || url.hash ||
-          (value.NODE_ENV === "production" && url.protocol !== "https:")) {
+      if (!isValidStaffInvitationAcceptanceUrl(value.STAFF_INVITATION_ACCEPTANCE_URL, value.NODE_ENV)) {
         throw new Error("invalid acceptance URL");
       }
     } catch {
       context.addIssue({
         code: "custom",
         path: ["STAFF_INVITATION_ACCEPTANCE_URL"],
-        message: "STAFF_INVITATION_ACCEPTANCE_URL must be a valid HTTPS URL in production without credentials, query, or fragment",
+        message: "STAFF_INVITATION_ACCEPTANCE_URL must use HTTP or HTTPS (HTTPS in production) and must not contain credentials, query, or fragment",
       });
     }
   }
