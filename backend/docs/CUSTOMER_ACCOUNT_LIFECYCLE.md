@@ -48,6 +48,7 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Add coverage for password confirmation, immediate deactivation and session invalidation.
 - [x] Add coverage for cancellation and the original 30-day deadline.
 - [x] Add coverage for operational deferral, anonymization and retained order history.
+- [x] Add coverage for active warranty and unresolved payment-inventory reconciliation deferrals.
 - [x] Add coverage for concurrent duplicate requests and idempotent worker processing.
 - [ ] Run the focused PostgreSQL integration test locally.
 - [ ] Run the full backend regression suite locally.
@@ -82,7 +83,10 @@ Track the design decisions, implementation stages, verification and release read
 ### Follow-up fixes pushed to the feature branch
 - [x] Narrow validated profile update fields to satisfy TypeScript `exactOptionalPropertyTypes`.
 - [x] Use `Prisma.DbNull` for nullable JSON audit fields.
-- [ ] Pull the fixes and rerun the build.
+- [x] Recheck account activity under the advisory lock before issuing verification or password-reset tokens.
+- [x] Defer anonymization through active warranty expiry and unresolved payment-inventory reconciliation.
+- [x] Scrub provider webhook payloads linked to deleted customer email deliveries.
+- [ ] Pull the latest branch and rerun the build and PostgreSQL tests.
 
 ## Acceptance criteria / release gates
 - [ ] Prisma formatting and schema validation pass.
@@ -115,7 +119,7 @@ git diff --check origin/dev...HEAD
 ## Change tracking
 - Feature branch: `feat/customer-profile-deactivation-deletion`
 - Pull request: [#31 — Customer profile management and privacy-safe account deletion](https://github.com/Richardjames2023/my-devops-project/pull/31)
-- Latest fix commits: `e892eab` (controller) and `923b963` (service).
+- Review follow-ups: preserve active warranty and payment-reconciliation obligations, close auth token issuance races, and scrub retained email webhook payloads.
 - Current tracking state: implementation and the two build fixes are on the feature branch; local build, migration status review and tests remain pending.
 - Update the checklists and workstream statuses in this document as local verification and review are completed.
 - Keep this work on the feature branch until all release gates pass. Do not merge to `dev` before review and verification.
