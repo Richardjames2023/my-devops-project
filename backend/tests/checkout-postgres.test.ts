@@ -171,15 +171,16 @@ async function createFixture(
 
     await pool.query(
       `INSERT INTO product_variants
-       (id, "productId", sku, name, price, "hasWarranty",
+       (id, "productId", sku, name, price, "costPrice", "hasWarranty",
         "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, $4, $5, NULL, NOW(), NOW())`,
+       VALUES ($1, $2, $3, $4, $5, $6, NULL, NOW(), NOW())`,
       [
         fixture.variantId,
         fixture.productId,
         `CHECKOUT-${fixture.variantId}`,
         "Standard Variant",
         1250.5,
+        400.25,
       ],
     );
 
@@ -302,6 +303,23 @@ describe("PostgreSQL customer checkout", () => {
       });
       expect(order.items[0].unitPrice.toString()).toBe("1250.5");
       expect(order.items[0].totalPrice.toString()).toBe("2501");
+      expect(order.items[0]).not.toHaveProperty("unitCostSnapshot");
+
+      const costSnapshot = await pool.query(
+        `SELECT "unitCostSnapshot" FROM order_items WHERE "orderId" = $1`,
+        [order.id],
+      );
+      expect(costSnapshot.rows[0].unitCostSnapshot).toBe("400.25");
+
+      await pool.query(
+        `UPDATE product_variants SET "costPrice" = 999.99 WHERE id = $1`,
+        [fixture.variantId],
+      );
+      const unchangedSnapshot = await pool.query(
+        `SELECT "unitCostSnapshot" FROM order_items WHERE "orderId" = $1`,
+        [order.id],
+      );
+      expect(unchangedSnapshot.rows[0].unitCostSnapshot).toBe("400.25");
 
       await pool.query(
         `UPDATE delivery_zones SET "deliveryFee" = 9999 WHERE id = $1`,
