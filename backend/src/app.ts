@@ -39,6 +39,7 @@ import healthRoutes from "./modules/health/health.routes";
 import deliveryZoneRoutes from "./modules/delivery-zones/delivery-zone.routes";
 import deliveryZonePublicRoutes from "./modules/delivery-zones/delivery-zone.public.routes";
 import couponRoutes from "./modules/coupons/coupon.routes";
+import customerProfileRoutes from "./modules/customer-profile/customer-profile.routes";
 
 const app = express();
 const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
@@ -80,6 +81,7 @@ app.use(express.json());
 app.use("/health", healthRoutes);
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/customer", customerProfileRoutes);
 app.use("/api/v1/notifications", notificationInboxRoutes);
 app.use("/api/v1/staff/notifications", staffNotificationInboxRoutes);
 app.use("/api/v1/notifications/preferences", notificationPreferenceRoutes);

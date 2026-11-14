@@ -1,0 +1,137 @@
+# Customer Profile and Account Deletion
+
+## Purpose
+Track the design decisions, implementation stages, verification and release readiness for customer profile management and privacy-safe account deletion.
+
+## Design process and decision record
+
+### 1. Requirements and scope
+- [x] Allow customers to update their first name, last name and phone number.
+- [x] Require password confirmation before an account-deletion request.
+- [x] Deactivate the account immediately and invalidate existing authenticated sessions.
+- [x] Provide a 30-day cancellation/restoration period.
+- [x] Automatically process eligible deletion requests after the cancellation period.
+- [x] Preserve legally and operationally necessary business records while anonymizing unnecessary personal data.
+- [x] Make processing safe to retry and resilient to concurrent requests, with persisted exponential backoff after failures.
+
+### 2. Agreed lifecycle decisions
+| Area | Decision |
+|---|---|
+| Profile changes | Customers can update first name, last name and phone; duplicate phone numbers are rejected. |
+| Deletion confirmation | The customer must provide their current password. |
+| Immediate effect | Deactivate the account, increment the session version, revoke refresh tokens and consume outstanding verification/reset tokens. |
+| Cancellation | Allow restoration only within 30 days of the original request. A fresh login is required after restoration. |
+| Operational deferral | Defer processing while dependent orders, payments, refunds, reservations, deliveries, returns, warranty claims or payment-inventory reconciliations remain unresolved. Also defer until every purchased product's active warranty coverage has expired. Recheck at the earlier of the normal seven-day retry interval or the latest active warranty expiry. Deferral must not extend the original 30-day cancellation deadline. |
+| Historical records | Retain completed orders, payments, refunds, returns, warranties, reviews and necessary audit actions. |
+| Identity and PII | Replace customer identity with “Deleted Customer”; anonymize order contact details and shipping information. |
+| Personal data cleanup | Remove carts, wishlists, notification inbox/preferences/deliveries, direct customer verification/reset email deliveries and their provider payloads, refresh tokens and verification/reset tokens. Replace the retained user password hash with a hash of an undisclosed random secret. |
+| User record | Retain the user row in anonymized, inactive form to preserve historical foreign-key relationships. |
+| Customer-authored free text and evidence | Retain return, warranty and review records, but replace customer-authored narratives with `[redacted after account deletion]`. Redact return reasons/descriptions, return-item notes, evidence descriptions and URLs; enqueue Cloudinary asset deletion and clear evidence `publicId`; redact warranty issue/description and review title/comment. Preserve staff-authored warranty resolution notes and return inspection notes. |
+
+### 3. API and security design
+- [x] `PATCH /api/v1/customer/profile` — authenticated profile update.
+- [x] `POST /api/v1/customer/account/deletion-request` — authenticated, password-confirmed deletion request.
+- [x] `POST /api/v1/customer/account/deletion-request/cancel` — public, rate-limited restoration using account email and password.
+- [x] Invalidate active sessions and refresh tokens when deletion is requested.
+- [x] Protect profile, request, cancellation and processing operations against concurrent updates with PostgreSQL advisory locks.
+- [x] Serialize relevant login/refresh-token operations against account lifecycle changes.
+- [x] Serialize email verification with account deletion using the same user advisory lock; re-read and validate the token after acquiring the lock.
+
+### 4. Data model and processing design
+- [x] Add a deletion-request lifecycle record with status, request/deadline timestamps, completion/cancellation timestamps and deferral metadata.
+- [x] Process due requests in bounded batches through a background worker.
+- [x] Defer requests while dependent business activity or payment-inventory reconciliation remains unresolved.
+- [x] Preserve active warranty entitlements by deferring anonymization until all recorded warranty expiry dates have passed.
+- [x] Perform anonymization and personal-data cleanup transactionally.
+- [x] Keep processing idempotent so retries do not repeat destructive work or corrupt retained records.
+- [x] Persist worker failure count and error detail; reschedule failed requests with capped exponential backoff so failures cannot monopolize every batch.
+
+### 5. Test design
+- [x] Add PostgreSQL integration coverage for profile updates and duplicate phone protection.
+- [x] Add coverage for password confirmation, immediate deactivation and session invalidation.
+- [x] Add coverage for cancellation and the original 30-day deadline.
+- [x] Add coverage for operational deferral, anonymization and retained order history.
+- [x] Add coverage for active warranty and unresolved payment-inventory reconciliation deferrals.
+- [x] Add coverage for concurrent duplicate requests and idempotent worker processing.
+- [x] Add coverage for email verification racing with account deletion.
+- [x] Add coverage for direct verification/reset email cleanup while preserving staff mail to a shared address.
+- [x] Add coverage for password-hash replacement and persisted deletion-worker retry scheduling.
+- [x] Agree and test redaction of customer-authored return, warranty and product-review text while retaining the underlying records.
+- [x] Verify staff-authored warranty resolution notes remain intact.
+- [ ] Rerun the focused PostgreSQL integration test locally after the review fixes.
+- [ ] Rerun the full backend regression suite locally after the review fixes.
+- [ ] Resolve any failures and rerun the affected tests.
+
+## Implementation status
+
+| Workstream | Status | Notes |
+|---|---|---|
+| Requirements and lifecycle decisions | Complete | Scope and retention rules recorded above. |
+| Prisma model and migration | Implemented; local verification pending | Intended migration applied to `shop_db_test`; inspect the additional locally generated migration before cleanup. |
+| Profile API | Implemented; build fix pushed | Controller now narrows optional validated fields before calling the service. |
+| Deletion request and cancellation APIs | Implemented; local verification pending | Immediate deactivation and 30-day cancellation window. |
+| Background deletion worker | Implemented; local verification pending | Hourly processing with seven-day operational deferrals and capped exponential retry scheduling for processing failures. |
+| Privacy-safe anonymization | Implemented; local verification pending | Includes direct customer auth-email/provider-payload cleanup and replacement of the retained password hash with a hash of a random undisclosed secret. |
+| Concurrency and idempotency safeguards | Implemented; rerun pending | Email verification uses the shared user advisory lock; new regression tests cover direct auth-email cleanup, credential scrubbing and worker retry scheduling. |
+| PostgreSQL integration tests | Extended; rerun pending | Covers direct auth-email cleanup, shared staff email preservation, credential scrubbing and worker retry scheduling. |
+| Build and regression verification | Rerun required | The latest review fixes have not yet been validated locally. |
+
+## Verification log
+
+### Local run 1
+- [x] `prisma format` completed.
+- [x] `prisma validate` passed.
+- [x] Intended account-deletion migration applied to `shop_db_test`.
+- [x] Prisma Client generation completed.
+- [ ] TypeScript build failed with three errors in the profile controller and audit JSON null handling.
+- [ ] Focused integration tests were not run in this attempt.
+- [ ] Full regression suite was not run.
+- Note: while `prisma migrate dev` was prompting for a migration name, the next pasted test command was entered as the name. Prisma created and applied an unintended local migration named `20261114135922_npx_vitest_run_tests_customer_account_lifecycle_postgres_test_ts_pool_forks_max_workers_1`. Inspect this migration and the local Git status before deleting or resetting anything. Do not commit or push this accidental migration.
+
+### Follow-up fixes pushed to the feature branch
+- [x] Serialize email verification with account deletion using the shared user advisory lock.
+- [x] Re-read the verification token and confirm the account remains active after acquiring the lock.
+- [x] Add PostgreSQL coverage for concurrent email verification and deletion.
+- [x] Narrow validated profile update fields to satisfy TypeScript `exactOptionalPropertyTypes`.
+- [x] Use `Prisma.DbNull` for nullable JSON audit fields.
+- [x] Recheck account activity under the advisory lock before issuing verification or password-reset tokens.
+- [x] Defer anonymization through active warranty expiry and unresolved payment-inventory reconciliation.
+- [x] Scrub provider webhook payloads linked to deleted customer email deliveries.
+- [ ] Pull the latest branch and rerun Prisma validation/generation, the build, focused PostgreSQL tests and the full regression suite.
+
+## Acceptance criteria / release gates
+- [ ] Prisma formatting and schema validation pass.
+- [ ] Migration applies successfully to the dedicated test database without unintended schema changes.
+- [ ] Prisma Client generation succeeds.
+- [ ] TypeScript production build passes after the review fixes.
+- [ ] Focused customer account lifecycle PostgreSQL tests pass after the review fixes.
+- [ ] Full backend regression suite passes after the review fixes.
+- [ ] `git diff --check` passes after the review fixes.
+- [ ] Review confirms retained records, anonymized fields and dependent workflows behave as intended, including direct auth-email cleanup, credential scrubbing and worker retries.
+- [ ] Pull request is reviewed and explicitly approved before merge.
+
+## Local verification
+
+Use only `TEST_DATABASE_URL` pointing to the dedicated `shop_db_test` database. Do not run this migration or test workflow against `shop_db` or production.
+
+From the backend directory, run each command separately. If `prisma migrate dev` prompts for a migration name, stop and inspect the reported schema difference; do not paste the next command into that prompt.
+
+```bash
+npx prisma format
+npx prisma validate
+DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate status
+npx prisma generate
+npm run build
+npx vitest run tests/customer-account-lifecycle-postgres.test.ts --pool=forks --maxWorkers=1
+npx vitest run --pool=forks --maxWorkers=1
+git diff --check origin/dev...HEAD
+```
+
+## Change tracking
+- Feature branch: `feat/customer-profile-deactivation-deletion`
+- Pull request: [#31 — Customer profile management and privacy-safe account deletion](https://github.com/Richardjames2023/my-devops-project/pull/31)
+- Review follow-ups: preserve active warranty and payment-reconciliation obligations; serialize email verification with account deletion; scrub direct customer auth-email deliveries, provider payloads and retained password credentials; and persist capped exponential retry scheduling for worker failures.
+- Prior local baseline predates the review fixes in this follow-up. Build, focused PostgreSQL tests, the full suite, Prisma validation/generation and `git diff --check` must all be rerun before merge.
+- Customer-authored free text is redacted during anonymization; return evidence URLs and Cloudinary public IDs are also cleared, with asset deletion queued through the existing Cloudinary cleanup worker. Staff-authored warranty resolution and return inspection notes remain available. Focused tests cover return/evidence redaction, warranty/review text redaction and retention of staff warranty resolution notes.
+- CI workflow changes are intentionally out of scope for this follow-up and have not been changed.
+- Keep this work on the feature branch until all release gates pass. Do not merge to `dev` before review and verification.

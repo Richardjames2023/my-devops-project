@@ -3,21 +3,43 @@ import { Prisma } from "@prisma/client";
 import prisma from "../prisma/client";
 import { getCloudinary } from "../../config/cloudinary";
 
+type CloudinaryResourceType = "image" | "video" | "raw";
+type CloudinaryDeliveryType = "upload" | "authenticated";
+
+interface CloudinaryCleanupOptions {
+  resourceType?: CloudinaryResourceType;
+  deliveryType?: CloudinaryDeliveryType;
+}
+
 export async function enqueueCloudinaryCleanup(
   publicId: string,
   tx: Prisma.TransactionClient | typeof prisma = prisma,
+  options: CloudinaryCleanupOptions = {},
 ): Promise<void> {
+  const resourceType = options.resourceType ?? "image";
+  const deliveryType = options.deliveryType ?? "upload";
   await tx.cloudinaryCleanupTask.upsert({
     where: { publicId },
-    create: { publicId },
-    update: { status: "PENDING", availableAt: new Date(), lockedAt: null, lockToken: null },
+    create: { publicId, resourceType, deliveryType },
+    update: {
+      resourceType,
+      deliveryType,
+      status: "PENDING",
+      availableAt: new Date(),
+      lockedAt: null,
+      lockToken: null,
+    },
   });
 }
 
-export async function deleteCloudinaryAsset(publicId: string): Promise<void> {
+export async function deleteCloudinaryAsset(
+  publicId: string,
+  resourceType: CloudinaryResourceType = "image",
+  deliveryType: CloudinaryDeliveryType = "upload",
+): Promise<void> {
   const result = await getCloudinary().uploader.destroy(publicId, {
-    resource_type: "image",
-    type: "upload",
+    resource_type: resourceType,
+    type: deliveryType,
     invalidate: true,
   });
   if (result.result !== "ok" && result.result !== "not found") {
@@ -30,8 +52,13 @@ export async function processCloudinaryCleanupBatch(limit = 20): Promise<number>
   for (let index = 0; index < limit; index++) {
     const token = randomUUID();
     const claimed = await prisma.$transaction(async (tx) => {
-      const rows = await tx.$queryRaw<Array<{ id: string; publicId: string }>>(Prisma.sql`
-        SELECT id, "publicId" FROM cloudinary_cleanup_tasks
+      const rows = await tx.$queryRaw<Array<{
+        id: string;
+        publicId: string;
+        resourceType: CloudinaryResourceType;
+        deliveryType: CloudinaryDeliveryType;
+      }>>(Prisma.sql`
+        SELECT id, "publicId", "resourceType", "deliveryType" FROM cloudinary_cleanup_tasks
         WHERE (status = 'PENDING' AND "availableAt" <= NOW())
            OR (status = 'PROCESSING' AND "lockedAt" < NOW() - INTERVAL '5 minutes')
         ORDER BY "availableAt" ASC
@@ -48,7 +75,7 @@ export async function processCloudinaryCleanupBatch(limit = 20): Promise<number>
     });
     if (!claimed) break;
     try {
-      await deleteCloudinaryAsset(claimed.publicId);
+      await deleteCloudinaryAsset(claimed.publicId, claimed.resourceType, claimed.deliveryType);
       await prisma.cloudinaryCleanupTask.deleteMany({
         where: { id: claimed.id, lockToken: token, status: "PROCESSING" },
       });
