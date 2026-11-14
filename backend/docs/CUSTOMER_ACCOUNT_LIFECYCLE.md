@@ -57,19 +57,36 @@ Track the design decisions, implementation stages, verification and release read
 | Workstream | Status | Notes |
 |---|---|---|
 | Requirements and lifecycle decisions | Complete | Scope and retention rules recorded above. |
-| Prisma model and migration | Implemented; local verification pending | Migration adds the account-deletion lifecycle record. |
-| Profile API | Implemented; local verification pending | Validation and duplicate-phone protection included. |
+| Prisma model and migration | Implemented; local verification pending | Intended migration applied to `shop_db_test`; inspect the additional locally generated migration before cleanup. |
+| Profile API | Implemented; build fix pushed | Controller now narrows optional validated fields before calling the service. |
 | Deletion request and cancellation APIs | Implemented; local verification pending | Immediate deactivation and 30-day cancellation window. |
 | Background deletion worker | Implemented; local verification pending | Hourly processing with seven-day operational deferrals. |
-| Privacy-safe anonymization | Implemented; local verification pending | Retains required business history and anonymizes customer PII. |
+| Privacy-safe anonymization | Implemented; build fix pushed | Nullable JSON audit fields now use Prisma's `DbNull` sentinel. |
 | Concurrency and idempotency safeguards | Implemented; local verification pending | Uses transaction boundaries and PostgreSQL advisory locks. |
 | PostgreSQL integration tests | Added; execution pending | Focused test file is listed in local verification below. |
-| Build and regression verification | Pending | Do not treat the feature as release-ready until checks pass. |
+| Build and regression verification | Pending | Initial build exposed three TypeScript errors; fixes are now on the feature branch and must be pulled and rechecked. |
+
+## Verification log
+
+### Local run 1
+- [x] `prisma format` completed.
+- [x] `prisma validate` passed.
+- [x] Intended account-deletion migration applied to `shop_db_test`.
+- [x] Prisma Client generation completed.
+- [ ] TypeScript build failed with three errors in the profile controller and audit JSON null handling.
+- [ ] Focused integration tests were not run in this attempt.
+- [ ] Full regression suite was not run.
+- Note: while `prisma migrate dev` was prompting for a migration name, the next pasted test command was entered as the name. Prisma created and applied an unintended local migration named `20261114135922_npx_vitest_run_tests_customer_account_lifecycle_postgres_test_ts_pool_forks_max_workers_1`. Inspect this migration and the local Git status before deleting or resetting anything. Do not commit or push this accidental migration.
+
+### Follow-up fixes pushed to the feature branch
+- [x] Narrow validated profile update fields to satisfy TypeScript `exactOptionalPropertyTypes`.
+- [x] Use `Prisma.DbNull` for nullable JSON audit fields.
+- [ ] Pull the fixes and rerun the build.
 
 ## Acceptance criteria / release gates
 - [ ] Prisma formatting and schema validation pass.
-- [ ] Migration applies successfully to the dedicated test database.
-- [ ] Prisma client generation succeeds.
+- [ ] Migration applies successfully to the dedicated test database without unintended schema changes.
+- [ ] Prisma Client generation succeeds.
 - [ ] TypeScript production build succeeds.
 - [ ] Focused customer account lifecycle PostgreSQL tests pass.
 - [ ] Full backend test suite passes.
@@ -81,12 +98,12 @@ Track the design decisions, implementation stages, verification and release read
 
 Use only `TEST_DATABASE_URL` pointing to the dedicated `shop_db_test` database. Do not run this migration or test workflow against `shop_db` or production.
 
-From the backend directory:
+From the backend directory, run each command separately. If `prisma migrate dev` prompts for a migration name, stop and inspect the reported schema difference; do not paste the next command into that prompt.
 
 ```bash
 npx prisma format
 npx prisma validate
-DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate dev
+DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate status
 npx prisma generate
 npm run build
 npx vitest run tests/customer-account-lifecycle-postgres.test.ts --pool=forks --maxWorkers=1
@@ -97,6 +114,7 @@ git diff --check origin/dev...HEAD
 ## Change tracking
 - Feature branch: `feat/customer-profile-deactivation-deletion`
 - Pull request: [#31 — Customer profile management and privacy-safe account deletion](https://github.com/Richardjames2023/my-devops-project/pull/31)
-- Current tracking state: implementation has been added to the feature branch; local build, migration and test verification are still pending.
+- Latest fix commits: `e892eab` (controller) and `923b963` (service).
+- Current tracking state: implementation and the two build fixes are on the feature branch; local build, migration status review and tests remain pending.
 - Update the checklists and workstream statuses in this document as local verification and review are completed.
 - Keep this work on the feature branch until all release gates pass. Do not merge to `dev` before review and verification.
