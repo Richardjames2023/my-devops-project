@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { hashRefreshToken } from "../src/common/utils/refreshToken";
@@ -9,6 +9,7 @@ if (new URL(databaseUrl).pathname !== "/shop_db_test") {
   throw new Error("Staff invitation tests may only use shop_db_test");
 }
 process.env.DATABASE_URL = databaseUrl;
+process.env.STAFF_INVITATION_ENCRYPTION_KEY ??= randomBytes(32).toString("base64");
 
 const pool = new Pool({ connectionString: databaseUrl, max: 3 });
 const suffix = randomUUID();
@@ -25,9 +26,10 @@ const invitationIds: string[] = [];
 const acceptedStaffIds: string[] = [];
 const auxiliaryStaffIds: string[] = [];
 
-const [{ default: prisma, disconnectDatabase }, staffService] = await Promise.all([
+const [{ default: prisma, disconnectDatabase }, staffService, encryption] = await Promise.all([
   import("../src/infrastructure/prisma/client"),
   import("../src/modules/staff/staff.service"),
+  import("../src/modules/staff/staff-invitation-encryption"),
 ]);
 
 const {
@@ -48,7 +50,25 @@ async function createInvitation(email: string, roleIds = [roleAId]) {
     { ipAddress: "127.0.0.1", userAgent: "staff-invitation-integration-test" },
   );
   invitationIds.push(result.invitation.id);
-  return result;
+  const delivery = await prisma.notificationEmailDelivery.findFirst({
+    where: {
+      templateKey: "staff.invitation",
+      eventRecipientKey: { startsWith: `staff-invitation:${result.invitation.id}:` },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { templateData: true },
+  });
+  if (!delivery || !delivery.templateData || typeof delivery.templateData !== "object" ||
+      Array.isArray(delivery.templateData)) {
+    throw new Error("Encrypted staff invitation email delivery was not queued");
+  }
+  const payload = delivery.templateData as Record<string, unknown>;
+  const encryptedToken = payload.encryptedToken as Parameters<typeof encryption.decryptInvitationSecret>[0];
+  const invitationToken = encryption.decryptInvitationSecret(
+    encryptedToken,
+    process.env.STAFF_INVITATION_ENCRYPTION_KEY!,
+  );
+  return { ...result, invitationToken };
 }
 
 describe("PostgreSQL staff invitation lifecycle", () => {
@@ -105,6 +125,11 @@ describe("PostgreSQL staff invitation lifecycle", () => {
        WHERE "staffAccountId" = ANY($1::uuid[])
           OR "entityId" = ANY($2::text[])`,
       [staffIds, invitationIds],
+    );
+    await pool.query(
+      `DELETE FROM notification_email_deliveries
+       WHERE "eventRecipientKey" LIKE ANY($1::text[])`,
+      [invitationIds.map((id) => `staff-invitation:${id}:%`)],
     );
     await pool.query(
       `DELETE FROM staff_invitations WHERE id = ANY($1::uuid[])`,
@@ -168,6 +193,20 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     );
     expect(created.invitation).not.toHaveProperty("tokenHash");
     expect(created.invitationToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(created).toHaveProperty("delivery.id");
+    const queued = await pool.query(
+      `SELECT "templateKey", "templateData", "eventRecipientKey", status
+       FROM notification_email_deliveries
+       WHERE "eventRecipientKey" LIKE $1`,
+      [`staff-invitation:${created.invitation.id}:%`],
+    );
+    expect(queued.rows).toHaveLength(1);
+    expect(queued.rows[0]).toMatchObject({
+      templateKey: "staff.invitation",
+      status: "QUEUED",
+    });
+    expect(JSON.stringify(queued.rows[0].templateData)).not.toContain(created.invitationToken);
+    expect(queued.rows[0].templateData).toHaveProperty("encryptedToken.algorithm", "aes-256-gcm");
 
     const stored = await pool.query(
       `SELECT "tokenHash", status FROM staff_invitations WHERE id = $1`,
