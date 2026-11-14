@@ -26,7 +26,7 @@ Track the design decisions, implementation stages, verification and release read
 | Identity and PII | Replace customer identity with “Deleted Customer”; anonymize order contact details and shipping information. |
 | Personal data cleanup | Remove carts, wishlists, notification inbox/preferences/deliveries, refresh tokens and verification/reset tokens. |
 | User record | Retain the user row in anonymized, inactive form to preserve historical foreign-key relationships. |
-| Customer-authored free text | **Policy decision still required before final privacy sign-off.** Return reasons/descriptions, warranty claim narratives and product-review text may contain identifiers. Do not delete or rewrite these records until the retention/redaction policy is explicitly approved. |
+| Customer-authored free text and evidence | Retain return, warranty and review records, but replace customer-authored narratives with `[redacted after account deletion]`. Redact return reasons/descriptions, return-item notes, evidence descriptions and URLs; clear evidence `publicId`; redact warranty issue/description and review title/comment. Preserve staff-authored warranty resolution notes and return inspection notes. |
 
 ### 3. API and security design
 - [x] `PATCH /api/v1/customer/profile` — authenticated profile update.
@@ -53,7 +53,7 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Add coverage for active warranty and unresolved payment-inventory reconciliation deferrals.
 - [x] Add coverage for concurrent duplicate requests and idempotent worker processing.
 - [x] Add coverage for email verification racing with account deletion.
-- [ ] Confirm and test the retention/redaction policy for customer-authored free-text fields.
+- [x] Agree and test redaction of customer-authored return, warranty and product-review text while retaining the underlying records.
 - [ ] Run the focused PostgreSQL integration test locally.
 - [ ] Run the full backend regression suite locally.
 - [ ] Resolve any failures and rerun the affected tests.
@@ -128,6 +128,6 @@ git diff --check origin/dev...HEAD
 - Pull request: [#31 — Customer profile management and privacy-safe account deletion](https://github.com/Richardjames2023/my-devops-project/pull/31)
 - Review follow-ups: preserve active warranty and payment-reconciliation obligations, serialize email verification with account deletion, and scrub retained email webhook payloads.
 - Local baseline before the latest auth change: TypeScript build passed; focused lifecycle tests passed 6/6; full suite passed 440 tests across 71 files; `git diff --check` passed. These checks must be rerun against the new commits.
-- Privacy decision still open: confirm whether customer-authored free-text fields in returns, warranty claims and reviews should be retained as business records or redacted during anonymization.
+- Customer-authored free text is redacted during anonymization; return evidence URLs and Cloudinary public IDs are also cleared. Staff-authored warranty resolution and return inspection notes remain available.
 - CI workflow changes are intentionally out of scope for this follow-up and have not been changed.
 - Keep this work on the feature branch until all release gates pass. Do not merge to `dev` before review and verification.
