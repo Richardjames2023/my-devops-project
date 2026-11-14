@@ -14,8 +14,10 @@ export const updateStaffRolesSchema = z.object({
 export const updateStaffStatusSchema = z.object({
   status: z.enum(["ACTIVE", "SUSPENDED", "DEACTIVATED"]),
 });
-export const acceptStaffInvitationSchema = z.object({
+export const exchangeStaffInvitationSchema = z.object({
   token: z.string().min(32).max(256),
+});
+export const completeStaffInvitationSchema = z.object({
   password: z.string().min(12).max(128),
   firstName: z.string().trim().min(1).max(100),
   lastName: z.string().trim().min(1).max(100),
