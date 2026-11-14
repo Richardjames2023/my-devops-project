@@ -75,6 +75,26 @@ async function deleteCloudinaryAsset(asset: UploadedAsset): Promise<void> {
   });
 }
 
+export async function assertGuestReturnEvidenceOrderAccess(
+  orderId: string,
+  guestAccessToken: string,
+): Promise<void> {
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      userId: null,
+      guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+      guestAccessTokenExpiresAt: { gt: new Date() },
+      guestAccessTokenRevokedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (!order) {
+    throw new AppError("Return evidence not found", 404);
+  }
+}
+
 function guestReturnWhere(
   returnRequestId: string,
   orderId: string,
