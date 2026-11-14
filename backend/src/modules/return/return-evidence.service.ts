@@ -141,10 +141,7 @@ async function createReturnEvidenceWithAccess(
   });
 
   if (!returnRequest) {
-    throw new AppError(
-      access.kind === "guest" ? "Return request not found" : "Return request not found",
-      404,
-    );
+    throw new AppError("Return request not found", 404);
   }
 
   if (access.kind === "customer") {
