@@ -1,6 +1,6 @@
 # Staff Invitation Email and Secure Acceptance Workflow
 
-**Status:** Backend implementation in progress — awaiting local verification  
+**Status:** Backend implementation locally verified; frontend integration remains pending  
 **Repository area:** Backend staff invitations and notification email delivery  
 **Product:** ClickClickBuy  
 **Last reviewed:** 2026-11-14
@@ -437,10 +437,10 @@ This feature is not complete until:
 
 ## Implementation progress note (2026-11-14)
 
-The feature branch `feat/staff-invitation-email-workflow` contains the first backend implementation pass: authenticated token encryption, transactional queue insertion using the existing email-delivery table, invitation-specific worker handling, fragment-based link generation, and restricted acceptance sessions. Tests have been added but have not yet been run against the local PostgreSQL test database. Do not treat this branch as verified until the focused tests and TypeScript build pass locally. The acceptance frontend route remains a configurable/proposed route and has not been built.
+The feature branch `feat/staff-invitation-email-workflow` contains the first backend implementation pass: authenticated token encryption, transactional queue insertion using the existing email-delivery table, invitation-specific worker handling, fragment-based link generation, and restricted acceptance sessions. The backend implementation has been locally verified against `shop_db_test`; see the verification record below. The acceptance frontend route remains configurable/proposed and has not been built.
 
 
-**Local verification status:** GitHub implementation commits are present, but the branch has not been built or tested locally. The checklists above distinguish implementation added from test execution still pending.
+**Local verification status:** The latest PR head was built and the full Vitest suite passed locally against `shop_db_test`. The frontend acceptance route and production deployment topology remain outstanding.
 
 
 ## Implementation update — 2026-11-14
@@ -452,4 +452,4 @@ The follow-up hardening changes are now present on PR #27:
 - The invitation worker now holds a row lock on the invitation from final state/hash/recipient validation through provider acceptance and the delivery status update. Resend/revoke use the same invitation row lock, establishing a clear ordering between an in-flight send and a state change.
 - Added unit coverage for URL schemes and key rotation, plus a PostgreSQL concurrency test for an in-flight send racing token rotation.
 
-**Verification remains pending:** pull the latest PR branch and run the focused tests, TypeScript build, and full suite against `shop_db_test` only. The provider call is intentionally bounded by the Prisma transaction timeout; monitor provider latency and database lock duration in deployment.
+**Verification record (2026-11-14):** On PR head `efe1ec4b56c13db479e884fb7ce531814e1eef6d`, `npm run build` passed; the full Vitest suite passed with 69 test files and 423 tests. The staff invitation lifecycle PostgreSQL suite passed all 10 tests, including the invitation-first/session-second lock-order regression. The full suite was run with `DATABASE_URL="$TEST_DATABASE_URL"`, where `TEST_DATABASE_URL` was configured for `shop_db_test`. GitHub Actions reported no workflow runs or commit status checks for this head. The provider call is intentionally bounded by the Prisma transaction timeout; monitor provider latency and database lock duration in deployment. This verification covers the backend at the recorded commit; frontend integration and production deployment topology are still pending.
