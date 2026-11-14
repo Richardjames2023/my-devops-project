@@ -177,7 +177,7 @@ function isEncryptedSecretEnvelope(value: unknown): value is EncryptedSecretEnve
     typeof candidate.ciphertext === "string";
 }
 
-async function renderStaffInvitationDelivery(delivery: ClaimedDelivery) {
+async function renderStaffInvitationDelivery(delivery: ClaimedDelivery, tx: Prisma.TransactionClient) {
   const data = delivery.templateData;
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("Invalid staff invitation email payload");
@@ -190,7 +190,7 @@ async function renderStaffInvitationDelivery(delivery: ClaimedDelivery) {
   if (!key) throw new Error("Staff invitation email encryption is not configured");
 
   const token = decryptInvitationSecret(payload.encryptedToken, key);
-  const [invitation] = await prisma.$queryRaw<Array<{
+  const [invitation] = await tx.$queryRaw<Array<{
     email: string;
     tokenHash: string;
     isValid: boolean;
@@ -198,6 +198,7 @@ async function renderStaffInvitationDelivery(delivery: ClaimedDelivery) {
     SELECT email, "tokenHash", status = 'PENDING' AND "expiresAt" > NOW() AS "isValid"
     FROM staff_invitations
     WHERE id = ${payload.invitationId}::uuid
+    FOR UPDATE
   `;
   if (!invitation?.isValid || invitation.email !== delivery.recipientEmail) {
     throw new StaleStaffInvitationDeliveryError();
@@ -219,6 +220,41 @@ async function renderStaffInvitationDelivery(delivery: ClaimedDelivery) {
   }
   url.hash = new URLSearchParams({ token }).toString();
   return renderStaffInvitationEmail(invitation.email, url.toString());
+}
+
+async function sendStaffInvitationDelivery(
+  delivery: ClaimedDelivery,
+  provider: EmailProvider,
+): Promise<void> {
+  // Lock the invitation row until the provider has accepted the message and
+  // the delivery is marked ACCEPTED. Resend/revoke use the same row lock, so
+  // either this send linearizes first or the state change wins and this send
+  // observes a stale invitation. The delivery row itself is not locked here,
+  // avoiding a lock-order cycle with resend's invitation-then-delivery updates.
+  await prisma.$transaction(async (tx) => {
+    const rendered = await renderStaffInvitationDelivery(delivery, tx);
+    const result = await provider.send({
+      to: delivery.recipientEmail,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+      idempotencyKey: "notification-email:" + delivery.id,
+    });
+    const updated = await tx.notificationEmailDelivery.updateMany({
+      where: { id: delivery.id, status: "PROCESSING", lockedBy: delivery.lockedBy },
+      data: {
+        status: "ACCEPTED",
+        providerMessageId: result.messageId,
+        acceptedAt: new Date(),
+        lockedAt: null,
+        lockedBy: null,
+        lastError: null,
+      },
+    });
+    if (updated.count !== 1) {
+      throw new Error("Notification email delivery lease was lost");
+    }
+  }, { maxWait: 10_000, timeout: 45_000 });
 }
 
 async function markSuppressed(delivery: ClaimedDelivery): Promise<void> {
@@ -282,42 +318,52 @@ export async function processNotificationEmailBatch(
   let failed = 0;
 
   for (const delivery of deliveries) {
+    if (delivery.templateKey === "staff.invitation") {
+      try {
+        await sendStaffInvitationDelivery(delivery, provider);
+        accepted += 1;
+      } catch (error) {
+        if (error instanceof StaleStaffInvitationDeliveryError) {
+          await markSuppressed(delivery);
+          continue;
+        }
+        failed += 1;
+        try {
+          const safeError = error instanceof EmailProviderError
+            ? new EmailProviderError("Staff invitation email delivery failed", error.retryable, error.statusCode)
+            : new Error("Staff invitation email could not be prepared or sent");
+          await markFailed(delivery, safeError);
+        } catch (recordError) {
+          console.error("[NOTIFICATION EMAIL] Failed to record delivery failure", delivery.id, recordError);
+        }
+        console.error("[NOTIFICATION EMAIL] Delivery failed", delivery.id, "Staff invitation email failed");
+      }
+      continue;
+    }
+
     let messageId: string;
     try {
-      const rendered = delivery.templateKey === "staff.invitation"
-        ? await renderStaffInvitationDelivery(delivery)
-        : renderNotificationEmail(
-            delivery.templateKey,
-            delivery.templateData,
-            env.APP_BASE_URL,
-          );
+      const rendered = renderNotificationEmail(
+        delivery.templateKey,
+        delivery.templateData,
+        env.APP_BASE_URL,
+      );
       const result = await provider.send({
         to: delivery.recipientEmail,
         subject: rendered.subject,
         html: rendered.html,
         text: rendered.text,
-        // Stable across retries so provider-side idempotency can prevent duplicates.
         idempotencyKey: "notification-email:" + delivery.id,
       });
       messageId = result.messageId;
     } catch (error) {
-      if (error instanceof StaleStaffInvitationDeliveryError) {
-        await markSuppressed(delivery);
-        continue;
-      }
       failed += 1;
       try {
-        const safeError = delivery.templateKey === "staff.invitation"
-          ? error instanceof EmailProviderError
-            ? new EmailProviderError("Staff invitation email delivery failed", error.retryable, error.statusCode)
-            : new Error("Staff invitation email could not be prepared or sent")
-          : error;
-        await markFailed(delivery, safeError);
+        await markFailed(delivery, error);
       } catch (recordError) {
         console.error("[NOTIFICATION EMAIL] Failed to record delivery failure", delivery.id, recordError);
       }
-      console.error("[NOTIFICATION EMAIL] Delivery failed", delivery.id,
-        delivery.templateKey === "staff.invitation" ? "Staff invitation email failed" : error);
+      console.error("[NOTIFICATION EMAIL] Delivery failed", delivery.id, error);
       continue;
     }
 
@@ -325,8 +371,6 @@ export async function processNotificationEmailBatch(
       await markAccepted(delivery, messageId);
       accepted += 1;
     } catch (error) {
-      // The provider may already have accepted this email. Leave the lease for
-      // recovery and retry with the same idempotency key; do not mark it DEAD.
       failed += 1;
       console.error("[NOTIFICATION EMAIL] Provider accepted email but acceptance could not be recorded", delivery.id, error);
     }
