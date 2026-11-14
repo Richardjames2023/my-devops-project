@@ -54,6 +54,7 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Add coverage for concurrent duplicate requests and idempotent worker processing.
 - [x] Add coverage for email verification racing with account deletion.
 - [x] Agree and test redaction of customer-authored return, warranty and product-review text while retaining the underlying records.
+- [x] Verify staff-authored warranty resolution notes remain intact.
 - [ ] Run the focused PostgreSQL integration test locally.
 - [ ] Run the full backend regression suite locally.
 - [ ] Resolve any failures and rerun the affected tests.
@@ -128,6 +129,6 @@ git diff --check origin/dev...HEAD
 - Pull request: [#31 — Customer profile management and privacy-safe account deletion](https://github.com/Richardjames2023/my-devops-project/pull/31)
 - Review follow-ups: preserve active warranty and payment-reconciliation obligations, serialize email verification with account deletion, and scrub retained email webhook payloads.
 - Local baseline before the latest auth change: TypeScript build passed; focused lifecycle tests passed 6/6; full suite passed 440 tests across 71 files; `git diff --check` passed. These checks must be rerun against the new commits.
-- Customer-authored free text is redacted during anonymization; return evidence URLs and Cloudinary public IDs are also cleared. Staff-authored warranty resolution and return inspection notes remain available.
+- Customer-authored free text is redacted during anonymization; return evidence URLs and Cloudinary public IDs are also cleared. Staff-authored warranty resolution and return inspection notes remain available. Focused tests cover return/evidence redaction, warranty/review text redaction and retention of staff warranty resolution notes.
 - CI workflow changes are intentionally out of scope for this follow-up and have not been changed.
 - Keep this work on the feature branch until all release gates pass. Do not merge to `dev` before review and verification.
