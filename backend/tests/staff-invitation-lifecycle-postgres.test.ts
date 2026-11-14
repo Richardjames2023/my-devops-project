@@ -469,6 +469,63 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
+  it("locks the invitation before its acceptance session when resend/revoke is in flight", async () => {
+    const created = await createInvitation(`lock-order-${suffix}@test.local`);
+    const session = await exchangeStaffInvitationToken(created.invitationToken);
+    const blocker = await pool.connect();
+
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query(
+        `SELECT id FROM staff_invitations WHERE id = $1 FOR UPDATE`,
+        [created.invitation.id],
+      );
+
+      const accepting = completeStaffInvitation({
+        sessionToken: session.sessionToken,
+        password: "A-strong-staff-password-2026",
+        firstName: "Lock",
+        lastName: "Ordering",
+      }).then(
+        (value) => ({ status: "fulfilled" as const, value }),
+        (error: unknown) => ({ status: "rejected" as const, error }),
+      );
+
+      // Give acceptance time to reach its first contended row lock. With the
+      // correct order it waits on the invitation without holding the session.
+      await new Promise((resolve) => setTimeout(resolve, 75));
+      await blocker.query("SET LOCAL lock_timeout = '500ms'");
+      const revoked = await blocker.query(
+        `UPDATE staff_invitation_acceptance_sessions
+         SET "revokedAt" = NOW(), "updatedAt" = NOW()
+         WHERE "invitationId" = $1 AND "tokenHash" = $2
+           AND "revokedAt" IS NULL AND "consumedAt" IS NULL`,
+        [created.invitation.id, hashRefreshToken(session.sessionToken)],
+      );
+      expect(revoked.rowCount).toBe(1);
+      await blocker.query("COMMIT");
+
+      const outcome = await accepting;
+      expect(outcome.status).toBe("rejected");
+      if (outcome.status === "fulfilled") {
+        acceptedStaffIds.push(outcome.value.id);
+        throw new Error("Acceptance unexpectedly succeeded after its session was revoked");
+      }
+      expect(outcome.error).toMatchObject({ statusCode: 400 });
+    } catch (error) {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    } finally {
+      blocker.release();
+    }
+
+    const persisted = await pool.query(
+      `SELECT status FROM staff_invitations WHERE id = $1`,
+      [created.invitation.id],
+    );
+    expect(persisted.rows[0]?.status).toBe("PENDING");
+  });
+
   it("allows only one concurrent acceptance of the same invitation", async () => {
     const created = await createInvitation(`concurrent-${suffix}@test.local`);
     const session = await exchangeStaffInvitationToken(created.invitationToken);
