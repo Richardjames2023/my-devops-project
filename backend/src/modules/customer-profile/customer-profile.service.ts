@@ -241,15 +241,18 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
   const now = new Date();
   const notifications = await tx.notification.findMany({ where: { customerUserId: user.id }, select: { id: true } });
   const notificationIds = notifications.map((item) => item.id);
-  // Only delete deliveries explicitly linked to this customer's notifications.
-  // recipientEmail is not an ownership key: staff accounts can legitimately share
-  // an email address with a customer, and event deliveries may belong to staff.
-  const emailDeliveries = notificationIds.length
-    ? await tx.notificationEmailDelivery.findMany({
-        where: { notificationId: { in: notificationIds } },
-        select: { id: true },
-      })
-    : [];
+  // Scope cleanup by customer identity, never by recipient email: staff accounts
+  // can legitimately share an email address with a customer. Include event-only
+  // customer deliveries, which may have no in-app notificationId.
+  const emailDeliveries = await tx.notificationEmailDelivery.findMany({
+    where: {
+      OR: [
+        { eventRecipientKey: { endsWith: `:CUSTOMER:${user.id}` } },
+        ...(notificationIds.length ? [{ notificationId: { in: notificationIds } }] : []),
+      ],
+    },
+    select: { id: true },
+  });
   const emailDeliveryIds = emailDeliveries.map((delivery) => delivery.id);
 
   if (emailDeliveryIds.length) {
