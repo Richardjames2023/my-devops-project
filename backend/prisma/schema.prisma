@@ -364,9 +364,11 @@ model Product {
 
 
 model CloudinaryCleanupTask {
-  id          String    @id @default(uuid()) @db.Uuid
-  publicId    String    @unique
-  status      String    @default("PENDING")
+  id           String    @id @default(uuid()) @db.Uuid
+  publicId     String    @unique
+  resourceType String    @default("image")
+  deliveryType String    @default("upload")
+  status       String    @default("PENDING")
   attempts    Int       @default(0)
   availableAt DateTime  @default(now())
   lockedAt    DateTime?
