@@ -264,3 +264,24 @@ export function renderNotificationEmail(
       throw new Error("Unsupported notification email template: " + templateKey);
   }
 }
+
+
+export function renderStaffInvitationEmail(
+  recipientEmail: string,
+  acceptanceUrl: string,
+): RenderedEmail {
+  const safeEmail = escapeHtml(recipientEmail);
+  const safeUrl = escapeHtml(acceptanceUrl);
+  const subject = "You have been invited to join ClickClickBuy";
+  const body = "An administrator has invited " + safeEmail +
+    " to join the ClickClickBuy staff team. Use the secure invitation link below to continue. " +
+    "For your security, this invitation link can only be used once and expires according to the invitation policy.";
+  return {
+    subject,
+    html: "<!doctype html><html><body style=\"margin:0;padding:24px;background:#f5f7fa;font-family:Arial,sans-serif;color:#172033\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr><td align=\"center\"><table role=\"presentation\" width=\"100%\" style=\"max-width:600px;background:#ffffff;border-radius:10px;padding:32px\"><tr><td><h1 style=\"font-size:22px\">Staff invitation</h1><p style=\"font-size:15px;line-height:1.6\">" +
+      body + "</p><p><a href=\"" + safeUrl +
+      "\" style=\"display:inline-block;padding:12px 20px;background:#082f63;color:#ffffff;text-decoration:none;border-radius:6px\">Accept invitation</a></p><p style=\"font-size:12px;color:#667085\">If you were not expecting this invitation, you can ignore this email.</p></td></tr></table></td></tr></table></body></html>",
+    text: subject + "\n\n" + body + "\n\nAccept invitation: " + acceptanceUrl +
+      "\n\nIf you were not expecting this invitation, you can ignore this email.",
+  };
+}
