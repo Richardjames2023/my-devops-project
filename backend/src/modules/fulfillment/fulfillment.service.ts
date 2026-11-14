@@ -142,7 +142,23 @@ export async function allocatePackage(
           })),
         },
       },
-      include: { items: { include: { orderItem: true } } },
+      include: {
+        items: {
+          include: {
+            orderItem: {
+              select: {
+                id: true,
+                productName: true,
+                variantName: true,
+                sku: true,
+                quantity: true,
+                unitPrice: true,
+                totalPrice: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     await tx.fulfillment.update({
