@@ -28,9 +28,9 @@ export async function createInvitation(req: AuthenticatedRequest, res: Response)
   if (!parsed.success) { res.status(400).json({ message: "Validation failed", errors: z.flattenError(parsed.error).fieldErrors }); return; }
   const result = await createStaffInvitation(actorId, parsed.data, metadata(req));
   res.status(201).json({
-    message: "Staff invitation created. The invitation token is returned once; deliver it through the configured trusted email channel.",
+    message: "Staff invitation created and email delivery queued",
     invitation: result.invitation,
-    invitationToken: result.invitationToken,
+    emailDelivery: result.delivery,
   });
 }
 export async function updateInvitationRoles(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -77,9 +77,9 @@ export async function resendInvitation(req: AuthenticatedRequest, res: Response)
   if (!params.success) { res.status(400).json({ message: "Validation failed", errors: z.flattenError(params.error).fieldErrors }); return; }
   const result = await resendStaffInvitation(actorId, params.data.invitationId, metadata(req));
   res.status(200).json({
-    message: "Invitation token rotated. Deliver the new token through the configured trusted email channel.",
+    message: "Invitation token rotated and email delivery queued",
     invitation: result.invitation,
-    invitationToken: result.invitationToken,
+    emailDelivery: result.delivery,
   });
 }
 
