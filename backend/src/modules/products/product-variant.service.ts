@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
+import { createAuditLog } from "../../common/utils/audit-log";
 import type {
   CreateProductVariantInput,
   UpdateProductVariantInput,
@@ -131,4 +132,47 @@ export async function setProductVariantActive(
 
 export async function deactivateProductVariant(variantId: string) {
   return setProductVariantActive(variantId, false);
+}
+
+
+export async function updateProductVariantCost(
+  variantId: string,
+  input: { costPrice: string | null },
+  staffAccountId: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    const lockedVariants = await tx.$queryRaw<Array<{ id: string }>>(
+      Prisma.sql`SELECT id FROM product_variants WHERE id = ${variantId}::uuid FOR UPDATE`,
+    );
+    if (lockedVariants.length === 0) {
+      throw new AppError("Product variant not found", 404);
+    }
+
+    const current = await tx.productVariant.findUnique({
+      where: { id: variantId },
+      select: { id: true, sku: true, costPrice: true },
+    });
+    if (!current) throw new AppError("Product variant not found", 404);
+
+    const updated = await tx.productVariant.update({
+      where: { id: variantId },
+      data: { costPrice: input.costPrice },
+      select: { id: true, sku: true, costPrice: true },
+    });
+
+    await createAuditLog(tx, {
+      staffAccountId,
+      action: "PRODUCT_VARIANT_COST_UPDATED",
+      entity: "ProductVariant",
+      entityId: variantId,
+      oldValues: {
+        costPrice: current.costPrice?.toString() ?? null,
+      },
+      newValues: {
+        costPrice: updated.costPrice?.toString() ?? null,
+      },
+    });
+
+    return updated;
+  });
 }
