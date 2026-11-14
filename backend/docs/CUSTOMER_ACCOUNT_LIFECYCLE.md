@@ -26,7 +26,7 @@ Track the design decisions, implementation stages, verification and release read
 | Identity and PII | Replace customer identity with “Deleted Customer”; anonymize order contact details and shipping information. |
 | Personal data cleanup | Remove carts, wishlists, notification inbox/preferences/deliveries, refresh tokens and verification/reset tokens. |
 | User record | Retain the user row in anonymized, inactive form to preserve historical foreign-key relationships. |
-| Customer-authored free text and evidence | Retain return, warranty and review records, but replace customer-authored narratives with `[redacted after account deletion]`. Redact return reasons/descriptions, return-item notes, evidence descriptions and URLs; clear evidence `publicId`; redact warranty issue/description and review title/comment. Preserve staff-authored warranty resolution notes and return inspection notes. |
+| Customer-authored free text and evidence | Retain return, warranty and review records, but replace customer-authored narratives with `[redacted after account deletion]`. Redact return reasons/descriptions, return-item notes, evidence descriptions and URLs; enqueue Cloudinary asset deletion and clear evidence `publicId`; redact warranty issue/description and review title/comment. Preserve staff-authored warranty resolution notes and return inspection notes. |
 
 ### 3. API and security design
 - [x] `PATCH /api/v1/customer/profile` — authenticated profile update.
@@ -129,6 +129,6 @@ git diff --check origin/dev...HEAD
 - Pull request: [#31 — Customer profile management and privacy-safe account deletion](https://github.com/Richardjames2023/my-devops-project/pull/31)
 - Review follow-ups: preserve active warranty and payment-reconciliation obligations, serialize email verification with account deletion, and scrub retained email webhook payloads.
 - Local baseline before the latest auth change: TypeScript build passed; focused lifecycle tests passed 6/6; full suite passed 440 tests across 71 files; `git diff --check` passed. These checks must be rerun against the new commits.
-- Customer-authored free text is redacted during anonymization; return evidence URLs and Cloudinary public IDs are also cleared. Staff-authored warranty resolution and return inspection notes remain available. Focused tests cover return/evidence redaction, warranty/review text redaction and retention of staff warranty resolution notes.
+- Customer-authored free text is redacted during anonymization; return evidence URLs and Cloudinary public IDs are also cleared, with asset deletion queued through the existing Cloudinary cleanup worker. Staff-authored warranty resolution and return inspection notes remain available. Focused tests cover return/evidence redaction, warranty/review text redaction and retention of staff warranty resolution notes.
 - CI workflow changes are intentionally out of scope for this follow-up and have not been changed.
 - Keep this work on the feature branch until all release gates pass. Do not merge to `dev` before review and verification.
