@@ -210,8 +210,10 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
     const customerNotificationId = randomUUID();
     const staffNotificationId = randomUUID();
     const customerDeliveryId = randomUUID();
+    const customerEventOnlyDeliveryId = randomUUID();
     const staffDeliveryId = randomUUID();
     const customerProviderEventId = randomUUID();
+    const customerEventOnlyProviderEventId = randomUUID();
     const staffProviderEventId = randomUUID();
 
     try {
@@ -248,13 +250,21 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         [customerDeliveryId, customerNotificationId, customer.email, staffDeliveryId, staffNotificationId],
       );
       await pool.query(
+        `INSERT INTO notification_email_deliveries
+          (id, "notificationId", "eventRecipientKey", "recipientEmail", "templateKey", "templateData", status, "createdAt", "updatedAt")
+         VALUES ($1, NULL, $2, $3, 'customer-payment-event', '{}'::jsonb, 'SENT', NOW(), NOW())`,
+        [customerEventOnlyDeliveryId, `v1:${customerEventId}:CUSTOMER:${customer.id}`, customer.email],
+      );
+      await pool.query(
         `INSERT INTO notification_email_events
           (id, "providerEventId", "providerMessageId", "eventType", payload, "deliveryId", "receivedAt")
          VALUES
            ($1, $2, $3, 'delivered', '{"recipient":"customer"}'::jsonb, $4, NOW()),
-           ($5, $6, $7, 'delivered', '{"recipient":"staff"}'::jsonb, $8, NOW())`,
+           ($5, $6, $7, 'delivered', '{"recipient":"event-only-customer"}'::jsonb, $8, NOW()),
+           ($9, $10, $11, 'delivered', '{"recipient":"staff"}'::jsonb, $12, NOW())`,
         [
           randomUUID(), customerProviderEventId, `provider-${customerDeliveryId}`, customerDeliveryId,
+          randomUUID(), customerEventOnlyProviderEventId, `provider-${customerEventOnlyDeliveryId}`, customerEventOnlyDeliveryId,
           randomUUID(), staffProviderEventId, `provider-${staffDeliveryId}`, staffDeliveryId,
         ],
       );
@@ -269,20 +279,22 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
 
       const deliveries = await pool.query(
         'SELECT id FROM notification_email_deliveries WHERE id = ANY($1::uuid[]) ORDER BY id',
-        [[customerDeliveryId, staffDeliveryId]],
+        [[customerDeliveryId, customerEventOnlyDeliveryId, staffDeliveryId]],
       );
       expect(deliveries.rows.map((row) => row.id)).toEqual([staffDeliveryId]);
       const providerEvents = await pool.query(
         'SELECT "providerEventId", payload, "deliveryId" FROM notification_email_events WHERE "providerEventId" = ANY($1::text[])',
-        [[customerProviderEventId, staffProviderEventId]],
+        [[customerProviderEventId, customerEventOnlyProviderEventId, staffProviderEventId]],
       );
       const customerEvent = providerEvents.rows.find((row) => row.providerEventId === customerProviderEventId);
+      const customerEventOnly = providerEvents.rows.find((row) => row.providerEventId === customerEventOnlyProviderEventId);
       const staffEvent = providerEvents.rows.find((row) => row.providerEventId === staffProviderEventId);
       expect(customerEvent).toMatchObject({ payload: { anonymized: true }, deliveryId: null });
+      expect(customerEventOnly).toMatchObject({ payload: { anonymized: true }, deliveryId: null });
       expect(staffEvent).toMatchObject({ payload: { recipient: "staff" }, deliveryId: staffDeliveryId });
     } finally {
-      await pool.query('DELETE FROM notification_email_events WHERE "providerEventId" = ANY($1::text[])', [[customerProviderEventId, staffProviderEventId]]);
-      await pool.query('DELETE FROM notification_email_deliveries WHERE id = ANY($1::uuid[])', [[customerDeliveryId, staffDeliveryId]]);
+      await pool.query('DELETE FROM notification_email_events WHERE "providerEventId" = ANY($1::text[])', [[customerProviderEventId, customerEventOnlyProviderEventId, staffProviderEventId]]);
+      await pool.query('DELETE FROM notification_email_deliveries WHERE id = ANY($1::uuid[])', [[customerDeliveryId, customerEventOnlyDeliveryId, staffDeliveryId]]);
       await pool.query('DELETE FROM notifications WHERE id = ANY($1::uuid[])', [[customerNotificationId, staffNotificationId]]);
       await pool.query('DELETE FROM notification_outbox WHERE id = ANY($1::uuid[])', [[customerEventId, staffEventId]]);
       await pool.query("DELETE FROM staff_accounts WHERE id = $1", [staffId]);
