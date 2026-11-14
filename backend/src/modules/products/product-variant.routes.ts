@@ -3,6 +3,7 @@ import {
   create,
   remove,
   update,
+  updateCost,
   updateStatus,
 } from "./product-variant.controller";
 import { authenticate } from "../../common/middleware/authenticate";
@@ -12,6 +13,7 @@ const router = Router();
 
 router.post("/", authenticate, authorize("products.manage"), create);
 router.patch("/:variantId", authenticate, authorize("products.manage"), update);
+router.patch("/:variantId/cost", authenticate, authorize("products.cost.manage"), updateCost);
 router.patch("/:variantId/status", authenticate, authorize("products.manage"), updateStatus);
 router.delete("/:variantId", authenticate, authorize("products.manage"), remove);
 
