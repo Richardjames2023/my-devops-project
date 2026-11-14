@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
+import type { Express } from "express";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 const cloudinaryMocks = vi.hoisted(() => ({
@@ -176,9 +177,11 @@ describe("PostgreSQL guest return evidence access", () => {
 
   it("uploads and retrieves evidence only for the guest order authorized by its token", async () => {
     const { fixture, tokens } = await createFixture();
-    const [orderId, otherOrderId] = fixture.orderIds;
-    const [returnRequestId, otherReturnRequestId] = fixture.returnRequestIds;
-    const [token] = tokens;
+    const orderId = fixture.orderIds[0]!;
+    const otherOrderId = fixture.orderIds[1]!;
+    const returnRequestId = fixture.returnRequestIds[0]!;
+    const otherReturnRequestId = fixture.returnRequestIds[1]!;
+    const token = tokens[0]!;
 
     try {
       await expect(
@@ -254,9 +257,9 @@ describe("PostgreSQL guest return evidence access", () => {
 
   it("rejects expired guest tokens for upload, metadata, and file access", async () => {
     const { fixture, tokens } = await createFixture();
-    const [orderId] = fixture.orderIds;
-    const [returnRequestId] = fixture.returnRequestIds;
-    const [token] = tokens;
+    const orderId = fixture.orderIds[0]!;
+    const returnRequestId = fixture.returnRequestIds[0]!;
+    const token = tokens[0]!;
 
     try {
       await pool.query(
@@ -326,9 +329,10 @@ describe("PostgreSQL guest return evidence access", () => {
 
   it("does not expose another guest order's evidence when a different order token is supplied", async () => {
     const { fixture, tokens } = await createFixture();
-    const [orderId, otherOrderId] = fixture.orderIds;
-    const [returnRequestId] = fixture.returnRequestIds;
-    const [, otherToken] = tokens;
+    const orderId = fixture.orderIds[0]!;
+    const otherOrderId = fixture.orderIds[1]!;
+    const returnRequestId = fixture.returnRequestIds[0]!;
+    const otherToken = tokens[1]!;
 
     try {
       const uploaded = await createGuestReturnEvidence(
