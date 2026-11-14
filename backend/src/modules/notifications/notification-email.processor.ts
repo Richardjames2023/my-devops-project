@@ -2,6 +2,7 @@ import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { env } from "../../config/env";
+import { isValidStaffInvitationAcceptanceUrl } from "../../config/url-validation";
 import {
   createResendEmailProvider,
   EmailProviderError,
@@ -213,8 +214,7 @@ async function renderStaffInvitationDelivery(delivery: ClaimedDelivery) {
     (env.APP_BASE_URL ? new URL("/staff/accept-invitation", env.APP_BASE_URL).toString() : undefined);
   if (!configuredUrl) throw new Error("Staff invitation acceptance URL is not configured");
   const url = new URL(configuredUrl);
-  if (url.username || url.password || url.search || url.hash ||
-      (env.NODE_ENV === "production" && url.protocol !== "https:")) {
+  if (!isValidStaffInvitationAcceptanceUrl(url.toString(), env.NODE_ENV)) {
     throw new Error("Staff invitation acceptance URL is invalid");
   }
   url.hash = new URLSearchParams({ token }).toString();
