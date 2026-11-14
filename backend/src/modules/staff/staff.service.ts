@@ -156,6 +156,10 @@ async function suppressStaffInvitationDeliveries(
   tx: Prisma.TransactionClient,
   invitationId: string,
 ) {
+  await tx.staffInvitationAcceptanceSession.updateMany({
+    where: { invitationId, consumedAt: null, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
   await tx.notificationEmailDelivery.updateMany({
     where: {
       templateKey: "staff.invitation",
@@ -419,13 +423,10 @@ export async function revokeStaffInvitation(actorId: string, invitationId: strin
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
-export async function acceptStaffInvitation(input: {
-  token: string; password: string; firstName: string; lastName: string;
-}) {
-  const tokenHash = hashRefreshToken(input.token);
-  return prisma.$transaction(async (tx) => {
-    // The row lock and expiry predicate both use PostgreSQL's clock. A token
-    // cannot be accepted based on a skewed application-server clock.
+export async function exchangeStaffInvitationToken(token: string) {
+  const tokenHash = hashRefreshToken(token);
+  const sessionToken = crypto.randomBytes(32).toString("base64url");
+  const expiresAt = await prisma.$transaction(async (tx) => {
     const locked = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT id FROM staff_invitations
       WHERE "tokenHash" = ${tokenHash}
@@ -434,11 +435,54 @@ export async function acceptStaffInvitation(input: {
       FOR UPDATE
     `;
     if (!locked.length) {
-      throw new AppError("This staff invitation is invalid, expired, or already used", 400);
+      throw new AppError("This staff invitation is invalid or expired", 400);
+    }
+
+    await tx.staffInvitationAcceptanceSession.updateMany({
+      where: { invitationId: locked[0].id, consumedAt: null, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    const [expiry] = await tx.$queryRaw<Array<{ expiresAt: Date }>>`
+      SELECT NOW() + (${env.STAFF_INVITATION_ACCEPTANCE_SESSION_TTL_MINUTES} * INTERVAL '1 minute') AS "expiresAt"
+    `;
+    if (!expiry?.expiresAt) throw new Error("Could not calculate invitation session expiry");
+    await tx.staffInvitationAcceptanceSession.create({
+      data: {
+        invitationId: locked[0].id,
+        tokenHash: hashRefreshToken(sessionToken),
+        expiresAt: expiry.expiresAt,
+      },
+    });
+    return expiry.expiresAt;
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  return { sessionToken, expiresAt };
+}
+
+export async function acceptStaffInvitation(input: {
+  sessionToken: string; password: string; firstName: string; lastName: string;
+}) {
+  const sessionHash = hashRefreshToken(input.sessionToken);
+  return prisma.$transaction(async (tx) => {
+    // The row lock and expiry predicate both use PostgreSQL's clock. A token
+    // cannot be accepted based on a skewed application-server clock.
+    const locked = await tx.$queryRaw<Array<{ sessionId: string; invitationId: string }>>`
+      SELECT session.id AS "sessionId", invitation.id AS "invitationId"
+      FROM staff_invitation_acceptance_sessions AS session
+      JOIN staff_invitations AS invitation ON invitation.id = session."invitationId"
+      WHERE session."tokenHash" = ${sessionHash}
+        AND session."consumedAt" IS NULL
+        AND session."revokedAt" IS NULL
+        AND session."expiresAt" > NOW()
+        AND invitation.status = 'PENDING'
+        AND invitation."expiresAt" > NOW()
+      FOR UPDATE OF session, invitation
+    `;
+    if (!locked.length) {
+      throw new AppError("This staff invitation session is invalid or expired", 400);
     }
 
     const invitation = await tx.staffInvitation.findUnique({
-      where: { tokenHash },
+      where: { id: locked[0].invitationId },
       include: { roles: { select: { roleId: true, role: { select: { name: true } } } } },
     });
     if (!invitation || invitation.status !== "PENDING") {
@@ -456,6 +500,20 @@ export async function acceptStaffInvitation(input: {
     `;
     if (claimed.length !== 1) {
       throw new AppError("This staff invitation has already been used", 409);
+    }
+
+    const consumedSession = await tx.staffInvitationAcceptanceSession.updateMany({
+      where: {
+        id: locked[0].sessionId,
+        tokenHash: sessionHash,
+        consumedAt: null,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      data: { consumedAt: new Date() },
+    });
+    if (consumedSession.count !== 1) {
+      throw new AppError("This staff invitation session has already been used", 409);
     }
 
     const passwordHash = await hashPassword(input.password);
