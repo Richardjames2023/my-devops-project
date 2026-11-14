@@ -134,11 +134,22 @@ export async function createProductReview(
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      throw new AppError("You have already reviewed this product", 409);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        throw new AppError("You have already reviewed this product", 409);
+      }
+
+      // Serializable transactions can lose a concurrent insert race with P2034.
+      // Only translate it to a duplicate-review conflict when the winning review exists.
+      if (error.code === "P2034") {
+        const existing = await prisma.productReview.findUnique({
+          where: { userId_productId: { userId, productId } },
+          select: { id: true },
+        });
+        if (existing) {
+          throw new AppError("You have already reviewed this product", 409);
+        }
+      }
     }
     throw error;
   }
