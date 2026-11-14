@@ -498,27 +498,52 @@ export async function acceptStaffInvitation(input: {
 }) {
   const sessionHash = hashRefreshToken(input.sessionToken);
   return prisma.$transaction(async (tx) => {
-    // The row lock and expiry predicate both use PostgreSQL's clock. A token
-    // cannot be accepted based on a skewed application-server clock.
-    const locked = await tx.$queryRaw<Array<{ sessionId: string; invitationId: string }>>`
-      SELECT session.id AS "sessionId", invitation.id AS "invitationId"
-      FROM staff_invitation_acceptance_sessions AS session
-      JOIN staff_invitations AS invitation ON invitation.id = session."invitationId"
-      WHERE session."tokenHash" = ${sessionHash}
-        AND session."consumedAt" IS NULL
-        AND session."revokedAt" IS NULL
-        AND session."expiresAt" > NOW()
-        AND invitation.status = 'PENDING'
-        AND invitation."expiresAt" > NOW()
-      FOR UPDATE OF session, invitation
+    // Always acquire locks in the same order as resend/revoke/exchange:
+    // invitation first, then acceptance session. Locking both sides of a JOIN
+    // leaves PostgreSQL free to acquire them in either order and can deadlock
+    // against resend/revoke (which lock the invitation before updating sessions).
+    // The initial lookup is intentionally unlocked; every security predicate is
+    // rechecked while holding the corresponding row lock below.
+    const candidate = await tx.$queryRaw<Array<{ sessionId: string; invitationId: string }>>`
+      SELECT id AS "sessionId", "invitationId"
+      FROM staff_invitation_acceptance_sessions
+      WHERE "tokenHash" = ${sessionHash}
+      LIMIT 1
     `;
-    const lockedSession = locked[0];
-    if (!lockedSession) {
+    const candidateSession = candidate[0];
+    if (!candidateSession) {
+      throw new AppError("This staff invitation session is invalid or expired", 400);
+    }
+
+    const lockedInvitation = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM staff_invitations
+      WHERE id = ${candidateSession.invitationId}::uuid
+        AND status = 'PENDING'
+        AND "expiresAt" > NOW()
+      FOR UPDATE
+    `;
+    if (!lockedInvitation.length) {
+      throw new AppError("This staff invitation session is invalid or expired", 400);
+    }
+
+    const lockedSession = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM staff_invitation_acceptance_sessions
+      WHERE id = ${candidateSession.sessionId}::uuid
+        AND "invitationId" = ${candidateSession.invitationId}::uuid
+        AND "tokenHash" = ${sessionHash}
+        AND "consumedAt" IS NULL
+        AND "revokedAt" IS NULL
+        AND "expiresAt" > NOW()
+      FOR UPDATE
+    `;
+    if (!lockedSession.length) {
       throw new AppError("This staff invitation session is invalid or expired", 400);
     }
 
     const invitation = await tx.staffInvitation.findUnique({
-      where: { id: lockedSession.invitationId },
+      where: { id: candidateSession.invitationId },
       include: { roles: { select: { roleId: true, role: { select: { name: true } } } } },
     });
     if (!invitation || invitation.status !== "PENDING") {
@@ -541,7 +566,7 @@ export async function acceptStaffInvitation(input: {
     const consumedSession = await tx.$executeRaw`
       UPDATE staff_invitation_acceptance_sessions
       SET "consumedAt" = NOW(), "updatedAt" = NOW()
-      WHERE id = ${lockedSession.sessionId}::uuid
+      WHERE id = ${lockedSession[0].id}::uuid
         AND "tokenHash" = ${sessionHash}
         AND "consumedAt" IS NULL
         AND "revokedAt" IS NULL
