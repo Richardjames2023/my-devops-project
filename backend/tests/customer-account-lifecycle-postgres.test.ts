@@ -23,6 +23,7 @@ const [
   { requireCustomer },
 ] = await Promise.all([
   import("../src/modules/auth/auth.service"),
+  import("../src/common/utils/refreshToken"),
   import("../src/modules/customer-profile/customer-profile.service"),
   import("../src/infrastructure/prisma/client"),
   import("../src/common/middleware/authenticate"),
