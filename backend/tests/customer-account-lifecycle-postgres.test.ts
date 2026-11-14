@@ -170,6 +170,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       expect(deletion.rows[0].status).toBe("COMPLETED");
       expect(deletion.rows[0].completedAt).toBeTruthy();
     } finally {
+      await pool.query("DELETE FROM return_requests WHERE id = $1", [returnRequestId]);
       await pool.query('DELETE FROM orders WHERE "userId" = $1', [customer.id]);
       await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
     }
@@ -289,6 +290,8 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         firstName: "Deleted",
       });
     } finally {
+      await pool.query("DELETE FROM product_reviews WHERE id = $1", [reviewId]);
+      await pool.query("DELETE FROM warranty_claims WHERE id = $1", [warrantyClaimId]);
       await pool.query('DELETE FROM payment_inventory_reconciliations WHERE "paymentId" = $1', [paymentId]);
       await pool.query("DELETE FROM payments WHERE id = $1", [paymentId]);
       await pool.query("DELETE FROM orders WHERE id = $1", [orderId]);
