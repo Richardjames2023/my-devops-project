@@ -141,6 +141,7 @@ If the frontend and API are on different origins, review cookie/CORS/CSRF behavi
 
 - Backend accepts registration only through a valid, unexpired, invitation-scoped acceptance session.
 - Acceptance must be single-use and safe under concurrent requests.
+- Acceptance, exchange, resend, and revoke acquire row locks in a consistent order: invitation first, then acceptance session. Acceptance performs an unlocked session-to-invitation lookup, locks and revalidates the invitation, then locks and revalidates the session.
 - Invitation state transition, staff identity creation/activation, session consumption, and required audit records must be transactionally consistent.
 - Replays and concurrent acceptance attempts must fail safely.
 - Existing role-delegation and staff identity rules remain enforced.
@@ -304,6 +305,7 @@ Admin responses must never include the raw invitation token once email delivery 
 - [ ] Resend/revocation/expiry invalidates previously issued acceptance sessions.
 - [ ] Acceptance session is consumed exactly once.
 - [ ] Concurrent acceptance attempts cannot create duplicate staff identities.
+- [ ] Acceptance racing with resend/revoke follows invitation-then-session lock ordering without deadlock.
 - [ ] CSRF/Origin protections are tested for the chosen deployment topology.
 
 ### Logging and HTTP security
