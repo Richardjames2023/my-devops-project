@@ -127,7 +127,6 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       expect(pending.rows[0]).toMatchObject({ status: "REQUESTED", deferralCount: 1 });
 
       await pool.query('UPDATE orders SET status = \'COMPLETED\' WHERE "userId" = $1', [customer.id]);
-      const returnRequestId = randomUUID();
       await pool.query(
         `INSERT INTO return_requests
           (id, "orderId", "userId", status, reason, description, "requestedAt", "createdAt", "updatedAt")
@@ -199,6 +198,94 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         [customer.id],
       );
 
+      await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
+    }
+  });
+
+  it("deletes only customer-owned email deliveries when a staff account shares the customer's email", async () => {
+    const customer = await createCustomer("deletion-shared-email");
+    const staffId = randomUUID();
+    const customerEventId = randomUUID();
+    const staffEventId = randomUUID();
+    const customerNotificationId = randomUUID();
+    const staffNotificationId = randomUUID();
+    const customerDeliveryId = randomUUID();
+    const staffDeliveryId = randomUUID();
+    const customerProviderEventId = randomUUID();
+    const staffProviderEventId = randomUUID();
+
+    try {
+      await pool.query(
+        `INSERT INTO staff_accounts (id, email, "firstName", "lastName", status, "createdAt", "updatedAt")
+         VALUES ($1, $2, 'Shared', 'Staff', 'ACTIVE', NOW(), NOW())`,
+        [staffId, customer.email],
+      );
+      await pool.query(
+        `INSERT INTO notification_outbox (id, "eventKey", "eventType", "aggregateType", "aggregateId", payload, status, "createdAt", "updatedAt")
+         VALUES
+           ($1, $2, 'customer.account.test', 'CUSTOMER', $3, '{}'::jsonb, 'PROCESSED', NOW(), NOW()),
+           ($4, $5, 'staff.security_event', 'STAFF', $6, '{}'::jsonb, 'PROCESSED', NOW(), NOW())`,
+        [customerEventId, `test:customer:${customer.id}`, customer.id, staffEventId, `test:staff:${staffId}`, staffId],
+      );
+      await pool.query(
+        `INSERT INTO notifications
+          (id, "outboxEventId", "recipientType", "customerUserId", category, title, body, "createdAt")
+         VALUES ($1, $2, 'CUSTOMER', $3, 'ACCOUNT', 'Customer notice', 'Customer body', NOW())`,
+        [customerNotificationId, customerEventId, customer.id],
+      );
+      await pool.query(
+        `INSERT INTO notifications
+          (id, "outboxEventId", "recipientType", "staffAccountId", category, title, body, "createdAt")
+         VALUES ($1, $2, 'STAFF', $3, 'ACCOUNT', 'Staff notice', 'Staff body', NOW())`,
+        [staffNotificationId, staffEventId, staffId],
+      );
+      await pool.query(
+        `INSERT INTO notification_email_deliveries
+          (id, "notificationId", "recipientEmail", "templateKey", "templateData", status, "createdAt", "updatedAt")
+         VALUES
+           ($1, $2, $3, 'customer-account', '{}'::jsonb, 'SENT', NOW(), NOW()),
+           ($4, $5, $3, 'staff-security', '{}'::jsonb, 'SENT', NOW(), NOW())`,
+        [customerDeliveryId, customerNotificationId, customer.email, staffDeliveryId, staffNotificationId],
+      );
+      await pool.query(
+        `INSERT INTO notification_email_events
+          (id, "providerEventId", "providerMessageId", "eventType", payload, "deliveryId", "receivedAt")
+         VALUES
+           ($1, $2, $3, 'delivered', '{"recipient":"customer"}'::jsonb, $4, NOW()),
+           ($5, $6, $7, 'delivered', '{"recipient":"staff"}'::jsonb, $8, NOW())`,
+        [
+          randomUUID(), customerProviderEventId, `provider-${customerDeliveryId}`, customerDeliveryId,
+          randomUUID(), staffProviderEventId, `provider-${staffDeliveryId}`, staffDeliveryId,
+        ],
+      );
+
+      await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
+      await pool.query(
+        'UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1',
+        [customer.id],
+      );
+      const processed = await processCustomerAccountDeletionBatch();
+      expect(processed.completed).toBe(1);
+
+      const deliveries = await pool.query(
+        'SELECT id FROM notification_email_deliveries WHERE id = ANY($1::uuid[]) ORDER BY id',
+        [[customerDeliveryId, staffDeliveryId]],
+      );
+      expect(deliveries.rows.map((row) => row.id)).toEqual([staffDeliveryId]);
+      const providerEvents = await pool.query(
+        'SELECT "providerEventId", payload, "deliveryId" FROM notification_email_events WHERE "providerEventId" = ANY($1::text[])',
+        [[customerProviderEventId, staffProviderEventId]],
+      );
+      const customerEvent = providerEvents.rows.find((row) => row.providerEventId === customerProviderEventId);
+      const staffEvent = providerEvents.rows.find((row) => row.providerEventId === staffProviderEventId);
+      expect(customerEvent).toMatchObject({ payload: { anonymized: true }, deliveryId: null });
+      expect(staffEvent).toMatchObject({ payload: { recipient: "staff" }, deliveryId: staffDeliveryId });
+    } finally {
+      await pool.query('DELETE FROM notification_email_events WHERE "providerEventId" = ANY($1::text[])', [[customerProviderEventId, staffProviderEventId]]);
+      await pool.query('DELETE FROM notification_email_deliveries WHERE id = ANY($1::uuid[])', [[customerDeliveryId, staffDeliveryId]]);
+      await pool.query('DELETE FROM notifications WHERE id = ANY($1::uuid[])', [[customerNotificationId, staffNotificationId]]);
+      await pool.query('DELETE FROM notification_outbox WHERE id = ANY($1::uuid[])', [[customerEventId, staffEventId]]);
+      await pool.query("DELETE FROM staff_accounts WHERE id = $1", [staffId]);
       await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
     }
   });
@@ -275,6 +362,21 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
 
       await pool.query(
         "UPDATE payment_inventory_reconciliations SET status = 'RESOLVED_FULFILLED' WHERE \"paymentId\" = $1",
+        [paymentId],
+      );
+      await pool.query(
+        'UPDATE payments SET "reconciliationRequired" = TRUE WHERE id = $1',
+        [paymentId],
+      );
+      await pool.query(
+        'UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1',
+        [customer.id],
+      );
+      const flaggedPaymentDeferred = await processCustomerAccountDeletionBatch();
+      expect(flaggedPaymentDeferred.deferred).toBe(1);
+
+      await pool.query(
+        'UPDATE payments SET "reconciliationRequired" = FALSE WHERE id = $1',
         [paymentId],
       );
       await pool.query(
