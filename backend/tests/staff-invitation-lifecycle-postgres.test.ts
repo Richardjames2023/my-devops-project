@@ -75,6 +75,27 @@ async function createInvitation(email: string, roleIds = [roleAId]) {
 }
 
 
+async function getQueuedInvitationToken(invitationId: string): Promise<string> {
+  const delivery = await prisma.notificationEmailDelivery.findFirst({
+    where: {
+      templateKey: "staff.invitation",
+      eventRecipientKey: { startsWith: `staff-invitation:${invitationId}:` },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { templateData: true },
+  });
+  if (!delivery?.templateData || typeof delivery.templateData !== "object" ||
+      Array.isArray(delivery.templateData)) {
+    throw new Error("Encrypted staff invitation email delivery was not queued");
+  }
+  const payload = delivery.templateData as Record<string, unknown>;
+  const encryptedToken = payload.encryptedToken as Parameters<typeof encryption.decryptInvitationSecret>[0];
+  return encryption.decryptInvitationSecret(
+    encryptedToken,
+    process.env.STAFF_INVITATION_ENCRYPTION_KEY!,
+  );
+}
+
 async function acceptStaffInvitation(input: {
   token: string;
   password: string;
@@ -293,8 +314,11 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     expect(updated.roles.map(({ role }) => role.id)).toEqual([roleBId]);
 
     const resent = await resendStaffInvitation(actorId, created.invitation.id);
-    expect(resent.invitationToken).not.toBe(originalToken);
+    expect(resent).not.toHaveProperty("invitationToken");
     expect(resent.invitation).not.toHaveProperty("tokenHash");
+    const resentToken = await getQueuedInvitationToken(created.invitation.id);
+    expect(resentToken).toMatch(/^[a-f0-9]{64}$/);
+    expect(resentToken).not.toBe(originalToken);
     const oldDelivery = await pool.query(
       `SELECT status FROM notification_email_deliveries WHERE "eventRecipientKey" = $1`,
       [`staff-invitation:${created.invitation.id}:${hashRefreshToken(originalToken)}`],
@@ -323,7 +347,7 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     ).rejects.toMatchObject({ statusCode: 400 });
 
     const staff = await acceptStaffInvitation({
-      token: resent.invitationToken,
+      token: resentToken,
       password: "A-strong-staff-password-2026",
       firstName: "Taylor",
       lastName: "Staff",
@@ -372,7 +396,7 @@ describe("PostgreSQL staff invitation lifecycle", () => {
 
     await expect(
       acceptStaffInvitation({
-        token: resent.invitationToken,
+        token: resentToken,
         password: "Another-strong-password-2026",
         firstName: "Taylor",
         lastName: "Replay",
