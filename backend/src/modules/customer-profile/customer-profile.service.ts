@@ -238,12 +238,17 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
 }
 
 export async function processCustomerAccountDeletionBatch() {
-  const due = await prisma.customerAccountDeletion.findMany({
-    where: { status: "REQUESTED", scheduledFor: { lte: new Date() } },
-    select: { id: true, userId: true },
-    orderBy: { scheduledFor: "asc" },
-    take: DELETION_BATCH_SIZE,
-  });
+  // Prisma DateTime fields are stored as TIMESTAMP(3) WITHOUT TIME ZONE.
+  // Compare them against an explicit UTC database clock to avoid runtime/session
+  // timezone differences between Node.js and PostgreSQL.
+  const due = await prisma.$queryRaw<Array<{ id: string; userId: string }>>`
+    SELECT "id", "userId"
+    FROM "customer_account_deletions"
+    WHERE "status" = 'REQUESTED'
+      AND "scheduledFor" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+    ORDER BY "scheduledFor" ASC
+    LIMIT ${DELETION_BATCH_SIZE}
+  `;
 
   let completed = 0;
   let deferred = 0;
@@ -252,21 +257,30 @@ export async function processCustomerAccountDeletionBatch() {
     try {
       const outcome = await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${candidate.userId}::text, 0))`;
-        const deletion = await tx.customerAccountDeletion.findUnique({ where: { id: candidate.id } });
-        if (!deletion || deletion.status !== "REQUESTED" || deletion.scheduledFor > new Date()) return "SKIPPED";
+        const [deletion] = await tx.$queryRaw<Array<{ status: string; isDue: boolean }>>`
+          SELECT "status",
+            ("scheduledFor" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')) AS "isDue"
+          FROM "customer_account_deletions"
+          WHERE "id" = ${candidate.id}::uuid
+          FOR UPDATE
+        `;
+        if (!deletion || deletion.status !== "REQUESTED" || !deletion.isDue) return "SKIPPED";
 
         const user = await tx.user.findUnique({ where: { id: candidate.userId }, select: { id: true, email: true } });
         if (!user) {
           await tx.customerAccountDeletion.update({ where: { id: candidate.id }, data: { status: "COMPLETED", completedAt: new Date() } });
-        return "COMPLETED";
+          return "COMPLETED";
         }
 
         if (await hasOutstandingCustomerActivity(tx, user.id)) {
-          const now = new Date();
-          await tx.customerAccountDeletion.updateMany({
-            where: { id: candidate.id, status: "REQUESTED", scheduledFor: { lte: now } },
-            data: { scheduledFor: new Date(now.getTime() + DELETION_DEFERRAL_DAYS * 24 * 60 * 60 * 1000), lastDeferredAt: now, deferralCount: { increment: 1 } },
-          });
+          await tx.$executeRaw`
+            UPDATE "customer_account_deletions"
+            SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + INTERVAL '7 days',
+                "lastDeferredAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+                "deferralCount" = "deferralCount" + 1
+            WHERE "id" = ${candidate.id}::uuid
+              AND "status" = 'REQUESTED'
+          `;
           return "DEFERRED";
         }
 
