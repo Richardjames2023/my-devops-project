@@ -610,7 +610,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       );
 
       await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
-      await pool.query("UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute' WHERE "userId" = $1", [customer.id]);
+      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1', [customer.id]);
       const processed = await processCustomerAccountDeletionBatch();
       expect(processed.completed).toBe(1);
 
@@ -641,7 +641,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
     const customer = await createCustomer("deletion-password-scrub");
     try {
       await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
-      await pool.query("UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute' WHERE "userId" = $1", [customer.id]);
+      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1', [customer.id]);
       const processed = await processCustomerAccountDeletionBatch();
       expect(processed.completed).toBe(1);
       const user = await pool.query('SELECT "passwordHash" FROM users WHERE id = $1', [customer.id]);
@@ -656,7 +656,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
     const customer = await createCustomer("deletion-retry");
     try {
       await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
-      await pool.query("UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute' WHERE "userId" = $1", [customer.id]);
+      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1', [customer.id]);
       await pool.query("CREATE OR REPLACE FUNCTION test_reject_customer_anonymization() RETURNS trigger LANGUAGE plpgsql AS 'BEGIN IF NEW.email LIKE ''deleted+%@deleted.invalid'' THEN RAISE EXCEPTION ''simulated transient anonymization failure''; END IF; RETURN NEW; END;'");
       await pool.query("CREATE TRIGGER test_reject_customer_anonymization_trigger BEFORE UPDATE OF email ON users FOR EACH ROW EXECUTE FUNCTION test_reject_customer_anonymization()");
 
