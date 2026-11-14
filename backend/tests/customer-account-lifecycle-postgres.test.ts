@@ -221,8 +221,8 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       const reviewId = randomUUID();
       await pool.query(
         `INSERT INTO warranty_claims
-          (id, "orderItemId", quantity, "userId", status, "claimNumber", issue, description, "submittedAt", "createdAt", "updatedAt")
-         VALUES ($1, $2, 1, $3, 'RESOLVED', $4, $5, $6, NOW(), NOW(), NOW())`,
+          (id, "orderItemId", quantity, "userId", status, "claimNumber", issue, description, "resolutionNotes", "submittedAt", "createdAt", "updatedAt")
+         VALUES ($1, $2, 1, $3, 'RESOLVED', $4, $5, $6, 'Staff resolution: replacement approved', NOW(), NOW(), NOW())`,
         [warrantyClaimId, orderItemId, customer.id, `WC-${warrantyClaimId}`, "My phone number is +2348012345678", "Please visit my home at Private Street"],
       );
       await pool.query(
@@ -276,6 +276,13 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         issue: "[redacted after account deletion]",
         description: "[redacted after account deletion]",
       });
+      const retainedResolution = await pool.query(
+        'SELECT "resolutionNotes" FROM warranty_claims WHERE id = $1',
+        [warrantyClaimId],
+      );
+      expect(retainedResolution.rows[0].resolutionNotes).toBe(
+        "Staff resolution: replacement approved",
+      );
       const review = await pool.query(
         'SELECT title, comment FROM product_reviews WHERE id = $1',
         [reviewId],
