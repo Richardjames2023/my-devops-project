@@ -512,17 +512,16 @@ export async function acceptStaffInvitation(input: {
       throw new AppError("This staff invitation has already been used", 409);
     }
 
-    const consumedSession = await tx.staffInvitationAcceptanceSession.updateMany({
-      where: {
-        id: locked[0].sessionId,
-        tokenHash: sessionHash,
-        consumedAt: null,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      data: { consumedAt: new Date() },
-    });
-    if (consumedSession.count !== 1) {
+    const consumedSession = await tx.$executeRaw`
+      UPDATE staff_invitation_acceptance_sessions
+      SET "consumedAt" = NOW(), "updatedAt" = NOW()
+      WHERE id = ${locked[0].sessionId}::uuid
+        AND "tokenHash" = ${sessionHash}
+        AND "consumedAt" IS NULL
+        AND "revokedAt" IS NULL
+        AND "expiresAt" > NOW()
+    `;
+    if (consumedSession !== 1) {
       throw new AppError("This staff invitation session has already been used", 409);
     }
 
