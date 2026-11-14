@@ -15,7 +15,8 @@ process.env.EMAIL_DELIVERY_ENABLED = "false";
 
 const pool = new Pool({ connectionString: databaseUrl, max: 3 });
 const [
-  { registerUser, loginUser },
+  { registerUser, loginUser, verifyCustomerEmail },
+  { hashRefreshToken },
   { updateCustomerProfile, requestCustomerAccountDeletion, cancelCustomerAccountDeletion, processCustomerAccountDeletionBatch },
   { disconnectDatabase },
   { authenticate },
@@ -233,6 +234,44 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       await pool.query("DELETE FROM product_variants WHERE id = $1", [variantId]);
       await pool.query("DELETE FROM products WHERE id = $1", [productId]);
       await pool.query("DELETE FROM categories WHERE id = $1", [categoryId]);
+      await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
+    }
+  });
+
+  it("serializes email verification with account deletion without a token/user lock-order deadlock", async () => {
+    const customer = await createCustomer("verification-deletion-race");
+    const verificationToken = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
+    try {
+      await pool.query(
+        `INSERT INTO customer_email_verification_tokens
+          (id, "userId", "tokenHash", "expiresAt", "createdAt")
+         VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour', NOW())`,
+        [randomUUID(), customer.id, hashRefreshToken(verificationToken)],
+      );
+
+      const [verificationResult, deletionResult] = await Promise.allSettled([
+        verifyCustomerEmail(verificationToken),
+        requestCustomerAccountDeletion(
+          customer.id,
+          "Customer-Lifecycle-Password-2026!",
+        ),
+      ]);
+      expect(deletionResult.status).toBe("fulfilled");
+      if (verificationResult.status === "rejected") {
+        expect(verificationResult.reason).toMatchObject({ statusCode: 400 });
+      }
+
+      const user = await pool.query(
+        'SELECT "isActive", "emailVerified" FROM users WHERE id = $1',
+        [customer.id],
+      );
+      expect(user.rows[0].isActive).toBe(false);
+      const token = await pool.query(
+        'SELECT "consumedAt" FROM customer_email_verification_tokens WHERE "userId" = $1',
+        [customer.id],
+      );
+      expect(token.rows[0].consumedAt).toBeTruthy();
+    } finally {
       await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
     }
   });
