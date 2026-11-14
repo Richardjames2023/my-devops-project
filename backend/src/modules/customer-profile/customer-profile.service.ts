@@ -440,7 +440,10 @@ export async function processCustomerAccountDeletionBatch() {
           });
         }
       } catch (rescheduleError) {
-        console.error("[CUSTOMER DELETION] Failed to persist retry schedule", candidate.id, rescheduleError);
+        console.error("[CUSTOMER DELETION] Failed to persist retry schedule", {
+          requestId: candidate.id,
+          errorName: rescheduleError instanceof Error ? rescheduleError.name : "UNKNOWN",
+        });
       }
     }
   }
