@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   listWarrantyClaims: vi.fn(),
   reviewWarrantyClaim: vi.fn(),
   createGuestReturnEvidence: vi.fn(),
+  assertGuestReturnEvidenceOrderAccess: vi.fn(),
   getGuestReturnEvidenceViewUrl: vi.fn(),
   getGuestReturnEvidenceFileSource: vi.fn(),
   streamEvidenceSource: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock("../src/modules/return/return.service", () => ({
 
 vi.mock("../src/modules/return/return-evidence.service", () => ({
   createGuestReturnEvidence: mocks.createGuestReturnEvidence,
+  assertGuestReturnEvidenceOrderAccess: mocks.assertGuestReturnEvidenceOrderAccess,
 }));
 
 vi.mock("../src/modules/return/return-evidence-view.service", () => ({
@@ -72,6 +74,7 @@ describe("guest after-sales HTTP endpoints", () => {
     mocks.createReturnRequest.mockResolvedValue({ id: returnRequestId, userId: null });
     mocks.listGuestReturnRequests.mockResolvedValue({ returnRequests: [] });
     mocks.getGuestReturnRequest.mockResolvedValue({ id: returnRequestId });
+    mocks.assertGuestReturnEvidenceOrderAccess.mockResolvedValue(undefined);
     mocks.createGuestReturnEvidence.mockResolvedValue([{ id: "d7b0a9f5-5e8c-4a6d-9f31-7a2c5d8e9b10" }]);
     mocks.getGuestReturnEvidenceViewUrl.mockResolvedValue({
       id: "d7b0a9f5-5e8c-4a6d-9f31-7a2c5d8e9b10",
