@@ -130,21 +130,56 @@ describe("PostgreSQL verified product reviews", () => {
     );
     await pool.query(`UPDATE orders SET status='FULFILLED' WHERE id=$1`, [ids.order]);
 
+    // A successful payment alone is not enough when the complete ordered
+    // quantity has not been delivered.
+    await pool.query('UPDATE payments SET status=\'FAILED\' WHERE id=$1', [ids.payment]);
     await expect(
-      service.createProductReview(randomUUID(), ids.product, input),
+      service.createProductReview(ids.user, ids.product, input),
     ).rejects.toMatchObject({ statusCode: 403 });
+    await pool.query('UPDATE payments SET status=\'SUCCESS\' WHERE id=$1', [ids.payment]);
 
-    const review = await service.createProductReview(ids.user, ids.product, input);
+    await pool.query('UPDATE order_items SET quantity=2 WHERE id=$1', [ids.item]);
+    await expect(
+      service.createProductReview(ids.user, ids.product, input),
+    ).rejects.toMatchObject({ statusCode: 403 });
+    await pool.query('UPDATE order_items SET quantity=1 WHERE id=$1', [ids.item]);
+
+    // Two simultaneous submissions must result in exactly one review.
+    const attempts = await Promise.allSettled([
+      service.createProductReview(ids.user, ids.product, input),
+      service.createProductReview(ids.user, ids.product, input),
+    ]);
+    const fulfilled = attempts.filter((result) => result.status === "fulfilled");
+    const rejected = attempts.filter((result) => result.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    if (rejected[0]?.status === "rejected") {
+      expect(rejected[0].reason).toMatchObject({ statusCode: 409 });
+    }
+    const created = fulfilled[0];
+    if (!created || created.status !== "fulfilled") {
+      throw new Error("Expected exactly one concurrent review submission to succeed");
+    }
+    const review = created.value;
     expect(review.status).toBe("PENDING");
 
     await expect(
       service.createProductReview(ids.user, ids.product, input),
     ).rejects.toMatchObject({ statusCode: 409 });
+    await expect(
+      service.getProductReviewEligibility(ids.user, ids.product),
+    ).resolves.toMatchObject({ canReview: false, hasVerifiedPurchase: true });
 
     let publicReviews = await service.listApprovedProductReviews(ids.product, { page: 1, limit: 10 });
     expect(publicReviews.summary.totalReviews).toBe(0);
 
     await service.moderateProductReview(review.id, "APPROVED");
+    // Repeating the same moderation decision is idempotent; reversing it is not.
+    await expect(service.moderateProductReview(review.id, "APPROVED"))
+      .resolves.toMatchObject({ status: "APPROVED" });
+    await expect(service.moderateProductReview(review.id, "REJECTED"))
+      .rejects.toMatchObject({ statusCode: 409 });
+
     publicReviews = await service.listApprovedProductReviews(ids.product, { page: 1, limit: 10 });
     expect(publicReviews.summary).toEqual({ averageRating: 5, totalReviews: 1 });
     expect(publicReviews.reviews[0]).toMatchObject({ verifiedPurchase: true, customerName: "Verified" });
@@ -154,6 +189,15 @@ describe("PostgreSQL verified product reviews", () => {
       comment: "After using it longer, I would give it four stars.",
     });
     expect(edited.status).toBe("PENDING");
+    publicReviews = await service.listApprovedProductReviews(ids.product, { page: 1, limit: 10 });
+    expect(publicReviews.summary.totalReviews).toBe(0);
+
+    await expect(service.moderateProductReview(review.id, "REJECTED"))
+      .resolves.toMatchObject({ status: "REJECTED" });
+    await expect(service.moderateProductReview(review.id, "REJECTED"))
+      .resolves.toMatchObject({ status: "REJECTED" });
+    await expect(service.moderateProductReview(review.id, "APPROVED"))
+      .rejects.toMatchObject({ statusCode: 409 });
     publicReviews = await service.listApprovedProductReviews(ids.product, { page: 1, limit: 10 });
     expect(publicReviews.summary.totalReviews).toBe(0);
   });
