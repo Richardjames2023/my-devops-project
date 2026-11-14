@@ -107,7 +107,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
     const customer = await createCustomer("deletion-retention");
     try {
       await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
-      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = NOW() - INTERVAL \'1 minute\' WHERE "userId" = $1', [customer.id]);
+      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = $1 WHERE "userId" = $2', [new Date(Date.now() - 60_000), customer.id]);
       await pool.query(
         `INSERT INTO orders
           (id, "userId", "orderNumber", status, subtotal, "discountAmount", "deliveryFee", "totalAmount", currency, "shippingAddress", "customerName", "customerEmail", "customerPhone", "createdAt", "updatedAt")
@@ -121,7 +121,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       expect(pending.rows[0]).toMatchObject({ status: "REQUESTED", deferralCount: 1 });
 
       await pool.query('UPDATE orders SET status = \'COMPLETED\' WHERE "userId" = $1', [customer.id]);
-      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = NOW() - INTERVAL \'1 minute\' WHERE "userId" = $1', [customer.id]);
+      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = $1 WHERE "userId" = $2', [new Date(Date.now() - 60_000), customer.id]);
       const processed = await processCustomerAccountDeletionBatch();
       expect(processed.completed).toBe(1);
       const user = await pool.query('SELECT email, "firstName", "lastName", phone, "isActive" FROM users WHERE id = $1', [customer.id]);
@@ -146,7 +146,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       ]);
       expect(results).toHaveLength(2);
       expect(results.every((result) => result.status === "REQUESTED")).toBe(true);
-      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = NOW() - INTERVAL \'1 minute\' WHERE "userId" = $1', [customer.id]);
+      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = $1 WHERE "userId" = $2', [new Date(Date.now() - 60_000), customer.id]);
       const outcomes = await Promise.all([processCustomerAccountDeletionBatch(), processCustomerAccountDeletionBatch()]);
       expect(outcomes.reduce((sum, result) => sum + result.completed, 0)).toBe(1);
       const deletion = await pool.query('SELECT status FROM customer_account_deletions WHERE "userId" = $1', [customer.id]);
