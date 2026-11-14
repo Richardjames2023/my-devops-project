@@ -199,7 +199,8 @@ export async function updateProductVariantCost(
       select: { id: true, sku: true, costPrice: true },
     });
 
-    await createAuditLog(tx, {
+    if (current.costPrice?.toString() !== updated.costPrice?.toString()) {
+      await createAuditLog(tx, {
       staffAccountId,
       action: "PRODUCT_VARIANT_COST_UPDATED",
       entity: "ProductVariant",
@@ -210,7 +211,8 @@ export async function updateProductVariantCost(
       newValues: {
         costPrice: updated.costPrice?.toString() ?? null,
       },
-    });
+      });
+    }
 
     return updated;
   });
