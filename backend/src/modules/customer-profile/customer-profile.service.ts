@@ -181,11 +181,28 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
   const now = new Date();
   const notifications = await tx.notification.findMany({ where: { customerUserId: user.id }, select: { id: true } });
   const notificationIds = notifications.map((item) => item.id);
+  const emailDeliveries = await tx.notificationEmailDelivery.findMany({
+    where: {
+      OR: [
+        { recipientEmail: user.email },
+        ...(notificationIds.length ? [{ notificationId: { in: notificationIds } }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+  const emailDeliveryIds = emailDeliveries.map((delivery) => delivery.id);
 
-  if (notificationIds.length) {
-    await tx.notificationEmailDelivery.deleteMany({ where: { notificationId: { in: notificationIds } } });
+  if (emailDeliveryIds.length) {
+    // Provider webhook payloads may contain recipient addresses and other PII.
+    // Preserve the event/delivery audit metadata, but remove the raw provider body.
+    await tx.notificationEmailEvent.updateMany({
+      where: { deliveryId: { in: emailDeliveryIds } },
+      data: { payload: { anonymized: true } },
+    });
+    await tx.notificationEmailDelivery.deleteMany({
+      where: { id: { in: emailDeliveryIds } },
+    });
   }
-  await tx.notificationEmailDelivery.deleteMany({ where: { recipientEmail: user.email } });
   await tx.notification.deleteMany({ where: { customerUserId: user.id } });
   await tx.notificationPreference.deleteMany({ where: { customerUserId: user.id } });
   await tx.wishlistItem.deleteMany({ where: { userId: user.id } });
