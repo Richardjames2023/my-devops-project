@@ -283,7 +283,8 @@ async function createOrderFromCart(
         },
       },
       include: {
-        items: { select: {
+        items: {
+          select: {
             id: true,
             productVariantId: true,
             productName: true,
@@ -299,7 +300,8 @@ async function createOrderFromCart(
             warrantyStartedAt: true,
             warrantyExpiresAt: true,
             createdAt: true,
-          } },
+          },
+        },
       },
     });
     if (couponResult) {
@@ -402,7 +404,8 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
       shippingAddress: true,
       createdAt: true,
       updatedAt: true,
-      items: { select: {
+      items: {
+          select: {
             id: true,
             productVariantId: true,
             productName: true,
@@ -418,7 +421,8 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
             warrantyStartedAt: true,
             warrantyExpiresAt: true,
             createdAt: true,
-          } },
+          },
+        },
       payments: {
         select: {
           status: true,
