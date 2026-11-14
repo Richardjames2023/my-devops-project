@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import { z } from "zod";
 import {
   createProductVariantSchema,
@@ -92,7 +93,7 @@ export async function remove(req: Request, res: Response): Promise<void> {
 }
 
 
-export async function updateCost(req: Request, res: Response): Promise<void> {
+export async function updateCost(req: AuthenticatedRequest, res: Response): Promise<void> {
   const params = variantIdParamsSchema.safeParse(req.params);
   const body = updateProductVariantCostSchema.safeParse(req.body);
   if (!params.success || !body.success) {
