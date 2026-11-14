@@ -420,7 +420,10 @@ export async function processCustomerAccountDeletionBatch() {
       if (outcome === "DEFERRED") deferred += 1;
     } catch (error) {
       failed += 1;
-      const message = error instanceof Error ? error.message : "Unknown deletion processing error";
+      const errorCode = typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
+        ? error.code
+        : error instanceof Error ? error.name : "UNKNOWN";
+      // Store only a safe error identifier, not a raw message that may contain PII.
       // The anonymization transaction has rolled back. Persist a retry deadline
       // separately so a poison request cannot occupy every batch forever.
       const retryDelayMs = Math.min(24 * 60 * 60 * 1000, 60 * 60 * 1000 * 2 ** Math.min(candidate.failureCount, 5));
@@ -428,12 +431,12 @@ export async function processCustomerAccountDeletionBatch() {
       try {
         const rescheduled = await prisma.customerAccountDeletion.updateMany({
           where: { id: candidate.id, status: "REQUESTED" },
-          data: { scheduledFor: retryAt, failureCount: { increment: 1 }, lastError: message.slice(0, 2000) },
+          data: { scheduledFor: retryAt, failureCount: { increment: 1 }, lastError: errorCode },
         });
         if (rescheduled.count === 1) {
           console.error("[CUSTOMER DELETION] Processing failed; request rescheduled", {
             requestId: candidate.id, failureCount: candidate.failureCount + 1,
-            retryAt: retryAt.toISOString(), message,
+            retryAt: retryAt.toISOString(), errorCode,
           });
         }
       } catch (rescheduleError) {
