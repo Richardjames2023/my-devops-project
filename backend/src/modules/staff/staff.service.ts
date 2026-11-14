@@ -9,6 +9,7 @@ import { REFRESH_TOKEN_EXPIRES_IN_DAYS } from "../../config/auth";
 import { createAuditLog } from "../../common/utils/audit-log";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 import { env } from "../../config/env";
+import { isValidStaffInvitationAcceptanceUrl } from "../../config/url-validation";
 import { encryptInvitationSecret } from "./staff-invitation-encryption";
 
 const invitationDaysMax = 30;
@@ -150,8 +151,7 @@ async function queueStaffInvitationEmail(
     throw new AppError("Staff invitation acceptance URL is not configured", 503);
   }
   const acceptanceUrl = new URL(configuredUrl);
-  if (acceptanceUrl.username || acceptanceUrl.password || acceptanceUrl.search || acceptanceUrl.hash ||
-      (env.NODE_ENV === "production" && acceptanceUrl.protocol !== "https:")) {
+  if (!isValidStaffInvitationAcceptanceUrl(acceptanceUrl.toString(), env.NODE_ENV)) {
     throw new AppError("Staff invitation acceptance URL is invalid", 503);
   }
   const encryptedToken = encryptInvitationSecret(input.token, encryptionKey);
