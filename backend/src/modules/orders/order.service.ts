@@ -180,6 +180,7 @@ async function createOrderFromCart(
       }
 
       const unitPrice = variant.price;
+      const unitCostSnapshot = variant.costPrice;
       const totalPrice = unitPrice.mul(item.quantity);
 
       subtotal = subtotal.plus(totalPrice);
@@ -191,6 +192,7 @@ async function createOrderFromCart(
         sku: variant.sku,
         quantity: item.quantity,
         unitPrice,
+        unitCostSnapshot,
         discountAmount: new Prisma.Decimal(0),
         totalPrice,
 
