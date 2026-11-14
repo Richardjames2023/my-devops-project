@@ -20,7 +20,7 @@ if (!encryptionKey) throw new Error("Test invitation encryption key was not conf
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
 const fixtures: Array<{ invitationId: string; deliveryId: string }> = [];
-const [{ processNotificationEmailBatch }, { default: prisma, disconnectDatabase }, encryption] =
+const [{ processNotificationEmailBatch }, { disconnectDatabase }, encryption] =
   await Promise.all([
     import("../src/modules/notifications/notification-email.processor"),
     import("../src/infrastructure/prisma/client"),
@@ -105,10 +105,10 @@ describe("PostgreSQL staff invitation email delivery", () => {
 
     expect(result).toMatchObject({ claimed: 1, accepted: 1, failed: 0, skipped: false });
     expect(send).toHaveBeenCalledTimes(1);
-    const sent = send.mock.calls[0][0];
-    expect(sent.to).toBe(`invited-${fixture.invitationId}@test.local`);
-    expect(sent.html).toContain(`#token=${fixture.token}`);
-    expect(sent.html).not.toContain(`?token=${fixture.token}`);
+    const sent = send.mock.calls[0]?.[0];
+    expect(sent?.to).toBe(`invited-${fixture.invitationId}@test.local`);
+    expect(sent?.html).toContain(`#token=${fixture.token}`);
+    expect(sent?.html).not.toContain(`?token=${fixture.token}`);
     const persisted = await pool.query(
       `SELECT status, "templateData" FROM notification_email_deliveries WHERE id = $1`,
       [fixture.deliveryId],
