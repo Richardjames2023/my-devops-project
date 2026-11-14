@@ -8,15 +8,16 @@ function amount(value: { toString(): string }): number {
 export async function getAnalyticsOverview(query: AnalyticsQuery) {
   const now = new Date();
   const activeCustomerSince = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const reportFrom = query.from ?? activeCustomerSince;
   const dateFilter = {
-    ...(query.from ? { gte: query.from } : {}),
+    gte: reportFrom,
     ...(query.to ? { lte: query.to } : {}),
   };
 
   const [orders, activeCustomers] = await Promise.all([
     prisma.order.findMany({
       where: {
-        ...(query.from || query.to ? { createdAt: dateFilter } : {}),
+        createdAt: dateFilter,
         payments: { some: { status: "SUCCESS" } },
       },
       select: {
@@ -149,7 +150,7 @@ export async function getAnalyticsOverview(query: AnalyticsQuery) {
 
   return {
     period: {
-      from: query.from?.toISOString() ?? null,
+      from: reportFrom.toISOString(),
       to: query.to?.toISOString() ?? null,
     },
     activeCustomers: {
