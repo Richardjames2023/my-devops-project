@@ -134,6 +134,16 @@ async function queueStaffInvitationEmail(
   if (!encryptionKey) {
     throw new AppError("Staff invitation email encryption is not configured", 503);
   }
+  const configuredUrl = env.STAFF_INVITATION_ACCEPTANCE_URL ??
+    (env.APP_BASE_URL ? new URL("/staff/accept-invitation", env.APP_BASE_URL).toString() : undefined);
+  if (!configuredUrl) {
+    throw new AppError("Staff invitation acceptance URL is not configured", 503);
+  }
+  const acceptanceUrl = new URL(configuredUrl);
+  if (acceptanceUrl.username || acceptanceUrl.password || acceptanceUrl.search || acceptanceUrl.hash ||
+      (env.NODE_ENV === "production" && acceptanceUrl.protocol !== "https:")) {
+    throw new AppError("Staff invitation acceptance URL is invalid", 503);
+  }
   const encryptedToken = encryptInvitationSecret(input.token, encryptionKey);
   const delivery = await tx.notificationEmailDelivery.create({
     data: {
