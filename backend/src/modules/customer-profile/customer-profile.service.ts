@@ -302,11 +302,14 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
   });
   const returnEvidence = await tx.returnEvidence.findMany({
     where: { returnRequest: { userId: user.id }, publicId: { not: null } },
-    select: { publicId: true },
+    select: { publicId: true, resourceType: true },
   });
   for (const evidence of returnEvidence) {
     if (evidence.publicId) {
-      await enqueueCloudinaryCleanup(evidence.publicId, tx);
+      await enqueueCloudinaryCleanup(evidence.publicId, tx, {
+        resourceType: evidence.resourceType === "video" ? "video" : "image",
+        deliveryType: "authenticated",
+      });
     }
   }
   await tx.returnEvidence.updateMany({
@@ -426,17 +429,47 @@ export async function processCustomerAccountDeletionBatch() {
       // Store only a safe error identifier, not a raw message that may contain PII.
       // The anonymization transaction has rolled back. Persist a retry deadline
       // separately so a poison request cannot occupy every batch forever.
-      const retryDelayMs = Math.min(24 * 60 * 60 * 1000, 60 * 60 * 1000 * 2 ** Math.min(candidate.failureCount, 5));
-      const retryAt = new Date(Date.now() + retryDelayMs);
       try {
-        const rescheduled = await prisma.customerAccountDeletion.updateMany({
-          where: { id: candidate.id, status: "REQUESTED" },
-          data: { scheduledFor: retryAt, failureCount: { increment: 1 }, lastError: errorCode },
+        const rescheduled = await prisma.$transaction(async (tx) => {
+          // Reacquire the same per-customer lock used by the processing transaction.
+          // Another worker may have completed, cancelled, or rescheduled this request
+          // after our failed transaction released its lock.
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${candidate.userId}::text, 0))`;
+          const [current] = await tx.$queryRaw<Array<{
+            status: string;
+            isDue: boolean;
+            failureCount: number;
+          }>>`
+            SELECT "status",
+              ("scheduledFor" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')) AS "isDue",
+              "failureCount"
+            FROM "customer_account_deletions"
+            WHERE "id" = ${candidate.id}::uuid
+            FOR UPDATE
+          `;
+          if (!current || current.status !== "REQUESTED" || !current.isDue) return null;
+
+          const retryDelayMs = Math.min(
+            24 * 60 * 60 * 1000,
+            60 * 60 * 1000 * 2 ** Math.min(current.failureCount, 5),
+          );
+          const retryAt = new Date(Date.now() + retryDelayMs);
+          await tx.customerAccountDeletion.update({
+            where: { id: candidate.id },
+            data: {
+              scheduledFor: retryAt,
+              failureCount: { increment: 1 },
+              lastError: errorCode,
+            },
+          });
+          return { failureCount: current.failureCount + 1, retryAt };
         });
-        if (rescheduled.count === 1) {
+        if (rescheduled) {
           console.error("[CUSTOMER DELETION] Processing failed; request rescheduled", {
-            requestId: candidate.id, failureCount: candidate.failureCount + 1,
-            retryAt: retryAt.toISOString(), errorCode,
+            requestId: candidate.id,
+            failureCount: rescheduled.failureCount,
+            retryAt: rescheduled.retryAt.toISOString(),
+            errorCode,
           });
         }
       } catch (rescheduleError) {
