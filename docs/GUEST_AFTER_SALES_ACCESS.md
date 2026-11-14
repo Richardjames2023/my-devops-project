@@ -35,4 +35,4 @@ The order item must belong to the token-authorized guest order. Existing warrant
 - Wrong-order and invalid-token lookups return not-found responses to avoid leaking resource ownership.
 - Guest write and read endpoints use the existing guest checkout/retrieval rate limiters.
 - The revocation timestamp is retained for auditability; the token hash is not cleared.
-- Guest return evidence upload/viewing is not included in this implementation slice and remains a tracked follow-up.
+- Guest return evidence upload, viewing, and bounded file streaming are implemented in PR #29. Upload and read access require the same valid, unexpired, unrevoked guest order token and are scoped to the route order and its return request/evidence.
