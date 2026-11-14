@@ -5,6 +5,7 @@ type EvidenceResourceType = "image" | "video";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import { getCloudinary } from "../../config/cloudinary";
+import { hashGuestOrderAccessToken } from "../orders/guest-order-access";
 
 const ALLOWED_SIGNATURES = new Set([
   "image/jpeg",
@@ -21,6 +22,10 @@ type UploadedAsset = {
   resourceType: EvidenceResourceType;
   secureUrl: string;
 };
+
+type EvidenceAccess =
+  | { kind: "customer"; userId: string; permissions: string[] }
+  | { kind: "guest"; orderId: string; token: string };
 
 function uploadToCloudinary(
   buffer: Buffer,
@@ -70,11 +75,50 @@ async function deleteCloudinaryAsset(asset: UploadedAsset): Promise<void> {
   });
 }
 
-export async function createReturnEvidence(
+export async function assertGuestReturnEvidenceOrderAccess(
+  orderId: string,
+  guestAccessToken: string,
+): Promise<void> {
+  const order = await prisma.order.findFirst({
+    where: {
+      id: orderId,
+      userId: null,
+      guestAccessTokenHash: hashGuestOrderAccessToken(guestAccessToken),
+      guestAccessTokenExpiresAt: { gt: new Date() },
+      guestAccessTokenRevokedAt: null,
+    },
+    select: { id: true },
+  });
+
+  if (!order) {
+    throw new AppError("Return evidence not found", 404);
+  }
+}
+
+function guestReturnWhere(
   returnRequestId: string,
-  userId: string,
-  permissions: string[],
+  orderId: string,
+  token: string,
+) {
+  return {
+    id: returnRequestId,
+    orderId,
+    userId: null,
+    order: {
+      is: {
+        userId: null,
+        guestAccessTokenHash: hashGuestOrderAccessToken(token),
+        guestAccessTokenExpiresAt: { gt: new Date() },
+        guestAccessTokenRevokedAt: null,
+      },
+    },
+  };
+}
+
+async function createReturnEvidenceWithAccess(
+  returnRequestId: string,
   files: Express.Multer.File[],
+  access: EvidenceAccess,
 ) {
   if (files.length === 0) {
     throw new AppError("At least one evidence file is required", 400);
@@ -84,8 +128,11 @@ export async function createReturnEvidence(
     throw new AppError("A maximum of 5 evidence files is allowed", 400);
   }
 
-  const returnRequest = await prisma.returnRequest.findUnique({
-    where: { id: returnRequestId },
+  const returnRequest = await prisma.returnRequest.findFirst({
+    where:
+      access.kind === "guest"
+        ? guestReturnWhere(returnRequestId, access.orderId, access.token)
+        : { id: returnRequestId },
     select: {
       id: true,
       userId: true,
@@ -97,14 +144,18 @@ export async function createReturnEvidence(
     throw new AppError("Return request not found", 404);
   }
 
-  const isOwner = returnRequest.userId === userId;
-  const canManageOrders = permissions.includes("orders.manage");
+  if (access.kind === "customer") {
+    const isOwner = returnRequest.userId === access.userId;
+    const canManageOrders = access.permissions.includes("orders.manage");
 
-  if (!isOwner && !canManageOrders) {
-    throw new AppError(
-      "You are not allowed to access this return request",
-      403,
-    );
+    if (!isOwner && !canManageOrders) {
+      throw new AppError(
+        "You are not allowed to access this return request",
+        403,
+      );
+    }
+  } else if (returnRequest.userId !== null) {
+    throw new AppError("Return request not found", 404);
   }
 
   if (
@@ -160,8 +211,11 @@ export async function createReturnEvidence(
     }
 
     return await prisma.$transaction(async (tx) => {
-      const currentRequest = await tx.returnRequest.findUnique({
-        where: { id: returnRequestId },
+      const currentRequest = await tx.returnRequest.findFirst({
+        where:
+          access.kind === "guest"
+            ? guestReturnWhere(returnRequestId, access.orderId, access.token)
+            : { id: returnRequestId },
         select: { userId: true, status: true },
       });
 
@@ -169,11 +223,17 @@ export async function createReturnEvidence(
         throw new AppError("Return request not found", 404);
       }
 
-      if (currentRequest.userId !== userId && !canManageOrders) {
-        throw new AppError(
-          "You are not allowed to access this return request",
-          403,
-        );
+      if (access.kind === "customer") {
+        const canManageOrders = access.permissions.includes("orders.manage");
+
+        if (currentRequest.userId !== access.userId && !canManageOrders) {
+          throw new AppError(
+            "You are not allowed to access this return request",
+            403,
+          );
+        }
+      } else if (currentRequest.userId !== null) {
+        throw new AppError("Return request not found", 404);
       }
 
       if (
@@ -214,4 +274,30 @@ export async function createReturnEvidence(
 
     throw error;
   }
+}
+
+export function createReturnEvidence(
+  returnRequestId: string,
+  userId: string,
+  permissions: string[],
+  files: Express.Multer.File[],
+) {
+  return createReturnEvidenceWithAccess(returnRequestId, files, {
+    kind: "customer",
+    userId,
+    permissions,
+  });
+}
+
+export function createGuestReturnEvidence(
+  returnRequestId: string,
+  orderId: string,
+  guestAccessToken: string,
+  files: Express.Multer.File[],
+) {
+  return createReturnEvidenceWithAccess(returnRequestId, files, {
+    kind: "guest",
+    orderId,
+    token: guestAccessToken,
+  });
 }
