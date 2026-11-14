@@ -627,7 +627,7 @@ export async function acceptStaffInvitation(input: {
       status: staff.status,
       roles: invitation.roles.map(({ role }) => role.name),
     };
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 }
 
 async function staffAuthContext(staffId: string) {
