@@ -162,14 +162,16 @@ export async function cancelCustomerAccountDeletion(email: string, password: str
 }
 
 async function hasOutstandingCustomerActivity(tx: Prisma.TransactionClient, userId: string) {
-  const [openOrders, openPayments, openRefunds, openReturns, openWarranties] = await Promise.all([
+  const [openOrders, openPayments, openRefunds, openReturns, openWarranties, openDeliveries, activeReservations] = await Promise.all([
     tx.order.findFirst({ where: { userId, status: { in: ["PENDING", "CONFIRMED", "PROCESSING", "PARTIALLY_FULFILLED"] } }, select: { id: true } }),
     tx.payment.findFirst({ where: { order: { userId }, status: { in: ["PENDING", "INITIALIZATION_UNKNOWN", "PROCESSING"] } }, select: { id: true } }),
     tx.refund.findFirst({ where: { order: { userId }, status: { in: ["PENDING", "PROCESSING", "NEEDS_ATTENTION", "SUBMISSION_UNKNOWN"] } }, select: { id: true } }),
     tx.returnRequest.findFirst({ where: { userId, status: { in: ["PENDING", "UNDER_REVIEW", "APPROVED", "RECEIVED", "INSPECTED"] } }, select: { id: true } }),
     tx.warrantyClaim.findFirst({ where: { userId, status: { in: ["PENDING", "UNDER_REVIEW", "APPROVED"] } }, select: { id: true } }),
+    tx.delivery.findFirst({ where: { package: { fulfillment: { order: { userId } } }, status: { in: ["PENDING", "ASSIGNED", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "FAILED"] } }, select: { id: true } }),
+    tx.inventoryReservation.findFirst({ where: { order: { userId }, status: "PENDING" }, select: { id: true } }),
   ]);
-  return Boolean(openOrders || openPayments || openRefunds || openReturns || openWarranties);
+  return Boolean(openOrders || openPayments || openRefunds || openReturns || openWarranties || openDeliveries || activeReservations);
 }
 
 async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: string; email: string }) {
