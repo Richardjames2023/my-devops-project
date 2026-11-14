@@ -42,6 +42,19 @@ export async function createProductVariant(input: CreateProductVariantInput) {
         warrantyTerms: input.warrantyTerms ?? null,
         isActive: true,
       },
+      select: {
+        id: true,
+        productId: true,
+        sku: true,
+        name: true,
+        price: true,
+        hasWarranty: true,
+        warrantyDuration: true,
+        warrantyTerms: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   });
 }
@@ -95,6 +108,19 @@ export async function updateProductVariant(
       warrantyDuration: hasWarranty === true ? warrantyDuration : null,
       warrantyTerms: hasWarranty === true ? warrantyTerms : null,
     },
+    select: {
+        id: true,
+        productId: true,
+        sku: true,
+        name: true,
+        price: true,
+        hasWarranty: true,
+        warrantyDuration: true,
+        warrantyTerms: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
   });
 }
 
@@ -126,6 +152,19 @@ export async function setProductVariantActive(
     return tx.productVariant.update({
       where: { id: variantId },
       data: { isActive },
+      select: {
+        id: true,
+        productId: true,
+        sku: true,
+        name: true,
+        price: true,
+        hasWarranty: true,
+        warrantyDuration: true,
+        warrantyTerms: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
   });
 }
