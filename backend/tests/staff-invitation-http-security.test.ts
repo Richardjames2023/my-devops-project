@@ -80,9 +80,11 @@ describe("staff invitation HTTP security boundaries", () => {
 
     const missingOrigin = await supertest(app)
       .post("/api/v1/staff-auth/invitation/exchange")
+      .set("X-Forwarded-For", "198.51.100.11")
       .send({ token: invitationToken });
     const untrustedOrigin = await supertest(app)
       .post("/api/v1/staff-auth/invitation/exchange")
+      .set("X-Forwarded-For", "198.51.100.12")
       .set("Origin", "https://attacker.example")
       .send({ token: invitationToken });
 
@@ -96,6 +98,7 @@ describe("staff invitation HTTP security boundaries", () => {
   it("requires the expected Origin on acceptance as well as exchange", async () => {
     const response = await supertest(createApp())
       .post("/api/v1/staff-auth/accept-invitation")
+      .set("X-Forwarded-For", "198.51.100.13")
       .set("Origin", "https://attacker.example")
       .set("Cookie", "staff_invitation_session=session-secret")
       .send(validAcceptance);
@@ -111,6 +114,7 @@ describe("staff invitation HTTP security boundaries", () => {
 
     const response = await supertest(createApp())
       .post("/api/v1/staff-auth/invitation/exchange")
+      .set("X-Forwarded-For", "198.51.100.14")
       .set("Origin", expectedOrigin)
       .send({ token: invitationToken });
 
@@ -130,6 +134,7 @@ describe("staff invitation HTTP security boundaries", () => {
   it("does not accept an invitation without the scoped session cookie", async () => {
     const response = await supertest(createApp())
       .post("/api/v1/staff-auth/accept-invitation")
+      .set("X-Forwarded-For", "198.51.100.15")
       .set("Origin", expectedOrigin)
       .send(validAcceptance);
 
@@ -144,6 +149,7 @@ describe("staff invitation HTTP security boundaries", () => {
 
     const response = await supertest(createApp())
       .post("/api/v1/staff-auth/accept-invitation")
+      .set("X-Forwarded-For", "198.51.100.16")
       .set("Origin", expectedOrigin)
       .set("Cookie", "staff_invitation_session=opaque-session-secret")
       .send(validAcceptance);
