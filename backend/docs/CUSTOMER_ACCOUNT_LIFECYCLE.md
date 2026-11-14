@@ -72,9 +72,9 @@ Track the design decisions, implementation stages, verification and release read
 | Deletion request and cancellation APIs | Implemented; local verification pending | Immediate deactivation and 30-day cancellation window. |
 | Background deletion worker | Implemented; local verification pending | Hourly processing with seven-day operational deferrals and capped exponential retry scheduling for processing failures. |
 | Privacy-safe anonymization | Implemented; local verification pending | Includes direct customer auth-email/provider-payload cleanup and replacement of the retained password hash with a hash of a random undisclosed secret. |
-| Concurrency and idempotency safeguards | Implemented; new auth race test pending | Email verification now takes the shared user advisory lock before re-reading/claiming its token. |
+| Concurrency and idempotency safeguards | Implemented; rerun pending | Email verification uses the shared user advisory lock; new regression tests cover direct auth-email cleanup, credential scrubbing and worker retry scheduling. |
 | PostgreSQL integration tests | Extended; rerun pending | Covers direct auth-email cleanup, shared staff email preservation, credential scrubbing and worker retry scheduling. |
-| Build and regression verification | Prior baseline passed; new auth change pending | Before the email-verification lock fix, the local build and full suite passed; rerun after pulling the latest commits. |
+| Build and regression verification | Rerun required | The latest review fixes have not yet been validated locally. |
 
 ## Verification log
 
@@ -97,16 +97,16 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Recheck account activity under the advisory lock before issuing verification or password-reset tokens.
 - [x] Defer anonymization through active warranty expiry and unresolved payment-inventory reconciliation.
 - [x] Scrub provider webhook payloads linked to deleted customer email deliveries.
-- [ ] Pull the latest branch and rerun the build and PostgreSQL tests.
+- [ ] Pull the latest branch and rerun Prisma validation/generation, the build, focused PostgreSQL tests and the full regression suite.
 
 ## Acceptance criteria / release gates
 - [ ] Prisma formatting and schema validation pass.
 - [ ] Migration applies successfully to the dedicated test database without unintended schema changes.
 - [ ] Prisma Client generation succeeds.
-- [x] TypeScript production build succeeded before the latest email-verification lock change; rerun required.
-- [x] Focused customer account lifecycle PostgreSQL tests passed 6/6 before the latest concurrency test; rerun required.
-- [x] Full backend test suite passed: 440 tests across 71 files before the latest auth/test change; rerun required.
-- [x] Diff whitespace check passed before the latest changes; rerun required.
+- [ ] TypeScript production build passes after the review fixes.
+- [ ] Focused customer account lifecycle PostgreSQL tests pass after the review fixes.
+- [ ] Full backend regression suite passes after the review fixes.
+- [ ] `git diff --check` passes after the review fixes.
 - [ ] Review confirms retained records, anonymized fields and dependent workflows behave as intended, including direct auth-email cleanup, credential scrubbing and worker retries.
 - [ ] Pull request is reviewed and explicitly approved before merge.
 
