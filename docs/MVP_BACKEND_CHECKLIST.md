@@ -98,7 +98,8 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Coupon release on applicable cancellation/failure paths.
 - [x] Discount snapshots and calculation tests.
 - [~] Verify staff-facing coupon lifecycle and reporting requirements against the final admin UI.
-- [~] Complete the remaining coupon hardening review: production HMAC secret provisioning and regression coverage for fixed discounts, maximum caps, minimum subtotals, and concurrent use of the final coupon slot.
+- [x] Coupon calculation regression coverage includes fixed and percentage discounts, maximum discount caps, minimum subtotals, final-slot concurrency, and fixed discounts capped at the order subtotal.
+- [~] Verify that the stable production `COUPON_CUSTOMER_HASH_SECRET` is provisioned in every deployment environment; repository validation enforces its presence in production, but deployment configuration still needs verification.
 
 ## 8. Returns, refunds, and warranties
 
