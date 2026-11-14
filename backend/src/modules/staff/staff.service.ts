@@ -10,7 +10,7 @@ import { createAuditLog } from "../../common/utils/audit-log";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 import { env } from "../../config/env";
 import { isValidStaffInvitationAcceptanceUrl } from "../../config/url-validation";
-import { encryptInvitationSecret } from "./staff-invitation-encryption";
+import { encryptInvitationSecret, getInvitationEncryptionKeyring } from "./staff-invitation-encryption";
 
 const invitationDaysMax = 30;
 
@@ -141,8 +141,7 @@ async function queueStaffInvitationEmail(
   tx: Prisma.TransactionClient,
   input: { invitationId: string; email: string; token: string; tokenHash: string },
 ) {
-  const encryptionKey = env.STAFF_INVITATION_ENCRYPTION_KEY;
-  if (!encryptionKey) {
+  if (!env.STAFF_INVITATION_ENCRYPTION_KEY && !env.STAFF_INVITATION_ENCRYPTION_KEYRING) {
     throw new AppError("Staff invitation email encryption is not configured", 503);
   }
   const configuredUrl = env.STAFF_INVITATION_ACCEPTANCE_URL ??
@@ -154,7 +153,12 @@ async function queueStaffInvitationEmail(
   if (!isValidStaffInvitationAcceptanceUrl(acceptanceUrl.toString(), env.NODE_ENV)) {
     throw new AppError("Staff invitation acceptance URL is invalid", 503);
   }
-  const encryptedToken = encryptInvitationSecret(input.token, encryptionKey);
+  const encryptionKeyring = getInvitationEncryptionKeyring(
+    env.STAFF_INVITATION_ENCRYPTION_KEY,
+    env.STAFF_INVITATION_ENCRYPTION_KEYRING,
+    env.STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID,
+  );
+  const encryptedToken = encryptInvitationSecret(input.token, encryptionKeyring);
   const templateData: Prisma.InputJsonObject = {
     invitationId: input.invitationId,
     encryptedToken: {
