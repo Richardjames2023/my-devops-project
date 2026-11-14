@@ -198,7 +198,9 @@ async function renderStaffInvitationDelivery(delivery: ClaimedDelivery) {
     FROM staff_invitations
     WHERE id = ${payload.invitationId}::uuid
   `;
-  if (!invitation?.isValid) throw new StaleStaffInvitationDeliveryError();
+  if (!invitation?.isValid || invitation.email !== delivery.recipientEmail) {
+    throw new StaleStaffInvitationDeliveryError();
+  }
 
   const expectedHash = hashRefreshToken(token);
   const expected = Buffer.from(expectedHash, "hex");
