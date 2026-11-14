@@ -201,16 +201,16 @@ export async function updateProductVariantCost(
 
     if (current.costPrice?.toString() !== updated.costPrice?.toString()) {
       await createAuditLog(tx, {
-      staffAccountId,
-      action: "PRODUCT_VARIANT_COST_UPDATED",
-      entity: "ProductVariant",
-      entityId: variantId,
-      oldValues: {
-        costPrice: current.costPrice?.toString() ?? null,
-      },
-      newValues: {
-        costPrice: updated.costPrice?.toString() ?? null,
-      },
+        staffAccountId,
+        action: "PRODUCT_VARIANT_COST_UPDATED",
+        entity: "ProductVariant",
+        entityId: variantId,
+        oldValues: {
+          costPrice: current.costPrice?.toString() ?? null,
+        },
+        newValues: {
+          costPrice: updated.costPrice?.toString() ?? null,
+        },
       });
     }
 
