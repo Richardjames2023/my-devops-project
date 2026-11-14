@@ -11,7 +11,6 @@ import { publishNotificationEvent } from "../notifications/notification-outbox.p
 import { env } from "../../config/env";
 import { encryptInvitationSecret } from "./staff-invitation-encryption";
 
-const invitationDaysDefault = Math.ceil(env.STAFF_INVITATION_TTL_HOURS / 24);
 const invitationDaysMax = 30;
 
 type RequestMetadata = { ipAddress?: string; userAgent?: string };
@@ -32,6 +31,17 @@ async function invitationExpiryFromDays(
 ): Promise<Date> {
   const [row] = await tx.$queryRaw<Array<{ expiresAt: Date }>>`
     SELECT NOW() + (${days} * INTERVAL '1 day') AS "expiresAt"
+  `;
+  if (!row?.expiresAt) throw new Error("Could not calculate invitation expiry");
+  return row.expiresAt;
+}
+
+async function invitationExpiryFromHours(
+  tx: Prisma.TransactionClient,
+  hours: number,
+): Promise<Date> {
+  const [row] = await tx.$queryRaw<Array<{ expiresAt: Date }>>`
+    SELECT NOW() + (${hours} * INTERVAL '1 hour') AS "expiresAt"
   `;
   if (!row?.expiresAt) throw new Error("Could not calculate invitation expiry");
   return row.expiresAt;
@@ -192,8 +202,8 @@ export async function createStaffInvitation(
   metadata: RequestMetadata = {},
 ) {
   const email = normalizeEmail(input.email);
-  const days = input.expiresInDays ?? invitationDaysDefault;
-  if (days < 1 || days > invitationDaysMax) {
+  if (input.expiresInDays !== undefined &&
+      (input.expiresInDays < 1 || input.expiresInDays > invitationDaysMax)) {
     throw new AppError(`Invitation expiry must be between 1 and ${invitationDaysMax} days`, 400);
   }
   if (!input.roleIds.length) throw new AppError("At least one staff role is required", 400);
@@ -238,7 +248,9 @@ export async function createStaffInvitation(
       throw new AppError("A pending invitation already exists for this email address", 409);
     }
 
-    const expiresAt = await invitationExpiryFromDays(tx, days);
+    const expiresAt = input.expiresInDays === undefined
+      ? await invitationExpiryFromHours(tx, env.STAFF_INVITATION_TTL_HOURS)
+      : await invitationExpiryFromDays(tx, input.expiresInDays);
     const createdBase = await tx.staffInvitation.create({
       data: {
         email,
@@ -321,7 +333,7 @@ export async function resendStaffInvitation(
       throw new AppError("Only unexpired pending invitations can be resent", 409);
     }
 
-    const expiresAt = await invitationExpiryFromDays(tx, invitationDaysDefault);
+    const expiresAt = await invitationExpiryFromHours(tx, env.STAFF_INVITATION_TTL_HOURS);
     const tokenHash = hashRefreshToken(token);
     const result = await tx.staffInvitation.update({
       where: { id: invitationId },
