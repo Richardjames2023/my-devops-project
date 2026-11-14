@@ -164,8 +164,24 @@ export async function cancelCustomerAccountDeletion(email: string, password: str
   });
 }
 
-async function hasOutstandingCustomerActivity(tx: Prisma.TransactionClient, userId: string) {
-  const [openOrders, openPayments, openRefunds, openReturns, openWarranties, openDeliveries, activeReservations] = await Promise.all([
+async function getCustomerDeletionDeferral(
+  tx: Prisma.TransactionClient,
+  userId: string,
+): Promise<{ required: boolean; scheduledFor: Date }> {
+  const now = new Date();
+  const defaultDeferral = new Date(now.getTime() + DELETION_DEFERRAL_DAYS * 24 * 60 * 60 * 1000);
+  const [
+    openOrders,
+    openPayments,
+    openRefunds,
+    openReturns,
+    openWarranties,
+    openDeliveries,
+    activeReservations,
+    unresolvedReconciliations,
+    activeWarranties,
+    warrantiesMissingExpiry,
+  ] = await Promise.all([
     tx.order.findFirst({ where: { userId, status: { in: ["PENDING", "CONFIRMED", "PROCESSING", "PARTIALLY_FULFILLED"] } }, select: { id: true } }),
     tx.payment.findFirst({ where: { order: { userId }, status: { in: ["PENDING", "INITIALIZATION_UNKNOWN", "PROCESSING"] } }, select: { id: true } }),
     tx.refund.findFirst({ where: { order: { userId }, status: { in: ["PENDING", "PROCESSING", "NEEDS_ATTENTION", "SUBMISSION_UNKNOWN"] } }, select: { id: true } }),
@@ -173,8 +189,45 @@ async function hasOutstandingCustomerActivity(tx: Prisma.TransactionClient, user
     tx.warrantyClaim.findFirst({ where: { userId, status: { in: ["PENDING", "UNDER_REVIEW", "APPROVED"] } }, select: { id: true } }),
     tx.delivery.findFirst({ where: { package: { fulfillment: { order: { userId } } }, status: { in: ["PENDING", "ASSIGNED", "PICKED_UP", "IN_TRANSIT", "OUT_FOR_DELIVERY", "FAILED"] } }, select: { id: true } }),
     tx.inventoryReservation.findFirst({ where: { order: { userId }, status: "PENDING" }, select: { id: true } }),
+    tx.paymentInventoryReconciliation.findFirst({
+      where: { order: { userId }, status: { in: ["PENDING", "UNDER_REVIEW", "REFUND_PENDING"] } },
+      select: { id: true },
+    }),
+    tx.orderItem.aggregate({
+      where: { order: { userId }, hasWarranty: true, warrantyExpiresAt: { gt: now } },
+      _max: { warrantyExpiresAt: true },
+    }),
+    tx.orderItem.findFirst({
+      where: {
+        order: { userId },
+        hasWarranty: true,
+        warrantyStartedAt: { not: null },
+        warrantyExpiresAt: null,
+      },
+      select: { id: true },
+    }),
   ]);
-  return Boolean(openOrders || openPayments || openRefunds || openReturns || openWarranties || openDeliveries || activeReservations);
+
+  const hasOperationalActivity = Boolean(
+    openOrders || openPayments || openRefunds || openReturns ||
+    openWarranties || openDeliveries || activeReservations || unresolvedReconciliations,
+  );
+  const latestActiveWarrantyExpiry = activeWarranties._max.warrantyExpiresAt;
+  const hasActiveWarranty = Boolean(latestActiveWarrantyExpiry || warrantiesMissingExpiry);
+  if (!hasOperationalActivity && !hasActiveWarranty) {
+    return { required: false, scheduledFor: defaultDeferral };
+  }
+
+  // Recheck at the earlier of the normal retry interval or the last known
+  // warranty expiry, so the worker does not repeatedly postpone an expired entitlement.
+  const warrantyCheckAt = latestActiveWarrantyExpiry
+    ? new Date(latestActiveWarrantyExpiry.getTime() + 60_000)
+    : defaultDeferral;
+  const scheduledFor = hasActiveWarranty && warrantyCheckAt < defaultDeferral
+    ? warrantyCheckAt
+    : defaultDeferral;
+
+  return { required: true, scheduledFor };
 }
 
 async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: string; email: string }) {
@@ -289,10 +342,11 @@ export async function processCustomerAccountDeletionBatch() {
           return "COMPLETED";
         }
 
-        if (await hasOutstandingCustomerActivity(tx, user.id)) {
+        const deferral = await getCustomerDeletionDeferral(tx, user.id);
+        if (deferral.required) {
           await tx.$executeRaw`
             UPDATE "customer_account_deletions"
-            SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + INTERVAL '7 days',
+            SET "scheduledFor" = ${deferral.scheduledFor},
                 "lastDeferredAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
                 "deferralCount" = "deferralCount" + 1
             WHERE "id" = ${candidate.id}::uuid
