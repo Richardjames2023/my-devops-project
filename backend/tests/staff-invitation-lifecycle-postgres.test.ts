@@ -10,6 +10,7 @@ if (new URL(databaseUrl).pathname !== "/shop_db_test") {
 }
 process.env.DATABASE_URL = databaseUrl;
 process.env.STAFF_INVITATION_ENCRYPTION_KEY ??= randomBytes(32).toString("base64");
+process.env.APP_BASE_URL ??= "http://localhost:3000";
 
 const pool = new Pool({ connectionString: databaseUrl, max: 3 });
 const suffix = randomUUID();
@@ -280,6 +281,7 @@ describe("PostgreSQL staff invitation lifecycle", () => {
   it("updates pending roles, rotates the token on resend, accepts the latest roles, and prevents replay", async () => {
     const created = await createInvitation(`accept-${suffix}@test.local`);
     const originalToken = created.invitationToken;
+    const originalSession = await exchangeStaffInvitationToken(originalToken);
 
     const updated = await updateStaffInvitationRoles(
       actorId,
@@ -292,6 +294,12 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     const resent = await resendStaffInvitation(actorId, created.invitation.id);
     expect(resent.invitationToken).not.toBe(originalToken);
     expect(resent.invitation).not.toHaveProperty("tokenHash");
+    await expect(completeStaffInvitation({
+      sessionToken: originalSession.sessionToken,
+      password: "A-strong-staff-password-2026",
+      firstName: "Taylor",
+      lastName: "Superseded",
+    })).rejects.toMatchObject({ statusCode: 400 });
     const resendExpiry = await pool.query(
       `SELECT "expiresAt" > NOW() AS is_future
        FROM staff_invitations WHERE id = $1`,
@@ -368,9 +376,16 @@ describe("PostgreSQL staff invitation lifecycle", () => {
 
   it("revokes a pending invitation and rejects its token", async () => {
     const created = await createInvitation(`revoke-${suffix}@test.local`);
+    const session = await exchangeStaffInvitationToken(created.invitationToken);
     const revoked = await revokeStaffInvitation(actorId, created.invitation.id);
 
     expect(revoked.status).toBe("REVOKED");
+    await expect(completeStaffInvitation({
+      sessionToken: session.sessionToken,
+      password: "A-strong-staff-password-2026",
+      firstName: "Revoked",
+      lastName: "Session",
+    })).rejects.toMatchObject({ statusCode: 400 });
     expect(revoked.revokedAt).toBeTruthy();
 
     await expect(
@@ -426,15 +441,16 @@ describe("PostgreSQL staff invitation lifecycle", () => {
 
   it("allows only one concurrent acceptance of the same invitation", async () => {
     const created = await createInvitation(`concurrent-${suffix}@test.local`);
+    const session = await exchangeStaffInvitationToken(created.invitationToken);
     const attempts = await Promise.allSettled([
-      acceptStaffInvitation({
-        token: created.invitationToken,
+      completeStaffInvitation({
+        sessionToken: session.sessionToken,
         password: "A-strong-staff-password-2026",
         firstName: "Concurrent",
         lastName: "Winner",
       }),
-      acceptStaffInvitation({
-        token: created.invitationToken,
+      completeStaffInvitation({
+        sessionToken: session.sessionToken,
         password: "Another-strong-password-2026",
         firstName: "Concurrent",
         lastName: "Loser",
