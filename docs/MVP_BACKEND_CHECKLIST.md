@@ -11,7 +11,6 @@ This checklist is an implementation tracker, not a claim that every item has alr
 
 - [x] Implemented on `dev` and supported by current code/tests reviewed during this reconciliation.
 - [~] Implemented or partially covered, but an explicit scope, deployment, or end-to-end verification remains.
-- [~] Foundation exists, but completion or end-to-end coverage needs verification.
 - [ ] Outstanding / not yet verified as implemented.
 
 ---
