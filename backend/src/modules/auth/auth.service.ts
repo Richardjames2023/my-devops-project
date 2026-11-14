@@ -344,13 +344,26 @@ export async function loginUser(input: LoginInput) {
     refreshTokenExpiresAt.getDate() + REFRESH_TOKEN_EXPIRES_IN_DAYS,
   );
 
-  await prisma.refreshToken.create({
-    data: {
-      userId: user.id,
-      familyId: crypto.randomUUID(),
-      tokenHash: refreshTokenHash,
-      expiresAt: refreshTokenExpiresAt,
-    },
+  await prisma.$transaction(async (tx) => {
+    // Serialize token issuance with account deactivation and password changes.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}::text, 0))`;
+    const current = await tx.user.findUnique({
+      where: { id: user.id },
+      select: { isActive: true, emailVerified: true, sessionVersion: true },
+    });
+    if (!current || !current.isActive) throw new AppError("Account is inactive", 403);
+    if (!current.emailVerified) throw new AppError("Please verify your email address before logging in", 403);
+    if (current.sessionVersion !== user.sessionVersion) {
+      throw new AppError("Account security state changed. Please log in again.", 401);
+    }
+    await tx.refreshToken.create({
+      data: {
+        userId: user.id,
+        familyId: crypto.randomUUID(),
+        tokenHash: refreshTokenHash,
+        expiresAt: refreshTokenExpiresAt,
+      },
+    });
   });
 
   return {
@@ -441,7 +454,10 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
   );
 
   const rotationSucceeded = await prisma.$transaction(async (tx) => {
-    // Serialize all rotations and replay revocations within this session family.
+    // Acquire the user lock before the family lock. Account deactivation and
+    // password changes use the same user lock, so no refresh token can be
+    // created after their revocation pass has completed.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${storedToken.userId}::text, 0))`;
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${storedToken.familyId}::text, 0))`;
     const now = new Date();
     const claimed = await tx.refreshToken.updateMany({
