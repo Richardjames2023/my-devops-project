@@ -538,7 +538,8 @@ export async function acceptStaffInvitation(input: {
         AND "expiresAt" > NOW()
       FOR UPDATE
     `;
-    if (!lockedSession.length) {
+    const lockedSessionId = lockedSession[0]?.id;
+    if (!lockedSessionId) {
       throw new AppError("This staff invitation session is invalid or expired", 400);
     }
 
@@ -566,7 +567,7 @@ export async function acceptStaffInvitation(input: {
     const consumedSession = await tx.$executeRaw`
       UPDATE staff_invitation_acceptance_sessions
       SET "consumedAt" = NOW(), "updatedAt" = NOW()
-      WHERE id = ${lockedSession[0].id}::uuid
+      WHERE id = ${lockedSessionId}::uuid
         AND "tokenHash" = ${sessionHash}
         AND "consumedAt" IS NULL
         AND "revokedAt" IS NULL
