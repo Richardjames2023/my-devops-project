@@ -21,7 +21,7 @@ Track the design decisions, implementation stages, verification and release read
 | Deletion confirmation | The customer must provide their current password. |
 | Immediate effect | Deactivate the account, increment the session version, revoke refresh tokens and consume outstanding verification/reset tokens. |
 | Cancellation | Allow restoration only within 30 days of the original request. A fresh login is required after restoration. |
-| Operational deferral | Defer processing by seven days when dependent orders, payments, refunds, reservations, deliveries, returns or warranty claims remain unresolved. Deferral must not extend the original 30-day cancellation deadline. |
+| Operational deferral | Defer processing while dependent orders, payments, refunds, reservations, deliveries, returns, warranty claims or payment-inventory reconciliations remain unresolved. Also defer until every purchased product's active warranty coverage has expired. Recheck at the earlier of the normal seven-day retry interval or the latest active warranty expiry. Deferral must not extend the original 30-day cancellation deadline. |
 | Historical records | Retain completed orders, payments, refunds, returns, warranties, reviews and necessary audit actions. |
 | Identity and PII | Replace customer identity with “Deleted Customer”; anonymize order contact details and shipping information. |
 | Personal data cleanup | Remove carts, wishlists, notification inbox/preferences/deliveries, refresh tokens and verification/reset tokens. |
@@ -38,7 +38,8 @@ Track the design decisions, implementation stages, verification and release read
 ### 4. Data model and processing design
 - [x] Add a deletion-request lifecycle record with status, request/deadline timestamps, completion/cancellation timestamps and deferral metadata.
 - [x] Process due requests in bounded batches through a background worker.
-- [x] Defer requests while dependent business activity remains unresolved.
+- [x] Defer requests while dependent business activity or payment-inventory reconciliation remains unresolved.
+- [x] Preserve active warranty entitlements by deferring anonymization until all recorded warranty expiry dates have passed.
 - [x] Perform anonymization and personal-data cleanup transactionally.
 - [x] Keep processing idempotent so retries do not repeat destructive work or corrupt retained records.
 
