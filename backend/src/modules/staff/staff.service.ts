@@ -8,8 +8,10 @@ import { generateRefreshToken, hashRefreshToken } from "../../common/utils/refre
 import { REFRESH_TOKEN_EXPIRES_IN_DAYS } from "../../config/auth";
 import { createAuditLog } from "../../common/utils/audit-log";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
+import { env } from "../../config/env";
+import { encryptInvitationSecret } from "./staff-invitation-encryption";
 
-const invitationDaysDefault = 7;
+const invitationDaysDefault = Math.ceil(env.STAFF_INVITATION_TTL_HOURS / 24);
 const invitationDaysMax = 30;
 
 type RequestMetadata = { ipAddress?: string; userAgent?: string };
@@ -124,6 +126,52 @@ async function getDelegableRoles(
   return { roles, actorRoleNames };
 }
 
+async function queueStaffInvitationEmail(
+  tx: Prisma.TransactionClient,
+  input: { invitationId: string; email: string; token: string; tokenHash: string },
+) {
+  const encryptionKey = env.STAFF_INVITATION_ENCRYPTION_KEY;
+  if (!encryptionKey) {
+    throw new AppError("Staff invitation email encryption is not configured", 503);
+  }
+  const encryptedToken = encryptInvitationSecret(input.token, encryptionKey);
+  const delivery = await tx.notificationEmailDelivery.create({
+    data: {
+      recipientEmail: input.email,
+      templateKey: "staff.invitation",
+      templateData: {
+        invitationId: input.invitationId,
+        encryptedToken,
+      } as Prisma.InputJsonValue,
+      eventRecipientKey: `staff-invitation:${input.invitationId}:${input.tokenHash}`,
+      status: "QUEUED",
+      nextAttemptAt: new Date(),
+    },
+    select: { id: true, status: true },
+  });
+  return delivery;
+}
+
+async function suppressStaffInvitationDeliveries(
+  tx: Prisma.TransactionClient,
+  invitationId: string,
+) {
+  await tx.notificationEmailDelivery.updateMany({
+    where: {
+      templateKey: "staff.invitation",
+      eventRecipientKey: { startsWith: `staff-invitation:${invitationId}:` },
+      status: { in: ["QUEUED", "RETRYING", "PROCESSING"] },
+    },
+    data: {
+      status: "SUPPRESSED",
+      suppressedAt: new Date(),
+      lockedAt: null,
+      lockedBy: null,
+      lastError: "Invitation token was rotated or invalidated",
+    },
+  });
+}
+
 export async function createStaffInvitation(
   actorId: string,
   input: { email: string; roleIds: string[]; expiresInDays?: number | undefined },
@@ -188,6 +236,12 @@ export async function createStaffInvitation(
     await tx.staffInvitationRole.createMany({
       data: roles.map((role) => ({ invitationId: createdBase.id, roleId: role.id })),
     });
+    const delivery = await queueStaffInvitationEmail(tx, {
+      invitationId: createdBase.id,
+      email,
+      token,
+      tokenHash: hashRefreshToken(token),
+    });
     const created = await tx.staffInvitation.findUniqueOrThrow({
       where: { id: createdBase.id },
       include: { roles: { include: { role: { select: { id: true, name: true } } } } },
@@ -200,14 +254,12 @@ export async function createStaffInvitation(
       newValues: { email, roleNames: roles.map((role) => role.name), expiresAt: created.expiresAt.toISOString() },
       ...metadata,
     });
-    return created;
+    return { invitation: created, delivery };
   });
 
-  // The raw token is returned once so the trusted admin UI can hand it to the
-  // configured email-delivery adapter. Only the hash is persisted.
-  const { tokenHash: _tokenHash, ...safeInvitation } = invitation;
+  const { tokenHash: _tokenHash, ...safeInvitation } = invitation.invitation;
   void _tokenHash;
-  return { invitation: safeInvitation, invitationToken: token };
+  return { invitation: safeInvitation, delivery: invitation.delivery };
 }
 
 export async function listStaffInvitations() {
@@ -256,9 +308,17 @@ export async function resendStaffInvitation(
     }
 
     const expiresAt = await invitationExpiryFromDays(tx, invitationDaysDefault);
+    const tokenHash = hashRefreshToken(token);
     const result = await tx.staffInvitation.update({
       where: { id: invitationId },
-      data: { tokenHash: hashRefreshToken(token), expiresAt },
+      data: { tokenHash, expiresAt },
+    });
+    await suppressStaffInvitationDeliveries(tx, invitationId);
+    const delivery = await queueStaffInvitationEmail(tx, {
+      invitationId,
+      email: invitation.email,
+      token,
+      tokenHash,
     });
     await createAuditLog(tx, {
       staffAccountId: actorId,
@@ -269,11 +329,11 @@ export async function resendStaffInvitation(
       newValues: { expiresAt: result.expiresAt.toISOString() },
       ...metadata,
     });
-    return result;
+    return { invitation: result, delivery };
   });
-  const { tokenHash: _tokenHash, ...safeInvitation } = updated;
+  const { tokenHash: _tokenHash, ...safeInvitation } = updated.invitation;
   void _tokenHash;
-  return { invitation: safeInvitation, invitationToken: token };
+  return { invitation: safeInvitation, delivery: updated.delivery };
 }
 
 export async function updateStaffInvitationRoles(
@@ -343,6 +403,7 @@ export async function revokeStaffInvitation(actorId: string, invitationId: strin
       where: { id: invitationId },
       data: { status: "REVOKED", revokedAt: new Date() },
     });
+    await suppressStaffInvitationDeliveries(tx, invitationId);
     await createAuditLog(tx, {
       staffAccountId: actorId,
       action: "STAFF_INVITATION_REVOKED",
