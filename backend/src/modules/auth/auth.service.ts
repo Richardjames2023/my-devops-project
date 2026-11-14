@@ -125,21 +125,59 @@ export async function resendCustomerEmailVerification(
 
 export async function verifyCustomerEmail(token: string): Promise<void> {
   const tokenHash = hashRefreshToken(token);
+  const initial = await prisma.customerEmailVerificationToken.findUnique({
+    where: { tokenHash },
+    select: { userId: true },
+  });
+  if (!initial) {
+    throw new AppError(
+      "This email verification link is invalid or expired",
+      400,
+    );
+  }
+
   await prisma.$transaction(async (tx) => {
+    // Use the same user-level lock as account deletion, resend, login and
+    // password-reset flows. Re-read the token only after acquiring the lock
+    // so verification never locks a token row before waiting on the user row.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${initial.userId}::text, 0))`;
+
     const stored = await tx.customerEmailVerificationToken.findUnique({
       where: { tokenHash },
       select: { id: true, userId: true, expiresAt: true, consumedAt: true },
     });
-    if (!stored || stored.consumedAt || stored.expiresAt <= new Date()) {
+    if (
+      !stored ||
+      stored.userId !== initial.userId ||
+      stored.consumedAt ||
+      stored.expiresAt <= new Date()
+    ) {
       throw new AppError(
         "This email verification link is invalid or expired",
         400,
       );
     }
 
+    const user = await tx.user.findUnique({
+      where: { id: stored.userId },
+      select: { isActive: true },
+    });
+    if (!user?.isActive) {
+      throw new AppError(
+        "This email verification link is invalid or expired",
+        400,
+      );
+    }
+
+    const now = new Date();
     const claimed = await tx.customerEmailVerificationToken.updateMany({
-      where: { id: stored.id, consumedAt: null, expiresAt: { gt: new Date() } },
-      data: { consumedAt: new Date() },
+      where: {
+        id: stored.id,
+        userId: stored.userId,
+        consumedAt: null,
+        expiresAt: { gt: now },
+      },
+      data: { consumedAt: now },
     });
     if (claimed.count !== 1) {
       throw new AppError(
@@ -148,17 +186,24 @@ export async function verifyCustomerEmail(token: string): Promise<void> {
       );
     }
 
-    await tx.user.update({
-      where: { id: stored.userId },
+    const updated = await tx.user.updateMany({
+      where: { id: stored.userId, isActive: true },
       data: { emailVerified: true },
     });
+    if (updated.count !== 1) {
+      throw new AppError(
+        "This email verification link is invalid or expired",
+        400,
+      );
+    }
+
     await tx.customerEmailVerificationToken.updateMany({
       where: {
         userId: stored.userId,
         id: { not: stored.id },
         consumedAt: null,
       },
-      data: { consumedAt: new Date() },
+      data: { consumedAt: now },
     });
   });
 }
