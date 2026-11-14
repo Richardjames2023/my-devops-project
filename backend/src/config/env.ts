@@ -48,6 +48,16 @@ const envSchema = z.object({
     return z.string().email().safeParse(address.trim()).success;
   }).optional()),
   APP_BASE_URL: z.preprocess((value) => value === "" ? undefined : value, z.string().url().optional()),
+  STAFF_INVITATION_ENCRYPTION_KEY: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().optional(),
+  ),
+  STAFF_INVITATION_ACCEPTANCE_URL: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().url().optional(),
+  ),
+  STAFF_INVITATION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(48),
+  STAFF_INVITATION_ACCEPTANCE_SESSION_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
 }).superRefine((value, context) => {
   if (value.NODE_ENV === "production" && !value.EMAIL_DELIVERY_ENABLED) {
     context.addIssue({
@@ -93,6 +103,39 @@ const envSchema = z.object({
       path: ["APP_BASE_URL"],
       message: "APP_BASE_URL is required when email delivery is enabled",
     });
+  }
+  if (value.EMAIL_DELIVERY_ENABLED && value.NODE_ENV === "production" && !value.STAFF_INVITATION_ENCRYPTION_KEY) {
+    context.addIssue({
+      code: "custom",
+      path: ["STAFF_INVITATION_ENCRYPTION_KEY"],
+      message: "STAFF_INVITATION_ENCRYPTION_KEY is required in production when email delivery is enabled",
+    });
+  }
+  if (value.STAFF_INVITATION_ENCRYPTION_KEY) {
+    const key = value.STAFF_INVITATION_ENCRYPTION_KEY;
+    const decoded = /^[A-Za-z0-9+/]{43}=$/.test(key) ? Buffer.from(key, "base64") : Buffer.alloc(0);
+    if (decoded.length !== 32 || decoded.toString("base64") !== key) {
+      context.addIssue({
+        code: "custom",
+        path: ["STAFF_INVITATION_ENCRYPTION_KEY"],
+        message: "STAFF_INVITATION_ENCRYPTION_KEY must be a canonical base64-encoded 32-byte key",
+      });
+    }
+  }
+  if (value.STAFF_INVITATION_ACCEPTANCE_URL) {
+    try {
+      const url = new URL(value.STAFF_INVITATION_ACCEPTANCE_URL);
+      if (url.username || url.password || url.search || url.hash ||
+          (value.NODE_ENV === "production" && url.protocol !== "https:")) {
+        throw new Error("invalid acceptance URL");
+      }
+    } catch {
+      context.addIssue({
+        code: "custom",
+        path: ["STAFF_INVITATION_ACCEPTANCE_URL"],
+        message: "STAFF_INVITATION_ACCEPTANCE_URL must be a valid HTTPS URL in production without credentials, query, or fragment",
+      });
+    }
   }
   if (value.EMAIL_DELIVERY_ENABLED && !value.EMAIL_FROM) {
     context.addIssue({
