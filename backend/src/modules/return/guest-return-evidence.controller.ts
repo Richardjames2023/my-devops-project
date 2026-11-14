@@ -1,8 +1,11 @@
-import type { Request, Response } from "express";
+import type { NextFunction, Request, Response } from "express";
 import { z } from "zod";
 import { AppError } from "../../common/errors/AppError";
 import { isValidGuestOrderAccessToken } from "../orders/guest-order-access";
-import { createGuestReturnEvidence } from "./return-evidence.service";
+import {
+  assertGuestReturnEvidenceOrderAccess,
+  createGuestReturnEvidence,
+} from "./return-evidence.service";
 import {
   getGuestReturnEvidenceFileSource,
   getGuestReturnEvidenceViewUrl,
@@ -28,6 +31,20 @@ function readGuestEvidenceCredentials(
   }
 
   return { orderId: params.data.orderId, token };
+}
+
+export function requireGuestReturnEvidenceAccess(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const credentials = readGuestEvidenceCredentials(req, res);
+  if (!credentials) return;
+
+  void assertGuestReturnEvidenceOrderAccess(
+    credentials.orderId,
+    credentials.token,
+  ).then(() => next()).catch(next);
 }
 
 function readEvidenceId(req: Request, res: Response): string | null {
