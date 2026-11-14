@@ -486,6 +486,7 @@ describe("PostgreSQL customer checkout", () => {
         result.guestAccessToken,
       );
       expect(retrieved.id).toBe(result.order.id);
+      expect(retrieved.items[0]).not.toHaveProperty("unitCostSnapshot");
 
       await expect(
         getGuestOrder(result.order.id, randomUUID().replace(/-/g, "").padEnd(64, "a")),
