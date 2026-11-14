@@ -19,7 +19,11 @@ export async function updateProfile(req: AuthenticatedRequest, res: Response): P
     res.status(400).json({ message: "Validation failed", errors: z.flattenError(parsed.error).fieldErrors });
     return;
   }
-  const user = await updateCustomerProfile(req.user.id, parsed.data);
+  const user = await updateCustomerProfile(req.user.id, {
+    ...(parsed.data.firstName === undefined ? {} : { firstName: parsed.data.firstName }),
+    ...(parsed.data.lastName === undefined ? {} : { lastName: parsed.data.lastName }),
+    ...(parsed.data.phone === undefined ? {} : { phone: parsed.data.phone }),
+  });
   res.status(200).json({ message: "Profile updated successfully", user });
 }
 
