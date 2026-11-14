@@ -166,10 +166,16 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         description: "[redacted after account deletion]",
         publicId: null,
       });
+      const cleanupTask = await pool.query(
+        'SELECT status FROM cloudinary_cleanup_tasks WHERE "publicId" = $1',
+        ["private/evidence"],
+      );
+      expect(cleanupTask.rows[0]?.status).toBe("PENDING");
       const deletion = await pool.query('SELECT status, "completedAt" FROM customer_account_deletions WHERE "userId" = $1', [customer.id]);
       expect(deletion.rows[0].status).toBe("COMPLETED");
       expect(deletion.rows[0].completedAt).toBeTruthy();
     } finally {
+      await pool.query('DELETE FROM cloudinary_cleanup_tasks WHERE "publicId" = $1', ["private/evidence"]);
       await pool.query("DELETE FROM return_requests WHERE id = $1", [returnRequestId]);
       await pool.query('DELETE FROM orders WHERE "userId" = $1', [customer.id]);
       await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
