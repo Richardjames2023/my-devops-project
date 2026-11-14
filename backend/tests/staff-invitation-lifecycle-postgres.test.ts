@@ -33,7 +33,8 @@ const [{ default: prisma, disconnectDatabase }, staffService, encryption] = awai
 ]);
 
 const {
-  acceptStaffInvitation,
+  acceptStaffInvitation: completeStaffInvitation,
+  exchangeStaffInvitationToken,
   createStaffInvitation,
   listStaffInvitations,
   resendStaffInvitation,
@@ -69,6 +70,22 @@ async function createInvitation(email: string, roleIds = [roleAId]) {
     process.env.STAFF_INVITATION_ENCRYPTION_KEY!,
   );
   return { ...result, invitationToken };
+}
+
+
+async function acceptStaffInvitation(input: {
+  token: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}) {
+  const session = await exchangeStaffInvitationToken(input.token);
+  return completeStaffInvitation({
+    sessionToken: session.sessionToken,
+    password: input.password,
+    firstName: input.firstName,
+    lastName: input.lastName,
+  });
 }
 
 describe("PostgreSQL staff invitation lifecycle", () => {
