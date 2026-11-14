@@ -143,6 +143,98 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
     }
   });
 
+  it("defers anonymization through active warranty coverage and unresolved payment reconciliation", async () => {
+    const customer = await createCustomer("deletion-warranty");
+    const categoryId = randomUUID();
+    const productId = randomUUID();
+    const variantId = randomUUID();
+    const orderId = randomUUID();
+    const paymentId = randomUUID();
+    const orderItemId = randomUUID();
+    try {
+      await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
+      await pool.query(
+        'UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1',
+        [customer.id],
+      );
+      await pool.query(
+        `INSERT INTO categories (id, name, slug, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, NOW(), NOW())`,
+        [categoryId, `Lifecycle ${categoryId}`, `lifecycle-${categoryId}`],
+      );
+      await pool.query(
+        `INSERT INTO products (id, "categoryId", name, slug, "basePrice", "hasWarranty", "warrantyDuration", "createdAt", "updatedAt")
+         VALUES ($1, $2, 'Warranty Test Product', $3, 100, TRUE, 12, NOW(), NOW())`,
+        [productId, categoryId, `warranty-product-${productId}`],
+      );
+      await pool.query(
+        `INSERT INTO product_variants (id, "productId", sku, name, price, "hasWarranty", "warrantyDuration", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, 'Standard', 100, TRUE, 12, NOW(), NOW())`,
+        [variantId, productId, `SKU-${variantId}`],
+      );
+      await pool.query(
+        `INSERT INTO orders
+          (id, "userId", "orderNumber", status, subtotal, "discountAmount", "deliveryFee", "totalAmount", currency, "shippingAddress", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, 'COMPLETED', 100, 0, 0, 100, 'NGN', '{"anonymized":true}'::jsonb, NOW(), NOW())`,
+        [orderId, customer.id, `ORD-${orderId}`],
+      );
+      await pool.query(
+        `INSERT INTO order_items
+          (id, "orderId", "productVariantId", "productName", "variantName", sku, quantity, "unitPrice", "discountAmount", "totalPrice", "hasWarranty", "warrantyDuration", "warrantyStartedAt", "warrantyExpiresAt", "createdAt")
+         VALUES ($1, $2, $3, 'Warranty Test Product', 'Standard', $4, 1, 100, 0, 100, TRUE, 12, NOW() - INTERVAL '30 days', NOW() + INTERVAL '30 days', NOW())`,
+        [orderItemId, orderId, variantId, `SKU-${variantId}`],
+      );
+      await pool.query(
+        `INSERT INTO payments (id, "orderId", reference, provider, status, amount, currency, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, 'PAYSTACK', 'SUCCESS', 100, 'NGN', NOW(), NOW())`,
+        [paymentId, orderId, `PAY-${paymentId}`],
+      );
+      await pool.query(
+        `INSERT INTO payment_inventory_reconciliations ("paymentId", "orderId", status, reason, "createdAt", "updatedAt")
+         VALUES ($1, $2, 'PENDING', 'Test reconciliation', NOW(), NOW())`,
+        [paymentId, orderId],
+      );
+
+      const reconciliationDeferred = await processCustomerAccountDeletionBatch();
+      expect(reconciliationDeferred.deferred).toBe(1);
+
+      await pool.query(
+        "UPDATE payment_inventory_reconciliations SET status = 'RESOLVED_FULFILLED' WHERE \"paymentId\" = $1",
+        [paymentId],
+      );
+      await pool.query(
+        'UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1',
+        [customer.id],
+      );
+      const warrantyDeferred = await processCustomerAccountDeletionBatch();
+      expect(warrantyDeferred.deferred).toBe(1);
+
+      await pool.query(
+        'UPDATE order_items SET "warrantyExpiresAt" = NOW() - INTERVAL \'1 minute\' WHERE id = $1',
+        [orderItemId],
+      );
+      await pool.query(
+        'UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1',
+        [customer.id],
+      );
+      const completed = await processCustomerAccountDeletionBatch();
+      expect(completed.completed).toBe(1);
+      const user = await pool.query('SELECT email, "firstName" FROM users WHERE id = $1', [customer.id]);
+      expect(user.rows[0]).toMatchObject({
+        email: `deleted+${customer.id}@deleted.invalid`,
+        firstName: "Deleted",
+      });
+    } finally {
+      await pool.query('DELETE FROM payment_inventory_reconciliations WHERE "paymentId" = $1', [paymentId]);
+      await pool.query("DELETE FROM payments WHERE id = $1", [paymentId]);
+      await pool.query("DELETE FROM orders WHERE id = $1", [orderId]);
+      await pool.query("DELETE FROM product_variants WHERE id = $1", [variantId]);
+      await pool.query("DELETE FROM products WHERE id = $1", [productId]);
+      await pool.query("DELETE FROM categories WHERE id = $1", [categoryId]);
+      await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
+    }
+  });
+
   it("serializes duplicate deletion requests and keeps processing idempotent", async () => {
     const customer = await createCustomer("deletion-concurrent");
     try {
