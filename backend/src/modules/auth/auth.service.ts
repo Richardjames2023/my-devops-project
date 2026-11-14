@@ -95,6 +95,13 @@ export async function resendCustomerEmailVerification(
 
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}::text, 0))`;
+    const current = await tx.user.findUnique({
+      where: { id: user.id },
+      select: { email: true, firstName: true, emailVerified: true, isActive: true },
+    });
+    // Deletion may have deactivated the account while this request waited for the lock.
+    if (!current || !current.isActive || current.emailVerified) return;
+
     await tx.customerEmailVerificationToken.updateMany({
       where: { userId: user.id, consumedAt: null },
       data: { consumedAt: new Date() },
@@ -104,10 +111,10 @@ export async function resendCustomerEmailVerification(
     });
     await tx.notificationEmailDelivery.create({
       data: {
-        recipientEmail: user.email,
+        recipientEmail: current.email,
         templateKey: "customer.email-verification",
         templateData: {
-          firstName: user.firstName,
+          firstName: current.firstName,
           actionUrl:
             "/verify-email?token=" + encodeURIComponent(verificationToken),
         },
@@ -178,8 +185,15 @@ export async function requestCustomerPasswordReset(
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
   await prisma.$transaction(async (tx) => {
-    // Serialize reset requests so only the newest outstanding link remains valid.
+    // Serialize reset requests with account deactivation and recheck eligibility
+    // after acquiring the shared lock.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}::text, 0))`;
+    const current = await tx.user.findUnique({
+      where: { id: user.id },
+      select: { email: true, firstName: true, emailVerified: true, isActive: true },
+    });
+    if (!current || !current.isActive || !current.emailVerified) return;
+
     await tx.customerPasswordResetToken.updateMany({
       where: { userId: user.id, consumedAt: null },
       data: { consumedAt: new Date() },
@@ -189,10 +203,10 @@ export async function requestCustomerPasswordReset(
     });
     await tx.notificationEmailDelivery.create({
       data: {
-        recipientEmail: user.email,
+        recipientEmail: current.email,
         templateKey: "customer.password-reset",
         templateData: {
-          firstName: user.firstName,
+          firstName: current.firstName,
           actionUrl: "/reset-password?token=" + encodeURIComponent(resetToken),
         },
       },
