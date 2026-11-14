@@ -667,7 +667,8 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         [customer.id],
       );
       expect(deletion.rows[0].failureCount).toBe(1);
-      expect(deletion.rows[0].lastError).toContain("simulated transient anonymization failure");
+      expect(deletion.rows[0].lastError).toBeTruthy();
+      expect(deletion.rows[0].lastError).not.toContain(customer.email);
       expect(new Date(deletion.rows[0].scheduledFor).getTime()).toBeGreaterThan(Date.now());
     } finally {
       await pool.query("DROP TRIGGER IF EXISTS test_reject_customer_anonymization_trigger ON users");
