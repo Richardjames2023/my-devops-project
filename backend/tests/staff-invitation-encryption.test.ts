@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   decryptInvitationSecret,
   encryptInvitationSecret,
+  getInvitationEncryptionKeyring,
 } from "../src/modules/staff/staff-invitation-encryption";
 
 const key = randomBytes(32).toString("base64");
@@ -45,6 +46,44 @@ describe("staff invitation secret encryption", () => {
     ciphertext[0] ^= 1;
     const modified = { ...envelope, ciphertext: ciphertext.toString("base64") };
     expect(() => decryptInvitationSecret(modified, key)).toThrow();
+  });
+
+
+  it("decrypts queued envelopes with retained historical keys after rotation", () => {
+    const oldKey = randomBytes(32).toString("base64");
+    const activeKey = randomBytes(32).toString("base64");
+    const oldEnvelope = encryptInvitationSecret("queued-before-rotation", {
+      activeKeyId: "key-2026-01",
+      keys: { "key-2026-01": oldKey },
+    });
+    const currentKeyring = getInvitationEncryptionKeyring(
+      undefined,
+      JSON.stringify({
+        "key-2026-01": oldKey,
+        "key-2026-11": activeKey,
+      }),
+      "key-2026-11",
+    );
+    const newEnvelope = encryptInvitationSecret("queued-after-rotation", currentKeyring);
+
+    expect(newEnvelope.keyId).toBe("key-2026-11");
+    expect(decryptInvitationSecret(oldEnvelope, currentKeyring)).toBe("queued-before-rotation");
+    expect(decryptInvitationSecret(newEnvelope, currentKeyring)).toBe("queued-after-rotation");
+  });
+
+  it("rejects an envelope when its historical key has been removed", () => {
+    const retiredKey = randomBytes(32).toString("base64");
+    const envelope = encryptInvitationSecret("secret", {
+      activeKeyId: "retired",
+      keys: { retired: retiredKey },
+    });
+    const currentKeyring = {
+      activeKeyId: "current",
+      keys: { current: randomBytes(32).toString("base64") },
+    };
+    expect(() => decryptInvitationSecret(envelope, currentKeyring)).toThrow(
+      "Invitation encryption key is unavailable",
+    );
   });
 
   it("rejects malformed envelopes and invalid keys", () => {
