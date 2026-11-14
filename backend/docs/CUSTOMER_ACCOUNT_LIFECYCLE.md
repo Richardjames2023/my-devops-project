@@ -5,7 +5,7 @@
 
 ## Account deletion lifecycle
 - `POST /api/v1/customer/account/deletion-request` — authenticated customer; requires the current password. Deactivates the account immediately, increments the session version, revokes refresh tokens and schedules anonymization 30 days later.
-- `POST /api/v1/customer/account/deletion-request/cancel` — public, rate-limited endpoint requiring the account email and password. Available only before the scheduled deadline; restores the account and requires a fresh login.
+- `POST /api/v1/customer/account/deletion-request/cancel` — public, rate-limited endpoint requiring the account email and password. Available only within 30 days of the original request (operational deferrals do not extend the cancellation window); restores the account and requires a fresh login.
 - A background worker checks due requests hourly. Requests with open orders, active inventory reservations, in-flight/failed deliveries, unresolved payments/refunds, returns or warranty claims are deferred by seven days and checked again.
 - Completed financial records, order history, product reviews, return records, warranty records and audit actions are retained. Customer-facing identity becomes **Deleted Customer**; order contact and shipping PII is anonymized. Carts, wishlists, notification inbox/preferences, customer email deliveries, refresh tokens and verification/reset tokens are removed.
 - Processing is transactionally locked per customer and can safely be retried. No user row is hard-deleted because retained business records depend on it.

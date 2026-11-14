@@ -162,7 +162,12 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       await expect(requestCustomerAccountDeletion(customer.id, "incorrect-password"))
         .rejects.toMatchObject({ statusCode: 401 });
       await requestCustomerAccountDeletion(customer.id, "Customer-Lifecycle-Password-2026!");
-      await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = NOW() - INTERVAL \'1 minute\' WHERE "userId" = $1', [customer.id]);
+      // A deferred request may have a future processing date, but deferral must
+      // never extend the original 30-day cancellation window.
+      await pool.query(
+        'UPDATE customer_account_deletions SET "requestedAt" = NOW() - INTERVAL \'31 days\', "scheduledFor" = NOW() + INTERVAL \'7 days\' WHERE "userId" = $1',
+        [customer.id],
+      );
       await expect(cancelCustomerAccountDeletion(customer.email, "Customer-Lifecycle-Password-2026!"))
         .rejects.toMatchObject({ statusCode: 410 });
     } finally {

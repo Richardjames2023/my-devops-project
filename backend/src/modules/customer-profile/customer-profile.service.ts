@@ -136,7 +136,10 @@ export async function cancelCustomerAccountDeletion(email: string, password: str
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${user.id}::text, 0))`;
     const deletion = await tx.customerAccountDeletion.findUnique({ where: { userId: user.id } });
     const now = new Date();
-    if (!deletion || deletion.status !== "REQUESTED" || deletion.scheduledFor <= now) {
+    const cancellationDeadline = deletion
+      ? new Date(deletion.requestedAt.getTime() + DELETION_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000)
+      : now;
+    if (!deletion || deletion.status !== "REQUESTED" || cancellationDeadline <= now) {
       throw new AppError("The account deletion cancellation period has ended or no request is active", 410);
     }
 
