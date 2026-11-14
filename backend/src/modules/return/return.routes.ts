@@ -17,6 +17,11 @@ import { uploadEvidence } from "./return-evidence.controller";
 import { uploadReturnEvidence } from "./return-evidence.upload";
 import { viewEvidence } from "./return-evidence-view.controller";
 import { streamEvidenceFile } from "./return-evidence-file.controller";
+import {
+  uploadGuestEvidence,
+  viewGuestEvidence,
+  streamGuestEvidenceFile,
+} from "./guest-return-evidence.controller";
 
 const router = Router();
 
@@ -24,6 +29,22 @@ const router = Router();
 router.get("/guest/:orderId", guestOrderRetrievalLimiter, listGuestReturns);
 router.post("/guest/:orderId", guestOrderLimiter, createGuestReturn);
 router.get("/guest/:orderId/:returnRequestId", guestOrderRetrievalLimiter, getGuestReturn);
+router.post(
+  "/guest/:orderId/:returnRequestId/evidence",
+  guestOrderLimiter,
+  uploadReturnEvidence,
+  uploadGuestEvidence,
+);
+router.get(
+  "/guest/:orderId/evidence/:evidenceId/view",
+  guestOrderRetrievalLimiter,
+  viewGuestEvidence,
+);
+router.get(
+  "/guest/:orderId/evidence/:evidenceId/file",
+  guestOrderRetrievalLimiter,
+  streamGuestEvidenceFile,
+);
 
 router.get("/", authenticate, requireCustomer, listMine);
 router.get("/:returnRequestId", authenticate, requireCustomer, getMine);
