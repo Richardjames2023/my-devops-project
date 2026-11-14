@@ -16,6 +16,7 @@ const permissions = [
   "staff.manage",
   "products.read",
   "products.manage",
+  "products.cost.manage",
   "categories.read",
   "categories.manage",
   "inventory.read",
