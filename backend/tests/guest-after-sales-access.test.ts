@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
+import { AppError } from "../src/common/errors/AppError";
 
 const mocks = vi.hoisted(() => ({
   createReturnRequest: vi.fn(),
@@ -127,6 +128,28 @@ describe("guest after-sales HTTP endpoints", () => {
       });
 
     expect(response.status).toBe(404);
+    expect(mocks.createGuestReturnEvidence).not.toHaveBeenCalled();
+  });
+
+
+  it("rejects expired or revoked guest order access before parsing uploads", async () => {
+    mocks.assertGuestReturnEvidenceOrderAccess.mockRejectedValue(
+      new AppError("Return evidence not found", 404),
+    );
+
+    const response = await request(app)
+      .post(`/api/v1/returns/guest/${orderId}/${returnRequestId}/evidence`)
+      .set("X-Guest-Order-Token", guestToken)
+      .attach("evidence", Buffer.from("fake-image"), {
+        filename: "evidence.jpg",
+        contentType: "image/jpeg",
+      });
+
+    expect(response.status).toBe(404);
+    expect(mocks.assertGuestReturnEvidenceOrderAccess).toHaveBeenCalledWith(
+      orderId,
+      guestToken,
+    );
     expect(mocks.createGuestReturnEvidence).not.toHaveBeenCalled();
   });
 
