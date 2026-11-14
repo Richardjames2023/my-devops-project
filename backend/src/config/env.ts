@@ -52,6 +52,11 @@ const envSchema = z.object({
     (value) => value === "" ? undefined : value,
     z.string().optional(),
   ),
+  STAFF_INVITATION_ENCRYPTION_KEYRING: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().optional(),
+  ),
+  STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID: z.string().min(1).default("v1"),
   STAFF_INVITATION_ACCEPTANCE_URL: z.preprocess(
     (value) => value === "" ? undefined : value,
     z.string().url().optional(),
@@ -104,23 +109,48 @@ const envSchema = z.object({
       message: "APP_BASE_URL is required when email delivery is enabled",
     });
   }
-  if (value.EMAIL_DELIVERY_ENABLED && value.NODE_ENV === "production" && !value.STAFF_INVITATION_ENCRYPTION_KEY) {
+  if (value.EMAIL_DELIVERY_ENABLED && value.NODE_ENV === "production" && !value.STAFF_INVITATION_ENCRYPTION_KEY && !value.STAFF_INVITATION_ENCRYPTION_KEYRING) {
     context.addIssue({
       code: "custom",
       path: ["STAFF_INVITATION_ENCRYPTION_KEY"],
       message: "STAFF_INVITATION_ENCRYPTION_KEY is required in production when email delivery is enabled",
     });
   }
-  if (value.STAFF_INVITATION_ENCRYPTION_KEY) {
-    const key = value.STAFF_INVITATION_ENCRYPTION_KEY;
+  const configuredKeys: Record<string, string> = {};
+  if (value.STAFF_INVITATION_ENCRYPTION_KEY) configuredKeys.v1 = value.STAFF_INVITATION_ENCRYPTION_KEY;
+  if (value.STAFF_INVITATION_ENCRYPTION_KEYRING) {
+    try {
+      const parsed: unknown = JSON.parse(value.STAFF_INVITATION_ENCRYPTION_KEYRING);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid keyring");
+      for (const [id, key] of Object.entries(parsed)) {
+        if (!/^[A-Za-z0-9._-]{1,64}$/.test(id) || typeof key !== "string") throw new Error("invalid key entry");
+        configuredKeys[id] = key;
+      }
+    } catch {
+      context.addIssue({
+        code: "custom",
+        path: ["STAFF_INVITATION_ENCRYPTION_KEYRING"],
+        message: "STAFF_INVITATION_ENCRYPTION_KEYRING must be a JSON object mapping key IDs to base64 keys",
+      });
+    }
+  }
+  for (const [id, key] of Object.entries(configuredKeys)) {
     const decoded = /^[A-Za-z0-9+/]{43}=$/.test(key) ? Buffer.from(key, "base64") : Buffer.alloc(0);
     if (decoded.length !== 32 || decoded.toString("base64") !== key) {
       context.addIssue({
         code: "custom",
-        path: ["STAFF_INVITATION_ENCRYPTION_KEY"],
-        message: "STAFF_INVITATION_ENCRYPTION_KEY must be a canonical base64-encoded 32-byte key",
+        path: [id === "v1" && value.STAFF_INVITATION_ENCRYPTION_KEY ? "STAFF_INVITATION_ENCRYPTION_KEY" : "STAFF_INVITATION_ENCRYPTION_KEYRING"],
+        message: "Every invitation encryption key must be a canonical base64-encoded 32-byte key",
       });
     }
+  }
+  if ((value.STAFF_INVITATION_ENCRYPTION_KEY || value.STAFF_INVITATION_ENCRYPTION_KEYRING) &&
+      !configuredKeys[value.STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID]) {
+    context.addIssue({
+      code: "custom",
+      path: ["STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID"],
+      message: "The active invitation encryption key ID must exist in the configured keyring",
+    });
   }
   if (value.STAFF_INVITATION_ACCEPTANCE_URL) {
     try {
