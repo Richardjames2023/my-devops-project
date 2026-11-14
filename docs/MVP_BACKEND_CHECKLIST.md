@@ -1,8 +1,8 @@
 # MVP Backend Feature Checklist
 
 **Target branch:** `dev`  
-**Tracking branch:** `docs/reconcile-mvp-backend-checklist`  
-**Last reconciled against:** `dev` at `9955efceb0cd3c5bf0385007ae2764ac8b2a540c` (14 November 2026)  
+**Tracking branch:** `docs/reconcile-mvp-after-prs-29-32`  
+**Last reconciled against:** `dev` at `0f7379c6cc7b9331fde9fc5d1ddb997fc839e9f7` (14 November 2026)  
 **Purpose:** Track backend MVP capabilities through implementation, review, database migration (where applicable), and automated tests.
 
 This checklist is an implementation tracker, not a claim that every item has already been fully audited. Mark an item complete only after its API/service behavior, authorization, persistence, failure handling, and relevant automated tests have been reviewed.
@@ -21,7 +21,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Customer account security and password reset.
 - [x] Guest checkout and secure guest order access.
 - [x] Staff identity, invitations, roles, and permission-based authorization.
-- [ ] Confirm the full customer profile lifecycle and account deactivation/deletion requirements for MVP.
+- [x] Customer profile updates, account deactivation, deletion request, 30-day cancellation window, deferred anonymization, and retention safeguards are implemented and covered by PostgreSQL lifecycle tests (PR #31).
 - [x] Backend staff invitation email delivery, encrypted token queueing, and restricted acceptance-session exchange/completion are implemented and covered by tests (PR #27).
 - [ ] Implement the frontend invitation acceptance page: read and remove the URL fragment safely, require an explicit user action to exchange the token, then complete acceptance using the HttpOnly session cookie.
 - [ ] Confirm production frontend/API origin topology and configure cookie SameSite/CORS settings accordingly before deployment.
@@ -112,14 +112,14 @@ This checklist is an implementation tracker, not a claim that every item has alr
   - [x] Guest token hashing, expiry, explicit revocation, and rate limiting are implemented.
   - [x] Guest token validity is enforced across guest order retrieval, delivery tracking, payment initialization/verification, returns, and warranty claims.
   - [x] PostgreSQL and HTTP coverage exists for guest access, token expiry/revocation, and guest return/warranty routes.
-- [ ] Add guest-specific return evidence upload and secure evidence viewing. Existing evidence upload/view controllers require authenticated users; guest-token authorization is not established by those controllers.
+- [x] Guest-specific return evidence upload and secure viewing/streaming are implemented using the guest order token, order-scoped authorization, private Cloudinary delivery, and PostgreSQL/HTTP tests (PR #29).
 - [~] Verify end-to-end stock restoration, refund state, audit trail, and customer notifications for every return/refund outcome; relevant reconciliation and business-event tests exist, but the complete cross-module outcome matrix still needs review.
 
 ## 9. Reviews and customer engagement
 
 - [x] Product review submission and moderation foundation.
 - [x] Review eligibility requires a paid, fully delivered order; unapproved reviews remain private (PostgreSQL coverage exists).
-- [~] Verify duplicate-review prevention and the complete moderation/public-visibility lifecycle.
+- [x] Duplicate-review prevention, concurrent submission conflict handling, moderation idempotency, terminal-state conflicts, edit-to-pending behavior, and public visibility are covered by lifecycle regression tests (PR #32).
 - [x] Customer wishlist (tracked in section 6).
 
 ## 10. Notifications and email
@@ -127,7 +127,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Notification persistence and inbox APIs.
 - [x] Transactional outbox foundation and processing worker.
 - [x] Email delivery worker, provider integration, retries, and dead-letter handling.
-- [x] Business event fan-out is covered for orders, successful payments, payment reconciliation, delivery exceptions, returns, refunds, warranties, low stock, and staff role/status security events.
+- [~] Business event fan-out is implemented for order creation, successful payments, payment reconciliation, delivery exceptions, return requests/receipt, warranty claim creation, refund manual-attention events, low stock, and staff role/status security events. Return decision/inspection outcomes and final refund success/failure customer updates still require an explicit outcome-policy review and coverage.
 - [x] Event-level email policy enforces routine in-app-only notifications and mandatory email for urgent/actionable events.
 - [x] Guest order confirmation and guest payment events are handled without creating fake customer inbox identities; guest order confirmation remains a transactional email exception.
 - [x] Successful payment receipts remain mandatory transactional notifications.
@@ -147,7 +147,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [~] Complete a rate-limit and abuse-protection audit across authentication, guest order access, checkout, wishlist, reviews, and public endpoints.
 - [ ] Verify structured logging, correlation/request IDs, and actionable error reporting across background workers and external integrations.
 - [ ] Verify backup/restore procedure and production migration/rollback runbook.
-- [x] Run full build and test suite against the dedicated test database before the latest merge: TypeScript build passed; full Vitest suite passed (69 files, 423 tests). Prisma migration status was up to date on `shop_db_test`.
+- [~] Last recorded full-suite verification was 69 test files / 423 tests on the earlier PR #27 baseline. PRs #29, #31, and #32 were merged afterward; a fresh Prisma validation, build, migration-status check, focused regression run, and full suite on current `dev` remain required.
 - [ ] Repeat build, migration validation, and full test suite against `shop_db_test` before each subsequent merge; never point integration tests at `shop_db` or production.
 
 ## MVP scope decisions
@@ -158,7 +158,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 | Multiple payment providers | Exclude from MVP |
 | External courier integration | On hold pending logistics partner selection; retain manual delivery workflow |
 | Customer wishlist | Include; merged and tested on `dev` |
-| Guest returns/warranty claims | Include; token-scoped API merged; guest evidence upload/view remains outstanding |
+| Guest returns/warranty claims | Include; token-scoped APIs and guest return evidence upload/view are merged |
 | Automated courier rate quoting at checkout | Decision required |
 | Move wishlist item to cart | Decision required |
 
@@ -174,6 +174,6 @@ A checklist item may be marked `[x]` only when:
 6. `npx prisma validate`, `npm run build`, and the full Vitest suite pass when applicable.
 7. Required environment variables, migrations, and deployment notes are documented.
 
-**Reconciliation note:** This update was prepared from the current `dev` tree, merged PR records, implementation files, and test cases. Items marked `[~]` or `[ ]` are intentionally not treated as complete merely because related code exists.
+**Reconciliation note:** Reconciled against `dev` commit `0f7379c` after PRs #29, #31, and #32. The account lifecycle, guest return evidence, and review lifecycle statuses now reflect those merged changes. The cross-module return/refund/inventory matrix and post-PR full-suite verification remain open until reviewed and tested.
 
 **Testing safety:** PostgreSQL integration tests must use the dedicated `shop_db_test` database, never a development or production database.
