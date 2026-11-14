@@ -53,3 +53,10 @@ export const productVariantStatusSchema = z.object({
 
 export type CreateProductVariantInput = z.infer<typeof createProductVariantSchema>;
 export type UpdateProductVariantInput = z.infer<typeof updateProductVariantSchema>;
+
+
+export const updateProductVariantCostSchema = z.object({
+  costPrice: priceSchema.nullable(),
+});
+
+export type UpdateProductVariantCostInput = z.infer<typeof updateProductVariantCostSchema>;
