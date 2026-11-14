@@ -107,7 +107,14 @@ The frontend must not persist the raw token in localStorage, sessionStorage, coo
 
 ### 3.5 Token exchange and acceptance session
 
-Target API flow (exact route names and response contract to be finalized during implementation):
+Implemented backend API contract:
+
+- `POST /api/v1/staff-auth/invitation/exchange` accepts `{ "token": "..." }` in the JSON body and sets the restricted `staff_invitation_session` HttpOnly cookie.
+- `POST /api/v1/staff-auth/accept-invitation` accepts only `{ "password": "...", "firstName": "...", "lastName": "..." }`; the token is not accepted in this request.
+- Both endpoints require the `Origin` header to match the configured acceptance page origin and return `Cache-Control: no-store` and `Referrer-Policy: no-referrer`.
+- The cookie is scoped to `/api/v1/staff-auth`, is HttpOnly, uses Secure in production, and uses the configured `COOKIE_SAME_SITE` policy.
+
+The API contract replaces the former direct-token acceptance body. The frontend must use the exchange endpoint before calling completion.
 
 1. Frontend explicitly POSTs the raw invitation token to a dedicated backend exchange endpoint over HTTPS.
 2. Backend hashes the submitted token and validates the matching invitation:
@@ -229,7 +236,7 @@ Notes:
 - `APP_BASE_URL` already exists in the application configuration and is used by email infrastructure.
 - `STAFF_INVITATION_ACCEPTANCE_URL` is proposed so the backend does not hardcode a frontend route. The final route is not confirmed until frontend implementation.
 - `STAFF_INVITATION_ENCRYPTION_KEY` must be a separate production secret.
-- The current invitation default is seven days. A shorter 24–48-hour TTL is the target policy; choose and document the final default during implementation. The example above uses 48 hours provisionally.
+- The invitation default is configurable through `STAFF_INVITATION_TTL_HOURS` and defaults to 48 hours. The existing optional `expiresInDays` administrator override remains supported (1–30 days). Resend uses the configured hour-based default.
 - Validate configuration at startup. Production must fail closed if required email/encryption configuration is missing or invalid when invitation email delivery is enabled.
 - Never log secret values during configuration validation.
 
@@ -399,17 +406,17 @@ Update this section as work is completed. Link relevant commits/PRs where possib
 | Invitation token storage | SHA-256 hash only |
 | Email queue token storage | AES-256-GCM encrypted envelope; never plaintext |
 | Encryption secret | Dedicated `STAFF_INVITATION_ENCRYPTION_KEY` |
-| Invitation TTL | Target 24–48 hours; final default to be selected (48 hours shown provisionally) |
-| Acceptance session | Opaque, hashed, invitation-scoped, one-time, 15-minute target |
+| Invitation TTL | 48 hours by default via `STAFF_INVITATION_TTL_HOURS`; admin override remains 1–30 days |
+| Acceptance session | Opaque, hashed, invitation-scoped, one-time; default 15 minutes via `STAFF_INVITATION_ACCEPTANCE_SESSION_TTL_MINUTES` |
 | Session transport | HttpOnly + Secure cookie; SameSite and scope depend on actual deployment origins |
 | Email provider | Reuse existing Resend infrastructure |
 | Email policy | Dedicated invitation email flow, not ordinary in-app notification |
 | Frontend start | Immediately after backend completion |
 
 Open questions to resolve during implementation:
-- Confirm whether 24 or 48 hours is the final invitation TTL.
+- Confirm production frontend/API origin topology and choose the final `COOKIE_SAME_SITE` setting.
 - Confirm frontend/API origin topology to determine cookie SameSite, domain, CORS, and CSRF configuration.
-- Confirm whether the existing acceptance endpoint should be replaced, versioned, or retained as the final completion endpoint behind the new exchange flow.
+- The existing acceptance endpoint now completes through the restricted session cookie; frontend must adopt this contract.
 - Confirm encryption key encoding and deployment secret-manager procedure.
 - Confirm final frontend route when frontend work begins.
 
@@ -429,3 +436,6 @@ This feature is not complete until:
 ## Implementation progress note (2026-11-14)
 
 The feature branch `feat/staff-invitation-email-workflow` contains the first backend implementation pass: authenticated token encryption, transactional queue insertion using the existing email-delivery table, invitation-specific worker handling, fragment-based link generation, and restricted acceptance sessions. Tests have been added but have not yet been run against the local PostgreSQL test database. Do not treat this branch as verified until the focused tests and TypeScript build pass locally. The acceptance frontend route remains a configurable/proposed route and has not been built.
+
+
+**Local verification status:** GitHub implementation commits are present, but the branch has not been built or tested locally. The checklists above distinguish implementation added from test execution still pending.
