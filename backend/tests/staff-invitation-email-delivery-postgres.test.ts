@@ -139,6 +139,54 @@ describe("PostgreSQL staff invitation email delivery", () => {
     });
   });
 
+
+  it("serializes an in-flight invitation send against token rotation", async () => {
+    const fixture = await createInvitationDelivery();
+    let notifyStarted!: () => void;
+    let releaseProvider!: () => void;
+    const started = new Promise<void>((resolve) => { notifyStarted = resolve; });
+    const providerGate = new Promise<void>((resolve) => { releaseProvider = resolve; });
+    const send = vi.fn<EmailProvider["send"]>().mockImplementation(async () => {
+      notifyStarted();
+      await providerGate;
+      return { messageId: "staff-invitation-concurrency" };
+    });
+
+    const processing = processNotificationEmailBatch({
+      deliveryId: fixture.deliveryId,
+      provider: { send },
+      enabled: true,
+    });
+    await started;
+
+    let rotationCompleted = false;
+    const replacementHash = (await import("../src/common/utils/refreshToken")).hashRefreshToken(
+      randomBytes(32).toString("hex"),
+    );
+    const rotation = pool.query(
+      `UPDATE staff_invitations SET "tokenHash" = $2, "updatedAt" = NOW() WHERE id = $1`,
+      [fixture.invitationId, replacementHash],
+    ).then(() => { rotationCompleted = true; });
+
+    // The worker holds the invitation row lock until provider acceptance and
+    // the delivery status update commit. A concurrent resend/rotation must wait.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(rotationCompleted).toBe(false);
+
+    releaseProvider();
+    const result = await processing;
+    await rotation;
+
+    expect(result).toMatchObject({ claimed: 1, accepted: 1, failed: 0, skipped: false });
+    expect(send).toHaveBeenCalledTimes(1);
+    const persisted = await pool.query(
+      `SELECT status FROM notification_email_deliveries WHERE id = $1`,
+      [fixture.deliveryId],
+    );
+    expect(persisted.rows[0].status).toBe("ACCEPTED");
+    expect(rotationCompleted).toBe(true);
+  });
+
   it("suppresses a revoked invitation before provider delivery", async () => {
     const fixture = await createInvitationDelivery();
     await pool.query(
