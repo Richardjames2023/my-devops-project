@@ -305,12 +305,12 @@ export async function processNotificationEmailBatch(
       }
       failed += 1;
       try {
-        await markFailed(
-          delivery,
-          delivery.templateKey === "staff.invitation"
-            ? new Error("Staff invitation email could not be prepared or sent")
-            : error,
-        );
+        const safeError = delivery.templateKey === "staff.invitation"
+          ? error instanceof EmailProviderError
+            ? new EmailProviderError("Staff invitation email delivery failed", error.retryable, error.statusCode)
+            : new Error("Staff invitation email could not be prepared or sent")
+          : error;
+        await markFailed(delivery, safeError);
       } catch (recordError) {
         console.error("[NOTIFICATION EMAIL] Failed to record delivery failure", delivery.id, recordError);
       }
