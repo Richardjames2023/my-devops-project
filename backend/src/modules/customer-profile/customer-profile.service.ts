@@ -3,6 +3,7 @@ import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import { verifyPassword } from "../../common/utils/password";
 import { createAuditLog } from "../../common/utils/audit-log";
+import { enqueueCloudinaryCleanup } from "../../infrastructure/cloudinary/cloudinary-cleanup";
 
 const DELETION_GRACE_PERIOD_DAYS = 30;
 const DELETION_DEFERRAL_DAYS = 7;
@@ -283,6 +284,15 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
     where: { userId: user.id },
     data: { reason: redactedText, description: redactedText },
   });
+  const returnEvidence = await tx.returnEvidence.findMany({
+    where: { returnRequest: { userId: user.id }, publicId: { not: null } },
+    select: { publicId: true },
+  });
+  for (const evidence of returnEvidence) {
+    if (evidence.publicId) {
+      await enqueueCloudinaryCleanup(evidence.publicId, tx);
+    }
+  }
   await tx.returnEvidence.updateMany({
     where: { returnRequest: { userId: user.id } },
     data: {
