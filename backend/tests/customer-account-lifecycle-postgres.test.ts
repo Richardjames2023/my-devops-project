@@ -120,7 +120,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       const pending = await pool.query('SELECT status, "deferralCount" FROM customer_account_deletions WHERE "userId" = $1', [customer.id]);
       expect(pending.rows[0]).toMatchObject({ status: "REQUESTED", deferralCount: 1 });
 
-      await pool.query("UPDATE orders SET status = 'COMPLETED' WHERE "userId" = $1", [customer.id]);
+      await pool.query('UPDATE orders SET status = \'COMPLETED\' WHERE "userId" = $1', [customer.id]);
       await pool.query('UPDATE customer_account_deletions SET "scheduledFor" = NOW() - INTERVAL \'1 minute\' WHERE "userId" = $1', [customer.id]);
       const processed = await processCustomerAccountDeletionBatch();
       expect(processed.completed).toBe(1);
@@ -132,6 +132,7 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       expect(deletion.rows[0].status).toBe("COMPLETED");
       expect(deletion.rows[0].completedAt).toBeTruthy();
     } finally {
+      await pool.query('DELETE FROM orders WHERE "userId" = $1', [customer.id]);
       await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
     }
   });

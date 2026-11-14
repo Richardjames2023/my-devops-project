@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import type { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import { verifyPassword } from "../../common/utils/password";
@@ -70,9 +70,13 @@ export async function requestCustomerAccountDeletion(userId: string, password: s
       where: { id: userId },
       select: { id: true, isActive: true },
     });
-    if (!user || !user.isActive) throw new AppError("Customer account is unavailable", 403);
+    if (!user) throw new AppError("Customer account is unavailable", 403);
 
     const existing = await tx.customerAccountDeletion.findUnique({ where: { userId } });
+    if (!user.isActive && existing?.status === "REQUESTED") {
+      return { status: existing.status, requestedAt: existing.requestedAt, scheduledFor: existing.scheduledFor, gracePeriodDays: DELETION_GRACE_PERIOD_DAYS };
+    }
+    if (!user.isActive) throw new AppError("Customer account is unavailable", 403);
     if (existing?.status === "REQUESTED") {
       return { status: existing.status, requestedAt: existing.requestedAt, scheduledFor: existing.scheduledFor, gracePeriodDays: DELETION_GRACE_PERIOD_DAYS };
     }
@@ -153,7 +157,7 @@ export async function cancelCustomerAccountDeletion(email: string, password: str
   });
 }
 
-async function hasOutstandingCustomerActivity(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], userId: string) {
+async function hasOutstandingCustomerActivity(tx: Prisma.TransactionClient, userId: string) {
   const [openOrders, openPayments, openRefunds, openReturns, openWarranties] = await Promise.all([
     tx.order.findFirst({ where: { userId, status: { in: ["PENDING", "CONFIRMED", "PROCESSING", "PARTIALLY_FULFILLED"] } }, select: { id: true } }),
     tx.payment.findFirst({ where: { order: { userId }, status: { in: ["PENDING", "INITIALIZATION_UNKNOWN", "PROCESSING"] } }, select: { id: true } }),
@@ -164,7 +168,7 @@ async function hasOutstandingCustomerActivity(tx: Parameters<Parameters<typeof p
   return Boolean(openOrders || openPayments || openRefunds || openReturns || openWarranties);
 }
 
-async function anonymizeCustomer(tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0], user: { id: string; email: string }) {
+async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: string; email: string }) {
   const now = new Date();
   const notifications = await tx.notification.findMany({ where: { customerUserId: user.id }, select: { id: true } });
   const notificationIds = notifications.map((item) => item.id);
