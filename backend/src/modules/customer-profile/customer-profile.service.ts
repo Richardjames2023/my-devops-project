@@ -197,7 +197,13 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
 
   await tx.auditLog.updateMany({
     where: { userId: user.id },
-    data: { userId: null, ipAddress: null, userAgent: null, oldValues: null, newValues: null },
+    data: {
+      userId: null,
+      ipAddress: null,
+      userAgent: null,
+      oldValues: Prisma.DbNull,
+      newValues: Prisma.DbNull,
+    },
   });
   await tx.order.updateMany({
     where: { userId: user.id },
@@ -252,7 +258,7 @@ export async function processCustomerAccountDeletionBatch() {
         const user = await tx.user.findUnique({ where: { id: candidate.userId }, select: { id: true, email: true } });
         if (!user) {
           await tx.customerAccountDeletion.update({ where: { id: candidate.id }, data: { status: "COMPLETED", completedAt: new Date() } });
-          return "COMPLETED";
+        return "COMPLETED";
         }
 
         if (await hasOutstandingCustomerActivity(tx, user.id)) {
