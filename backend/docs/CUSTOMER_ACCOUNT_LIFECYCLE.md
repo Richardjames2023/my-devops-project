@@ -26,6 +26,7 @@ Track the design decisions, implementation stages, verification and release read
 | Identity and PII | Replace customer identity with “Deleted Customer”; anonymize order contact details and shipping information. |
 | Personal data cleanup | Remove carts, wishlists, notification inbox/preferences/deliveries, refresh tokens and verification/reset tokens. |
 | User record | Retain the user row in anonymized, inactive form to preserve historical foreign-key relationships. |
+| Customer-authored free text | **Policy decision still required before final privacy sign-off.** Return reasons/descriptions, warranty claim narratives and product-review text may contain identifiers. Do not delete or rewrite these records until the retention/redaction policy is explicitly approved. |
 
 ### 3. API and security design
 - [x] `PATCH /api/v1/customer/profile` — authenticated profile update.
@@ -34,6 +35,7 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Invalidate active sessions and refresh tokens when deletion is requested.
 - [x] Protect profile, request, cancellation and processing operations against concurrent updates with PostgreSQL advisory locks.
 - [x] Serialize relevant login/refresh-token operations against account lifecycle changes.
+- [x] Serialize email verification with account deletion using the same user advisory lock; re-read and validate the token after acquiring the lock.
 
 ### 4. Data model and processing design
 - [x] Add a deletion-request lifecycle record with status, request/deadline timestamps, completion/cancellation timestamps and deferral metadata.
@@ -50,6 +52,8 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Add coverage for operational deferral, anonymization and retained order history.
 - [x] Add coverage for active warranty and unresolved payment-inventory reconciliation deferrals.
 - [x] Add coverage for concurrent duplicate requests and idempotent worker processing.
+- [x] Add coverage for email verification racing with account deletion.
+- [ ] Confirm and test the retention/redaction policy for customer-authored free-text fields.
 - [ ] Run the focused PostgreSQL integration test locally.
 - [ ] Run the full backend regression suite locally.
 - [ ] Resolve any failures and rerun the affected tests.
@@ -64,9 +68,9 @@ Track the design decisions, implementation stages, verification and release read
 | Deletion request and cancellation APIs | Implemented; local verification pending | Immediate deactivation and 30-day cancellation window. |
 | Background deletion worker | Implemented; local verification pending | Hourly processing with seven-day operational deferrals. |
 | Privacy-safe anonymization | Implemented; build fix pushed | Nullable JSON audit fields now use Prisma's `DbNull` sentinel. |
-| Concurrency and idempotency safeguards | Implemented; local verification pending | Uses transaction boundaries and PostgreSQL advisory locks. |
+| Concurrency and idempotency safeguards | Implemented; new auth race test pending | Email verification now takes the shared user advisory lock before re-reading/claiming its token. |
 | PostgreSQL integration tests | Added; execution pending | Focused test file is listed in local verification below. |
-| Build and regression verification | Pending | Initial build exposed three TypeScript errors; fixes are now on the feature branch and must be pulled and rechecked. |
+| Build and regression verification | Prior baseline passed; new auth change pending | Before the email-verification lock fix, the local build and full suite passed; rerun after pulling the latest commits. |
 
 ## Verification log
 
@@ -81,6 +85,9 @@ Track the design decisions, implementation stages, verification and release read
 - Note: while `prisma migrate dev` was prompting for a migration name, the next pasted test command was entered as the name. Prisma created and applied an unintended local migration named `20261114135922_npx_vitest_run_tests_customer_account_lifecycle_postgres_test_ts_pool_forks_max_workers_1`. Inspect this migration and the local Git status before deleting or resetting anything. Do not commit or push this accidental migration.
 
 ### Follow-up fixes pushed to the feature branch
+- [x] Serialize email verification with account deletion using the shared user advisory lock.
+- [x] Re-read the verification token and confirm the account remains active after acquiring the lock.
+- [x] Add PostgreSQL coverage for concurrent email verification and deletion.
 - [x] Narrow validated profile update fields to satisfy TypeScript `exactOptionalPropertyTypes`.
 - [x] Use `Prisma.DbNull` for nullable JSON audit fields.
 - [x] Recheck account activity under the advisory lock before issuing verification or password-reset tokens.
@@ -92,10 +99,10 @@ Track the design decisions, implementation stages, verification and release read
 - [ ] Prisma formatting and schema validation pass.
 - [ ] Migration applies successfully to the dedicated test database without unintended schema changes.
 - [ ] Prisma Client generation succeeds.
-- [ ] TypeScript production build succeeds.
-- [ ] Focused customer account lifecycle PostgreSQL tests pass.
-- [ ] Full backend test suite passes.
-- [ ] Diff whitespace check passes.
+- [x] TypeScript production build succeeded before the latest email-verification lock change; rerun required.
+- [x] Focused customer account lifecycle PostgreSQL tests passed 6/6 before the latest concurrency test; rerun required.
+- [x] Full backend test suite passed: 440 tests across 71 files before the latest auth/test change; rerun required.
+- [x] Diff whitespace check passed before the latest changes; rerun required.
 - [ ] Review confirms retained records, anonymized fields and dependent workflows behave as intended.
 - [ ] Pull request is reviewed and explicitly approved before merge.
 
@@ -119,7 +126,8 @@ git diff --check origin/dev...HEAD
 ## Change tracking
 - Feature branch: `feat/customer-profile-deactivation-deletion`
 - Pull request: [#31 — Customer profile management and privacy-safe account deletion](https://github.com/Richardjames2023/my-devops-project/pull/31)
-- Review follow-ups: preserve active warranty and payment-reconciliation obligations, close auth token issuance races, and scrub retained email webhook payloads.
-- Current tracking state: implementation and the two build fixes are on the feature branch; local build, migration status review and tests remain pending.
-- Update the checklists and workstream statuses in this document as local verification and review are completed.
+- Review follow-ups: preserve active warranty and payment-reconciliation obligations, serialize email verification with account deletion, and scrub retained email webhook payloads.
+- Local baseline before the latest auth change: TypeScript build passed; focused lifecycle tests passed 6/6; full suite passed 440 tests across 71 files; `git diff --check` passed. These checks must be rerun against the new commits.
+- Privacy decision still open: confirm whether customer-authored free-text fields in returns, warranty claims and reviews should be retained as business records or redacted during anonymization.
+- CI workflow changes are intentionally out of scope for this follow-up and have not been changed.
 - Keep this work on the feature branch until all release gates pass. Do not merge to `dev` before review and verification.
