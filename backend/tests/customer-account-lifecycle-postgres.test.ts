@@ -210,7 +210,9 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       expect(warrantyDeferred.deferred).toBe(1);
 
       await pool.query(
-        'UPDATE order_items SET "warrantyExpiresAt" = NOW() - INTERVAL \'1 minute\' WHERE id = $1',
+        `UPDATE order_items
+        SET "warrantyExpiresAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute'
+        WHERE id = $1`,
         [orderItemId],
       );
       await pool.query(
