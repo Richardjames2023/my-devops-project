@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   listCustomerWarrantyClaims: vi.fn(),
   listWarrantyClaims: vi.fn(),
   reviewWarrantyClaim: vi.fn(),
+  createReturnEvidence: vi.fn(),
+  getReturnEvidenceViewUrl: vi.fn(),
   createGuestReturnEvidence: vi.fn(),
   assertGuestReturnEvidenceOrderAccess: vi.fn(),
   getGuestReturnEvidenceViewUrl: vi.fn(),
@@ -37,11 +39,13 @@ vi.mock("../src/modules/return/return.service", () => ({
 }));
 
 vi.mock("../src/modules/return/return-evidence.service", () => ({
+  createReturnEvidence: mocks.createReturnEvidence,
   createGuestReturnEvidence: mocks.createGuestReturnEvidence,
   assertGuestReturnEvidenceOrderAccess: mocks.assertGuestReturnEvidenceOrderAccess,
 }));
 
 vi.mock("../src/modules/return/return-evidence-view.service", () => ({
+  getReturnEvidenceViewUrl: mocks.getReturnEvidenceViewUrl,
   getGuestReturnEvidenceViewUrl: mocks.getGuestReturnEvidenceViewUrl,
   getGuestReturnEvidenceFileSource: mocks.getGuestReturnEvidenceFileSource,
 }));
