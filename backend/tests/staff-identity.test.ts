@@ -4,7 +4,8 @@ import type { AuthenticatedRequest } from "../src/common/middleware/authenticate
 import prisma from "../src/infrastructure/prisma/client";
 import { requireCustomer, requireStaff } from "../src/common/middleware/identity";
 import {
-  acceptStaffInvitationSchema,
+  completeStaffInvitationSchema,
+  exchangeStaffInvitationSchema,
   staffInvitationSchema,
 } from "../src/modules/staff/staff.validation";
 
@@ -155,13 +156,19 @@ describe("staff invitation validation", () => {
     }).success).toBe(false);
   });
 
-  it("requires a strong password when accepting an invitation", () => {
+  it("validates invitation token exchange and requires a strong password for account completion", () => {
+    const token = "a".repeat(64);
+    expect(exchangeStaffInvitationSchema.safeParse({ token }).success).toBe(true);
+    expect(exchangeStaffInvitationSchema.safeParse({ token: "short" }).success).toBe(false);
+
     const base = {
-      token: "a".repeat(64),
       firstName: "Taylor",
       lastName: "Staff",
     };
-    expect(acceptStaffInvitationSchema.safeParse({ ...base, password: "short" }).success).toBe(false);
-    expect(acceptStaffInvitationSchema.safeParse({ ...base, password: "A-strong-password-2026" }).success).toBe(true);
+    expect(completeStaffInvitationSchema.safeParse({ ...base, password: "short" }).success).toBe(false);
+    expect(completeStaffInvitationSchema.safeParse({
+      ...base,
+      password: "A-strong-password-2026",
+    }).success).toBe(true);
   });
 });
