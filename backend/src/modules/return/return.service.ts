@@ -31,7 +31,20 @@ async function receiveReturnTransaction(
       const returnRequest = await tx.returnRequest.findUnique({
         where: { id: returnRequestId },
         include: {
-          items: { include: { orderItem: true } },
+          items: {
+            include: {
+              orderItem: {
+                select: {
+                  id: true,
+                  productVariantId: true,
+                  productName: true,
+                  variantName: true,
+                  sku: true,
+                  quantity: true,
+                },
+              },
+            },
+          },
         },
       });
 
