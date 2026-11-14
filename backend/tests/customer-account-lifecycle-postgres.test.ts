@@ -126,6 +126,19 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       expect(pending.rows[0]).toMatchObject({ status: "REQUESTED", deferralCount: 1 });
 
       await pool.query('UPDATE orders SET status = \'COMPLETED\' WHERE "userId" = $1', [customer.id]);
+      const returnRequestId = randomUUID();
+      await pool.query(
+        `INSERT INTO return_requests
+          (id, "orderId", "userId", status, reason, description, "requestedAt", "createdAt", "updatedAt")
+         VALUES ($1, (SELECT id FROM orders WHERE "userId" = $2 LIMIT 1), $2, 'COMPLETED', $3, $4, NOW(), NOW(), NOW())`,
+        [returnRequestId, customer.id, "My name is Lifecycle Tester, call +2348012345678", "Collect from Private Street"],
+      );
+      await pool.query(
+        `INSERT INTO return_evidence
+          (id, "returnRequestId", url, type, description, "publicId", "resourceType", "createdAt")
+         VALUES ($1, $2, 'https://cdn.test/private-evidence.jpg', 'IMAGE', 'Photo contains my address', 'private/evidence', 'image', NOW())`,
+        [randomUUID(), returnRequestId],
+      );
       await pool.query(
         'UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1',
         [customer.id],
@@ -136,6 +149,23 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       expect(user.rows[0]).toMatchObject({ email: `deleted+${customer.id}@deleted.invalid`, firstName: "Deleted", lastName: "Customer", phone: null, isActive: false });
       const order = await pool.query('SELECT "customerName", "customerEmail", "customerPhone", "shippingAddress", status FROM orders WHERE "userId" = $1', [customer.id]);
       expect(order.rows[0]).toMatchObject({ customerName: null, customerEmail: null, customerPhone: null, shippingAddress: { anonymized: true }, status: "COMPLETED" });
+      const returnData = await pool.query(
+        'SELECT reason, description FROM return_requests WHERE id = $1',
+        [returnRequestId],
+      );
+      expect(returnData.rows[0]).toMatchObject({
+        reason: "[redacted after account deletion]",
+        description: "[redacted after account deletion]",
+      });
+      const evidence = await pool.query(
+        'SELECT url, description, "publicId" FROM return_evidence WHERE "returnRequestId" = $1',
+        [returnRequestId],
+      );
+      expect(evidence.rows[0]).toMatchObject({
+        url: "[redacted after account deletion]",
+        description: "[redacted after account deletion]",
+        publicId: null,
+      });
       const deletion = await pool.query('SELECT status, "completedAt" FROM customer_account_deletions WHERE "userId" = $1', [customer.id]);
       expect(deletion.rows[0].status).toBe("COMPLETED");
       expect(deletion.rows[0].completedAt).toBeTruthy();
