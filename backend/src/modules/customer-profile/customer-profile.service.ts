@@ -180,6 +180,7 @@ async function getCustomerDeletionDeferral(
     openDeliveries,
     activeReservations,
     unresolvedReconciliations,
+    flaggedReconciliationPayments,
     activeWarranties,
     warrantiesMissingExpiry,
   ] = await Promise.all([
@@ -192,6 +193,10 @@ async function getCustomerDeletionDeferral(
     tx.inventoryReservation.findFirst({ where: { order: { userId }, status: "PENDING" }, select: { id: true } }),
     tx.paymentInventoryReconciliation.findFirst({
       where: { order: { userId }, status: { in: ["PENDING", "UNDER_REVIEW", "REFUND_PENDING"] } },
+      select: { id: true },
+    }),
+    tx.payment.findFirst({
+      where: { order: { userId }, reconciliationRequired: true },
       select: { id: true },
     }),
     tx.orderItem.aggregate({
@@ -211,7 +216,8 @@ async function getCustomerDeletionDeferral(
 
   const hasOperationalActivity = Boolean(
     openOrders || openPayments || openRefunds || openReturns ||
-    openWarranties || openDeliveries || activeReservations || unresolvedReconciliations,
+    openWarranties || openDeliveries || activeReservations ||
+    unresolvedReconciliations || flaggedReconciliationPayments,
   );
   const latestActiveWarrantyExpiry = activeWarranties._max.warrantyExpiresAt;
   const hasActiveWarranty = Boolean(latestActiveWarrantyExpiry || warrantiesMissingExpiry);
@@ -235,15 +241,15 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
   const now = new Date();
   const notifications = await tx.notification.findMany({ where: { customerUserId: user.id }, select: { id: true } });
   const notificationIds = notifications.map((item) => item.id);
-  const emailDeliveries = await tx.notificationEmailDelivery.findMany({
-    where: {
-      OR: [
-        { recipientEmail: user.email },
-        ...(notificationIds.length ? [{ notificationId: { in: notificationIds } }] : []),
-      ],
-    },
-    select: { id: true },
-  });
+  // Only delete deliveries explicitly linked to this customer's notifications.
+  // recipientEmail is not an ownership key: staff accounts can legitimately share
+  // an email address with a customer, and event deliveries may belong to staff.
+  const emailDeliveries = notificationIds.length
+    ? await tx.notificationEmailDelivery.findMany({
+        where: { notificationId: { in: notificationIds } },
+        select: { id: true },
+      })
+    : [];
   const emailDeliveryIds = emailDeliveries.map((delivery) => delivery.id);
 
   if (emailDeliveryIds.length) {
