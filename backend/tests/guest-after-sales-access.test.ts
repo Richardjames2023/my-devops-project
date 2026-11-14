@@ -17,6 +17,10 @@ const mocks = vi.hoisted(() => ({
   listCustomerWarrantyClaims: vi.fn(),
   listWarrantyClaims: vi.fn(),
   reviewWarrantyClaim: vi.fn(),
+  createGuestReturnEvidence: vi.fn(),
+  getGuestReturnEvidenceViewUrl: vi.fn(),
+  getGuestReturnEvidenceFileSource: vi.fn(),
+  streamEvidenceSource: vi.fn(),
 }));
 
 vi.mock("../src/modules/return/return.service", () => ({
@@ -28,6 +32,20 @@ vi.mock("../src/modules/return/return.service", () => ({
   inspectReturnRequest: mocks.inspectReturnRequest,
   listCustomerReturnRequests: mocks.listCustomerReturnRequests,
   getCustomerReturnRequest: mocks.getCustomerReturnRequest,
+}));
+
+vi.mock("../src/modules/return/return-evidence.service", () => ({
+  createGuestReturnEvidence: mocks.createGuestReturnEvidence,
+}));
+
+vi.mock("../src/modules/return/return-evidence-view.service", () => ({
+  getGuestReturnEvidenceViewUrl: mocks.getGuestReturnEvidenceViewUrl,
+  getGuestReturnEvidenceFileSource: mocks.getGuestReturnEvidenceFileSource,
+}));
+
+vi.mock("../src/modules/return/return-evidence-file.controller", () => ({
+  streamEvidenceFile: vi.fn(),
+  streamEvidenceSource: mocks.streamEvidenceSource,
 }));
 
 vi.mock("../src/modules/warranty-claims/warranty-claim.service", () => ({
@@ -54,6 +72,19 @@ describe("guest after-sales HTTP endpoints", () => {
     mocks.createReturnRequest.mockResolvedValue({ id: returnRequestId, userId: null });
     mocks.listGuestReturnRequests.mockResolvedValue({ returnRequests: [] });
     mocks.getGuestReturnRequest.mockResolvedValue({ id: returnRequestId });
+    mocks.createGuestReturnEvidence.mockResolvedValue([{ id: "d7b0a9f5-5e8c-4a6d-9f31-7a2c5d8e9b10" }]);
+    mocks.getGuestReturnEvidenceViewUrl.mockResolvedValue({
+      id: "d7b0a9f5-5e8c-4a6d-9f31-7a2c5d8e9b10",
+      returnRequestId,
+      viewUrl: `/api/v1/returns/guest/${orderId}/evidence/d7b0a9f5-5e8c-4a6d-9f31-7a2c5d8e9b10/file`,
+    });
+    mocks.getGuestReturnEvidenceFileSource.mockResolvedValue({
+      type: "image/jpeg",
+      signedUrl: "https://cloudinary.example/private-file",
+    });
+    mocks.streamEvidenceSource.mockImplementation(async (_source, res) => {
+      res.status(200).send("streamed evidence");
+    });
     mocks.createWarrantyClaim.mockResolvedValue({ id: claimId, userId: null });
     mocks.listGuestWarrantyClaims.mockResolvedValue({ claims: [] });
     mocks.getGuestWarrantyClaim.mockResolvedValue({ id: claimId });
@@ -81,6 +112,78 @@ describe("guest after-sales HTTP endpoints", () => {
       expect.objectContaining({ orderId, reason: "Item arrived damaged" }),
       guestToken,
     );
+  });
+
+
+  it("does not allow guest evidence uploads without the order token", async () => {
+    const response = await request(app)
+      .post(`/api/v1/returns/guest/${orderId}/${returnRequestId}/evidence`)
+      .attach("evidence", Buffer.from("fake-image"), {
+        filename: "evidence.jpg",
+        contentType: "image/jpeg",
+      });
+
+    expect(response.status).toBe(404);
+    expect(mocks.createGuestReturnEvidence).not.toHaveBeenCalled();
+  });
+
+  it("uploads guest evidence using the route order and return IDs", async () => {
+    const response = await request(app)
+      .post(`/api/v1/returns/guest/${orderId}/${returnRequestId}/evidence`)
+      .set("X-Guest-Order-Token", guestToken)
+      .attach("evidence", Buffer.from("fake-image"), {
+        filename: "evidence.jpg",
+        contentType: "image/jpeg",
+      });
+
+    expect(response.status).toBe(201);
+    expect(mocks.createGuestReturnEvidence).toHaveBeenCalledWith(
+      returnRequestId,
+      orderId,
+      guestToken,
+      expect.arrayContaining([
+        expect.objectContaining({ originalname: "evidence.jpg" }),
+      ]),
+    );
+  });
+
+  it("does not allow guest evidence viewing with a malformed token", async () => {
+    const response = await request(app)
+      .get(`/api/v1/returns/guest/${orderId}/evidence/d7b0a9f5-5e8c-4a6d-9f31-7a2c5d8e9b10/view`)
+      .set("X-Guest-Order-Token", "invalid");
+
+    expect(response.status).toBe(404);
+    expect(mocks.getGuestReturnEvidenceViewUrl).not.toHaveBeenCalled();
+  });
+
+  it("scopes guest evidence viewing to the route order and token", async () => {
+    const evidenceId = "d7b0a9f5-5e8c-4a6d-9f31-7a2c5d8e9b10";
+    const response = await request(app)
+      .get(`/api/v1/returns/guest/${orderId}/evidence/${evidenceId}/view`)
+      .set("X-Guest-Order-Token", guestToken);
+
+    expect(response.status).toBe(200);
+    expect(mocks.getGuestReturnEvidenceViewUrl).toHaveBeenCalledWith(
+      evidenceId,
+      orderId,
+      guestToken,
+    );
+  });
+
+  it("streams guest evidence through the protected application endpoint", async () => {
+    const evidenceId = "d7b0a9f5-5e8c-4a6d-9f31-7a2c5d8e9b10";
+    const response = await request(app)
+      .get(`/api/v1/returns/guest/${orderId}/evidence/${evidenceId}/file`)
+      .set("X-Guest-Order-Token", guestToken);
+
+    expect(response.status).toBe(200);
+    expect(response.text).toBe("streamed evidence");
+    expect(mocks.getGuestReturnEvidenceFileSource).toHaveBeenCalledWith(
+      evidenceId,
+      orderId,
+      guestToken,
+    );
+    expect(mocks.streamEvidenceSource).toHaveBeenCalled();
   });
 
   it("scopes guest warranty claim creation to the token-authorized order", async () => {
