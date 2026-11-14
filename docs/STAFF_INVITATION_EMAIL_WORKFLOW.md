@@ -68,7 +68,7 @@ The following were identified during the initial repository review. Re-verify th
 2. Backend rotates the invitation token and updates the stored hash and expiry.
 3. Backend queues a newly encrypted email delivery transactionally with the rotation.
 4. Older queued/retrying deliveries for the same invitation are suppressed where possible.
-5. Before sending, the worker verifies that the invitation is still pending, unexpired, and that the decrypted token hashes to the invitation's current token hash.
+5. Before sending, the worker locks the invitation row and verifies that the invitation is still pending, unexpired, addressed to the queued recipient, and that the decrypted token hashes to the invitation's current token hash. It holds that lock through provider acceptance and the delivery's `ACCEPTED` update. Resend/revoke take the same invitation lock, so the send and state change are serialized.
 6. If the token is no longer current, the old delivery is suppressed and must not be sent.
 
 ### 3.3 Invitation email URL
@@ -81,7 +81,7 @@ https://clickclickbuy.ng/staff/accept-invitation#token=<ONE_TIME_TOKEN>
 
 The frontend route above is a **proposed route only**. The final route must be configurable and confirmed when the frontend is built.
 
-Use a URL fragment (`#token=...`) rather than a query parameter (`?token=...`) where the frontend architecture permits it. A fragment is not included in the initial HTTP request to the web server, reducing exposure in ordinary server access logs and HTTP referrer headers. It does not eliminate exposure through browser history, copied links, screenshots, browser extensions, or client-side scripts.
+Use a URL fragment (`#token=...`) rather than a query parameter (`?token=...`) where the frontend architecture permits it. The configured acceptance URL must use HTTP or HTTPS in every environment; HTTP is permitted only outside production, while production requires HTTPS. Credentials, query strings, and fragments in the configured base URL are rejected. A fragment is not included in the initial HTTP request to the web server, reducing exposure in ordinary server access logs and HTTP referrer headers. It does not eliminate exposure through browser history, copied links, screenshots, browser extensions, or client-side scripts.
 
 Do not put invitation tokens in:
 - Query parameters.
@@ -166,7 +166,7 @@ The raw token is needed later by the email worker, so encrypt it before persisti
 - Use a dedicated secret such as `STAFF_INVITATION_ENCRYPTION_KEY`; do not reuse JWT secrets, database credentials, Resend API keys, or other application secrets.
 - Key material must be 32 random bytes, supplied through the deployment secret manager/environment, with a documented encoding and strict validation.
 - Never commit real key material or example production secrets.
-- Plan key rotation: include a key version/key identifier in the envelope so old queued deliveries can be decrypted during a controlled rotation window.
+- Include a key identifier in every envelope. Configure `STAFF_INVITATION_ENCRYPTION_KEYRING` as a JSON object mapping key IDs to canonical base64-encoded 32-byte keys, and set `STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID` to the key used for new encryptions. Retain historical keys until every queued/retrying delivery encrypted with them has been accepted or suppressed. The legacy `STAFF_INVITATION_ENCRYPTION_KEY` remains supported as key ID `v1`.
 - Decrypt only in the dedicated invitation email delivery path, immediately before rendering/sending.
 - Do not include decrypted tokens in errors, logs, traces, metrics, or provider metadata.
 - If decryption fails, fail safely and surface an operationally useful error without exposing ciphertext or token material.
@@ -439,3 +439,15 @@ The feature branch `feat/staff-invitation-email-workflow` contains the first bac
 
 
 **Local verification status:** GitHub implementation commits are present, but the branch has not been built or tested locally. The checklists above distinguish implementation added from test execution still pending.
+
+
+## Implementation update — 2026-11-14
+
+The follow-up hardening changes are now present on PR #27:
+
+- Acceptance URL validation is shared across environment validation, invitation queueing, and email rendering. Only HTTP/HTTPS are accepted outside production; production requires HTTPS. Credentials, query strings, and fragments are rejected.
+- Invitation encryption now supports an active key ID and a keyring of historical keys. New queue payloads use the active key; old payloads continue decrypting while their key IDs remain configured. The legacy single-key setting maps to key ID `v1`.
+- The invitation worker now holds a row lock on the invitation from final state/hash/recipient validation through provider acceptance and the delivery status update. Resend/revoke use the same invitation row lock, establishing a clear ordering between an in-flight send and a state change.
+- Added unit coverage for URL schemes and key rotation, plus a PostgreSQL concurrency test for an in-flight send racing token rotation.
+
+**Verification remains pending:** pull the latest PR branch and run the focused tests, TypeScript build, and full suite against `shop_db_test` only. The provider call is intentionally bounded by the Prisma transaction timeout; monitor provider latency and database lock duration in deployment.
