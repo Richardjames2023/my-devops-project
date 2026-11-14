@@ -162,7 +162,7 @@ async function queueStaffInvitationEmail(
       templateData: {
         invitationId: input.invitationId,
         encryptedToken,
-      } as Prisma.InputJsonValue,
+      } as unknown as Prisma.InputJsonValue,
       eventRecipientKey: `staff-invitation:${input.invitationId}:${input.tokenHash}`,
       status: "QUEUED",
       nextAttemptAt: new Date(),
@@ -456,12 +456,13 @@ export async function exchangeStaffInvitationToken(token: string) {
         AND "expiresAt" > NOW()
       FOR UPDATE
     `;
-    if (!locked.length) {
+    const lockedInvitation = locked[0];
+    if (!lockedInvitation) {
       throw new AppError("This staff invitation is invalid or expired", 400);
     }
 
     await tx.staffInvitationAcceptanceSession.updateMany({
-      where: { invitationId: locked[0].id, consumedAt: null, revokedAt: null },
+      where: { invitationId: lockedInvitation.id, consumedAt: null, revokedAt: null },
       data: { revokedAt: new Date() },
     });
     const [expiry] = await tx.$queryRaw<Array<{ expiresAt: Date }>>`
@@ -470,7 +471,7 @@ export async function exchangeStaffInvitationToken(token: string) {
     if (!expiry?.expiresAt) throw new Error("Could not calculate invitation session expiry");
     await tx.staffInvitationAcceptanceSession.create({
       data: {
-        invitationId: locked[0].id,
+        invitationId: lockedInvitation.id,
         tokenHash: hashRefreshToken(sessionToken),
         expiresAt: expiry.expiresAt,
       },
@@ -499,12 +500,13 @@ export async function acceptStaffInvitation(input: {
         AND invitation."expiresAt" > NOW()
       FOR UPDATE OF session, invitation
     `;
-    if (!locked.length) {
+    const lockedSession = locked[0];
+    if (!lockedSession) {
       throw new AppError("This staff invitation session is invalid or expired", 400);
     }
 
     const invitation = await tx.staffInvitation.findUnique({
-      where: { id: locked[0].invitationId },
+      where: { id: lockedSession.invitationId },
       include: { roles: { select: { roleId: true, role: { select: { name: true } } } } },
     });
     if (!invitation || invitation.status !== "PENDING") {
@@ -527,7 +529,7 @@ export async function acceptStaffInvitation(input: {
     const consumedSession = await tx.$executeRaw`
       UPDATE staff_invitation_acceptance_sessions
       SET "consumedAt" = NOW(), "updatedAt" = NOW()
-      WHERE id = ${locked[0].sessionId}::uuid
+      WHERE id = ${lockedSession.sessionId}::uuid
         AND "tokenHash" = ${sessionHash}
         AND "consumedAt" IS NULL
         AND "revokedAt" IS NULL
