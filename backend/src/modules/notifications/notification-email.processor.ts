@@ -9,7 +9,7 @@ import {
   type EmailProvider,
 } from "./email/email-provider";
 import { renderNotificationEmail, renderStaffInvitationEmail } from "./email/email-templates";
-import { decryptInvitationSecret, type EncryptedSecretEnvelope } from "../staff/staff-invitation-encryption";
+import { decryptInvitationSecret, getInvitationEncryptionKeyring, type EncryptedSecretEnvelope } from "../staff/staff-invitation-encryption";
 import { hashRefreshToken } from "../../common/utils/refreshToken";
 
 const BATCH_SIZE = 10;
@@ -171,7 +171,7 @@ function isEncryptedSecretEnvelope(value: unknown): value is EncryptedSecretEnve
   const candidate = value as Record<string, unknown>;
   return candidate.version === 1 &&
     candidate.algorithm === "aes-256-gcm" &&
-    candidate.keyId === "v1" &&
+    typeof candidate.keyId === "string" &&
     typeof candidate.nonce === "string" &&
     typeof candidate.authTag === "string" &&
     typeof candidate.ciphertext === "string";
@@ -186,10 +186,15 @@ async function renderStaffInvitationDelivery(delivery: ClaimedDelivery, tx: Pris
   if (typeof payload.invitationId !== "string" || !isEncryptedSecretEnvelope(payload.encryptedToken)) {
     throw new Error("Invalid staff invitation email payload");
   }
-  const key = env.STAFF_INVITATION_ENCRYPTION_KEY;
-  if (!key) throw new Error("Staff invitation email encryption is not configured");
-
-  const token = decryptInvitationSecret(payload.encryptedToken, key);
+  if (!env.STAFF_INVITATION_ENCRYPTION_KEY && !env.STAFF_INVITATION_ENCRYPTION_KEYRING) {
+    throw new Error("Staff invitation email encryption is not configured");
+  }
+  const keyring = getInvitationEncryptionKeyring(
+    env.STAFF_INVITATION_ENCRYPTION_KEY,
+    env.STAFF_INVITATION_ENCRYPTION_KEYRING,
+    env.STAFF_INVITATION_ENCRYPTION_ACTIVE_KEY_ID,
+  );
+  const token = decryptInvitationSecret(payload.encryptedToken, keyring);
   const [invitation] = await tx.$queryRaw<Array<{
     email: string;
     tokenHash: string;
