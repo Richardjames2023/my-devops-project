@@ -113,7 +113,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
   - [x] Guest token validity is enforced across guest order retrieval, delivery tracking, payment initialization/verification, returns, and warranty claims.
   - [x] PostgreSQL and HTTP coverage exists for guest access, token expiry/revocation, and guest return/warranty routes.
 - [x] Guest-specific return evidence upload and secure viewing/streaming are implemented using the guest order token, order-scoped authorization, private Cloudinary delivery, and PostgreSQL/HTTP tests (PR #29).
-- [~] Verify end-to-end stock restoration, refund state, audit trail, and customer notifications for every return/refund outcome; relevant reconciliation and business-event tests exist, but the complete cross-module outcome matrix still needs review.
+- [~] Verify end-to-end stock restoration, refund state, audit trail, and customer notifications for every return/refund outcome. The current flow correctly places received units in quarantine and moves accepted units into sellable stock after inspection, but the outcome matrix is incomplete: no transition to `COMPLETED` was found, return review uses a read-then-update status change without a concurrency guard, return review/receipt/inspection do not write staff audit logs, and customer notifications for return decisions/inspection and final refund success/failure are not wired. Inventory reconciliation has stronger locking, retry, audit, and regression-test coverage; the remaining return/refund paths need equivalent verification.
 
 ## 9. Reviews and customer engagement
 
@@ -145,7 +145,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Prisma migrations and generated client workflow.
 - [~] Verify actual production secrets, webhook secrets, courier credentials, and coupon HMAC secret are configured securely in deployment environments. Repository code cannot prove deployment secret values.
 - [~] Complete a rate-limit and abuse-protection audit across authentication, guest order access, checkout, wishlist, reviews, and public endpoints.
-- [ ] Verify structured logging, correlation/request IDs, and actionable error reporting across background workers and external integrations.
+- [ ] Implement and verify structured logging and correlation IDs. `src/config/logger.ts` is empty, `requestId` middleware exists but is not mounted in `app.ts`, the error handler and background workers use `console.*`, and worker/external-integration logs need consistent context and secret/token redaction.
 - [ ] Verify backup/restore procedure and production migration/rollback runbook.
 - [~] Last recorded full-suite verification was 69 test files / 423 tests on the earlier PR #27 baseline. PRs #29, #31, and #32 were merged afterward; a fresh Prisma validation, build, migration-status check, focused regression run, and full suite on current `dev` remain required.
 - [ ] Repeat build, migration validation, and full test suite against `shop_db_test` before each subsequent merge; never point integration tests at `shop_db` or production.
