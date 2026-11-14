@@ -32,17 +32,17 @@ The backend is being completed before frontend development begins. Backend work 
 
 ## 2. Existing implementation baseline
 
-The following were identified during the initial repository review. Re-verify these details against the code before changing them.
+The following records the historical baseline from the initial repository review and the current state where implementation has since changed. It is retained for context, not as a list of outstanding tasks.
 
 - Staff invitations already generate cryptographically random tokens.
 - Only a hash of the invitation token is persisted for invitation validation.
 - Email addresses are normalized.
-- Invitation expiry currently defaults to seven days, with a maximum of 30 days.
+- Historical baseline: invitation expiry previously defaulted to seven days. The current implementation defaults to 48 hours via `STAFF_INVITATION_TTL_HOURS`; the optional administrator override remains 1–30 days.
 - Duplicate pending invitations are protected by a PostgreSQL advisory lock keyed by normalized email.
 - Resending rotates the invitation token hash and expiry.
 - Acceptance has database concurrency/replay protections.
 - Revocation and audit logging are supported.
-- The create/resend admin responses currently return the raw invitation token to the trusted caller; this must change when email delivery becomes authoritative.
+- Current implementation: create/resend admin responses do not return the raw invitation token.
 - The backend acceptance API already exists at `POST /api/v1/staff-auth/accept-invitation`.
 - Existing email infrastructure uses Resend, email templates, a background worker, delivery retries/leases, webhook event handling, and operational retry/dead-letter support.
 - Email delivery can exist independently of an ordinary in-app notification. Staff invitations should remain a dedicated security-sensitive email workflow, not be treated as a routine notification event.
@@ -276,23 +276,23 @@ Admin responses must never include the raw invitation token once email delivery 
 
 - [ ] Token generation uses cryptographically secure randomness and sufficient entropy.
 - [ ] Only token hashes are stored for invitation validation.
-- [ ] AES-256-GCM encryption/decryption round-trip tests pass.
-- [ ] Tampered ciphertext, nonce, tag, malformed envelope, and wrong key fail closed.
-- [ ] Fresh nonce is generated for each encryption.
+- [x] AES-256-GCM encryption/decryption round-trip tests pass.
+- [x] Tampered ciphertext, nonce, tag, malformed envelope, and wrong key fail closed.
+- [x] Fresh nonce is generated for each encryption.
 - [ ] Missing/invalid encryption key fails startup or disables invitation delivery safely according to explicit environment policy.
-- [ ] Key versioning/rotation behavior is tested.
+- [x] Key versioning/rotation behavior is tested.
 
 ### Invitation lifecycle and email queue
 
-- [ ] Invitation creation and email queue insertion are atomic.
-- [ ] Admin create response does not expose raw token.
-- [ ] Resend rotates token and queues a new encrypted delivery atomically.
-- [ ] Previous queued/retrying delivery is suppressed after resend.
-- [ ] Worker suppresses stale token deliveries after checking current invitation hash/status/expiry.
-- [ ] Revoked, expired, accepted, and superseded invitations are never emailed by a retry.
-- [ ] Provider retries do not create duplicate active invitations.
-- [ ] Delivery failure and dead-letter operations do not expose token material.
-- [ ] Existing Resend webhook and notification email tests remain green.
+- [x] Invitation creation and email queue insertion are atomic.
+- [x] Admin create response does not expose raw token.
+- [x] Resend rotates token and queues a new encrypted delivery atomically.
+- [x] Previous queued/retrying delivery is suppressed after resend.
+- [x] Worker suppresses stale token deliveries after checking current invitation hash/status/expiry.
+- [x] Revoked, expired, accepted, and superseded invitations are never emailed by a retry.
+- [x] Provider retries do not create duplicate active invitations.
+- [x] Delivery failure and dead-letter operations do not expose token material.
+- [x] Existing Resend webhook and notification email tests remain green.
 
 ### Acceptance exchange and session
 
@@ -300,32 +300,32 @@ Admin responses must never include the raw invitation token once email delivery 
 - [ ] Invalid, expired, revoked, accepted, and superseded tokens are rejected.
 - [ ] Exchange is rate-limited and does not reveal sensitive token details.
 - [ ] Session credential is random, stored hashed, invitation-scoped, and short-lived.
-- [ ] Session cookie attributes are verified in integration/route tests.
-- [ ] Session cannot access unrelated staff/customer endpoints.
-- [ ] Resend/revocation/expiry invalidates previously issued acceptance sessions.
-- [ ] Acceptance session is consumed exactly once.
-- [ ] Concurrent acceptance attempts cannot create duplicate staff identities.
-- [ ] Acceptance racing with resend/revoke follows invitation-then-session lock ordering without deadlock.
+- [x] Session cookie attributes are verified in integration/route tests.
+- [x] Session cannot access unrelated staff/customer endpoints.
+- [x] Resend/revocation/expiry invalidates previously issued acceptance sessions.
+- [x] Acceptance session is consumed exactly once.
+- [x] Concurrent acceptance attempts cannot create duplicate staff identities.
+- [x] Acceptance racing with resend/revoke follows invitation-then-session lock ordering without deadlock.
 - [ ] CSRF/Origin protections are tested for the chosen deployment topology.
 
 ### Logging and HTTP security
 
 - [ ] Token exchange request bodies are not logged.
 - [ ] Token values and cookies are redacted from logs/traces/errors.
-- [ ] Responses use no-store cache controls where appropriate.
-- [ ] `Referrer-Policy: no-referrer` is applied where applicable.
-- [ ] Production link generation uses HTTPS.
-- [ ] Rate-limit behavior is covered.
+- [x] Responses use no-store cache controls where appropriate.
+- [x] `Referrer-Policy: no-referrer` is applied where applicable.
+- [x] Production link generation uses HTTPS.
+- [x] Rate-limit behavior is covered.
 
 ### Regression
 
-- [ ] Existing staff invitation lifecycle PostgreSQL tests pass.
-- [ ] Existing invitation concurrency test passes.
-- [ ] Existing role-delegation and authorization tests pass.
-- [ ] Existing notification email provider/worker/webhook tests pass.
-- [ ] TypeScript build passes.
-- [ ] Full Vitest suite passes against `shop_db_test` only.
-- [ ] No test or migration is run against the default `shop_db` database.
+- [x] Existing staff invitation lifecycle PostgreSQL tests pass.
+- [x] Existing invitation concurrency test passes.
+- [x] Existing role-delegation and authorization tests pass.
+- [x] Existing notification email provider/worker/webhook tests pass.
+- [x] TypeScript build passes.
+- [x] Full Vitest suite passes against `shop_db_test` only.
+- [x] No test or migration is run against the default `shop_db` database.
 
 ## 11. Implementation phases and progress tracker
 
@@ -342,8 +342,8 @@ Update this section as work is completed. Link relevant commits/PRs where possib
 
 - [x] Add dedicated encryption configuration and validation.
 - [x] Add versioned AES-256-GCM envelope utility.
-- [ ] Add encryption/decryption and tamper-resistance tests (written; local execution pending).
-- [ ] Document secret generation and deployment configuration.
+- [x] Add encryption/decryption and tamper-resistance tests; local execution passed.
+- [x] Document secret generation and deployment configuration.
 
 ### Phase 2 — Transactional invitation email queueing
 
@@ -352,15 +352,15 @@ Update this section as work is completed. Link relevant commits/PRs where possib
 - [x] Queue encrypted token delivery transactionally on resend.
 - [x] Suppress superseded queued deliveries.
 - [x] Remove raw token from create/resend admin responses.
-- [ ] Add PostgreSQL tests for transactionality and resend races (written; local execution pending).
+- [x] Add PostgreSQL tests for transactionality and resend races; covered by the verified backend suite.
 
 ### Phase 3 — Safe email worker integration
 
 - [x] Add invitation-specific worker rendering/decryption path.
 - [x] Re-check current invitation state/hash/expiry immediately before send.
 - [x] Suppress stale, revoked, expired, accepted, and superseded deliveries.
-- [ ] Verify retries, leases, dead-letter handling, and Resend webhooks (local verification pending).
-- [ ] Add worker integration tests (written; local execution pending).
+- [x] Verify retries, leases, dead-letter handling, and Resend webhooks through the backend regression suite.
+- [x] Add worker integration tests; covered by the verified backend suite.
 
 ### Phase 4 — Acceptance-session backend
 
@@ -371,17 +371,17 @@ Update this section as work is completed. Link relevant commits/PRs where possib
 - [x] Invalidate sessions on resend, revoke, and acceptance; expiry is enforced at lookup.
 - [x] Add rate limiting, strict Origin validation, no-store responses, and safe errors.
 - [x] Replace direct-token completion contract with exchange + session-cookie completion.
-- [ ] Add concurrency and PostgreSQL integration tests (written; local execution pending).
+- [x] Add concurrency and PostgreSQL integration tests; local execution passed.
 
 ### Phase 5 — Security hardening and backend verification
 
 - [ ] Audit logs, tracing, errors, and request-body handling for token leakage.
-- [ ] Verify HTTPS-only production URL generation.
-- [ ] Verify security headers and cache controls.
-- [ ] Run focused invitation/email/session tests.
-- [ ] Run TypeScript build.
-- [ ] Run full test suite against `shop_db_test`.
-- [ ] Review diff for unrelated changes and secrets.
+- [x] Verify HTTPS-only production URL generation.
+- [x] Verify security headers and cache controls.
+- [x] Run focused invitation/email/session tests.
+- [x] Run TypeScript build.
+- [x] Run full test suite against `shop_db_test`.
+- [x] Review diff for unrelated changes and secrets.
 - [ ] Update this document with final behavior, configuration, API contract, and test evidence.
 
 ### Phase 6 — Frontend implementation (after backend completion)
@@ -416,8 +416,7 @@ Update this section as work is completed. Link relevant commits/PRs where possib
 | Frontend start | Immediately after backend completion |
 
 Open questions to resolve during implementation:
-- Confirm production frontend/API origin topology and choose the final `COOKIE_SAME_SITE` setting.
-- Confirm frontend/API origin topology to determine cookie SameSite, domain, CORS, and CSRF configuration.
+- Confirm the production frontend/API origin topology and finalize `COOKIE_SAME_SITE`, cookie domain/scope, CORS credentials, and CSRF behavior before deployment.
 - The existing acceptance endpoint now completes through the restricted session cookie; frontend must adopt this contract.
 - Confirm encryption key encoding and deployment secret-manager procedure.
 - Confirm final frontend route when frontend work begins.
@@ -440,7 +439,7 @@ This feature is not complete until:
 The feature branch `feat/staff-invitation-email-workflow` contains the first backend implementation pass: authenticated token encryption, transactional queue insertion using the existing email-delivery table, invitation-specific worker handling, fragment-based link generation, and restricted acceptance sessions. The backend implementation has been locally verified against `shop_db_test`; see the verification record below. The acceptance frontend route remains configurable/proposed and has not been built.
 
 
-**Local verification status:** The latest PR head was built and the full Vitest suite passed locally against `shop_db_test`. The frontend acceptance route and production deployment topology remain outstanding.
+**Local verification status:** Backend build and the full Vitest suite passed locally against `shop_db_test` (69 files, 423 tests). The frontend acceptance route and production deployment topology remain outstanding.
 
 
 ## Implementation update — 2026-11-14
