@@ -51,6 +51,7 @@ async function createInvitation(email: string, roleIds = [roleAId]) {
     { email, roleIds },
     { ipAddress: "127.0.0.1", userAgent: "staff-invitation-integration-test" },
   );
+  expect(result).not.toHaveProperty("invitationToken");
   invitationIds.push(result.invitation.id);
   const delivery = await prisma.notificationEmailDelivery.findFirst({
     where: {
@@ -294,6 +295,11 @@ describe("PostgreSQL staff invitation lifecycle", () => {
     const resent = await resendStaffInvitation(actorId, created.invitation.id);
     expect(resent.invitationToken).not.toBe(originalToken);
     expect(resent.invitation).not.toHaveProperty("tokenHash");
+    const oldDelivery = await pool.query(
+      `SELECT status FROM notification_email_deliveries WHERE "eventRecipientKey" = $1`,
+      [`staff-invitation:${created.invitation.id}:${hashRefreshToken(originalToken)}`],
+    );
+    expect(oldDelivery.rows[0]?.status).toBe("SUPPRESSED");
     await expect(completeStaffInvitation({
       sessionToken: originalSession.sessionToken,
       password: "A-strong-staff-password-2026",
