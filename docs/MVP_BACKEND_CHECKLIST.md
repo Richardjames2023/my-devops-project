@@ -150,6 +150,18 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [~] Last recorded full-suite verification was 69 test files / 423 tests on the earlier PR #27 baseline. PRs #29, #31, and #32 were merged afterward; a fresh Prisma validation, build, migration-status check, focused regression run, and full suite on current `dev` remain required.
 - [ ] Repeat build, migration validation, and full test suite against `shop_db_test` before each subsequent merge; never point integration tests at `shop_db` or production.
 
+
+## 12. Statistics and analytics (STA)
+
+- [ ] Build a permission-protected staff analytics API; no analytics/statistics module or routes were found in the current backend tree.
+- [ ] Sales reporting: gross order value, net sales after discounts/refunds, order counts, average order value, period comparisons, and sales by product/category.
+- [ ] Customer reporting: total customers, new customers, repeat customers, and active customers. Define the active-customer lookback window before implementation.
+- [ ] Order reporting: counts and value by lifecycle status, with cancelled and returned orders treated consistently.
+- [ ] Inventory/product reporting: best sellers, low-stock products, and inventory valuation where the required cost basis exists.
+- [ ] Profitability reporting: add and maintain a trusted product-variant cost basis before calculating gross profit or profit margin. The current Product/ProductVariant schema has selling prices but no cost-price field, so revenue must not be labelled as profit.
+- [ ] Define reporting timezone, date boundaries, currency handling, refund/discount treatment, authorization, query performance, and PostgreSQL regression coverage.
+
+
 ## MVP scope decisions
 
 | Capability | MVP decision |
