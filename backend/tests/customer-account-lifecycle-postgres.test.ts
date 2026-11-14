@@ -663,13 +663,14 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
       const processed = await processCustomerAccountDeletionBatch();
       expect(processed.failed).toBe(1);
       const deletion = await pool.query(
-        'SELECT "failureCount", "lastError", "scheduledFor" FROM customer_account_deletions WHERE "userId" = $1',
+        'SELECT "failureCount", "lastError", EXTRACT(EPOCH FROM ("scheduledFor" - (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\')) ) AS "retryDelaySeconds" FROM customer_account_deletions WHERE "userId" = $1',
         [customer.id],
       );
       expect(deletion.rows[0].failureCount).toBe(1);
       expect(deletion.rows[0].lastError).toBeTruthy();
       expect(deletion.rows[0].lastError).not.toContain(customer.email);
-      expect(new Date(deletion.rows[0].scheduledFor).getTime()).toBeGreaterThan(Date.now());
+      expect(Number(deletion.rows[0].retryDelaySeconds)).toBeGreaterThan(3500);
+      expect(Number(deletion.rows[0].retryDelaySeconds)).toBeLessThanOrEqual(3600);
     } finally {
       await pool.query("DROP TRIGGER IF EXISTS test_reject_customer_anonymization_trigger ON users");
       await pool.query("DROP FUNCTION IF EXISTS test_reject_customer_anonymization()");
