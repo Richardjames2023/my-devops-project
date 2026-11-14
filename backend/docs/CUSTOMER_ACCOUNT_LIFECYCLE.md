@@ -12,7 +12,7 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Provide a 30-day cancellation/restoration period.
 - [x] Automatically process eligible deletion requests after the cancellation period.
 - [x] Preserve legally and operationally necessary business records while anonymizing unnecessary personal data.
-- [x] Make processing safe to retry and resilient to concurrent requests.
+- [x] Make processing safe to retry and resilient to concurrent requests, with persisted exponential backoff after failures.
 
 ### 2. Agreed lifecycle decisions
 | Area | Decision |
@@ -24,7 +24,7 @@ Track the design decisions, implementation stages, verification and release read
 | Operational deferral | Defer processing while dependent orders, payments, refunds, reservations, deliveries, returns, warranty claims or payment-inventory reconciliations remain unresolved. Also defer until every purchased product's active warranty coverage has expired. Recheck at the earlier of the normal seven-day retry interval or the latest active warranty expiry. Deferral must not extend the original 30-day cancellation deadline. |
 | Historical records | Retain completed orders, payments, refunds, returns, warranties, reviews and necessary audit actions. |
 | Identity and PII | Replace customer identity with “Deleted Customer”; anonymize order contact details and shipping information. |
-| Personal data cleanup | Remove carts, wishlists, notification inbox/preferences/deliveries, refresh tokens and verification/reset tokens. |
+| Personal data cleanup | Remove carts, wishlists, notification inbox/preferences/deliveries, direct customer verification/reset email deliveries and their provider payloads, refresh tokens and verification/reset tokens. Replace the retained user password hash with a hash of an undisclosed random secret. |
 | User record | Retain the user row in anonymized, inactive form to preserve historical foreign-key relationships. |
 | Customer-authored free text and evidence | Retain return, warranty and review records, but replace customer-authored narratives with `[redacted after account deletion]`. Redact return reasons/descriptions, return-item notes, evidence descriptions and URLs; enqueue Cloudinary asset deletion and clear evidence `publicId`; redact warranty issue/description and review title/comment. Preserve staff-authored warranty resolution notes and return inspection notes. |
 
@@ -44,6 +44,7 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Preserve active warranty entitlements by deferring anonymization until all recorded warranty expiry dates have passed.
 - [x] Perform anonymization and personal-data cleanup transactionally.
 - [x] Keep processing idempotent so retries do not repeat destructive work or corrupt retained records.
+- [x] Persist worker failure count and error detail; reschedule failed requests with capped exponential backoff so failures cannot monopolize every batch.
 
 ### 5. Test design
 - [x] Add PostgreSQL integration coverage for profile updates and duplicate phone protection.
@@ -53,10 +54,12 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Add coverage for active warranty and unresolved payment-inventory reconciliation deferrals.
 - [x] Add coverage for concurrent duplicate requests and idempotent worker processing.
 - [x] Add coverage for email verification racing with account deletion.
+- [x] Add coverage for direct verification/reset email cleanup while preserving staff mail to a shared address.
+- [x] Add coverage for password-hash replacement and persisted deletion-worker retry scheduling.
 - [x] Agree and test redaction of customer-authored return, warranty and product-review text while retaining the underlying records.
 - [x] Verify staff-authored warranty resolution notes remain intact.
-- [ ] Run the focused PostgreSQL integration test locally.
-- [ ] Run the full backend regression suite locally.
+- [ ] Rerun the focused PostgreSQL integration test locally after the review fixes.
+- [ ] Rerun the full backend regression suite locally after the review fixes.
 - [ ] Resolve any failures and rerun the affected tests.
 
 ## Implementation status
@@ -67,10 +70,10 @@ Track the design decisions, implementation stages, verification and release read
 | Prisma model and migration | Implemented; local verification pending | Intended migration applied to `shop_db_test`; inspect the additional locally generated migration before cleanup. |
 | Profile API | Implemented; build fix pushed | Controller now narrows optional validated fields before calling the service. |
 | Deletion request and cancellation APIs | Implemented; local verification pending | Immediate deactivation and 30-day cancellation window. |
-| Background deletion worker | Implemented; local verification pending | Hourly processing with seven-day operational deferrals. |
-| Privacy-safe anonymization | Implemented; build fix pushed | Nullable JSON audit fields now use Prisma's `DbNull` sentinel. |
+| Background deletion worker | Implemented; local verification pending | Hourly processing with seven-day operational deferrals and capped exponential retry scheduling for processing failures. |
+| Privacy-safe anonymization | Implemented; local verification pending | Includes direct customer auth-email/provider-payload cleanup and replacement of the retained password hash with a hash of a random undisclosed secret. |
 | Concurrency and idempotency safeguards | Implemented; new auth race test pending | Email verification now takes the shared user advisory lock before re-reading/claiming its token. |
-| PostgreSQL integration tests | Added; execution pending | Focused test file is listed in local verification below. |
+| PostgreSQL integration tests | Extended; rerun pending | Covers direct auth-email cleanup, shared staff email preservation, credential scrubbing and worker retry scheduling. |
 | Build and regression verification | Prior baseline passed; new auth change pending | Before the email-verification lock fix, the local build and full suite passed; rerun after pulling the latest commits. |
 
 ## Verification log
@@ -104,7 +107,7 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Focused customer account lifecycle PostgreSQL tests passed 6/6 before the latest concurrency test; rerun required.
 - [x] Full backend test suite passed: 440 tests across 71 files before the latest auth/test change; rerun required.
 - [x] Diff whitespace check passed before the latest changes; rerun required.
-- [ ] Review confirms retained records, anonymized fields and dependent workflows behave as intended.
+- [ ] Review confirms retained records, anonymized fields and dependent workflows behave as intended, including direct auth-email cleanup, credential scrubbing and worker retries.
 - [ ] Pull request is reviewed and explicitly approved before merge.
 
 ## Local verification
@@ -127,8 +130,8 @@ git diff --check origin/dev...HEAD
 ## Change tracking
 - Feature branch: `feat/customer-profile-deactivation-deletion`
 - Pull request: [#31 — Customer profile management and privacy-safe account deletion](https://github.com/Richardjames2023/my-devops-project/pull/31)
-- Review follow-ups: preserve active warranty and payment-reconciliation obligations, serialize email verification with account deletion, and scrub retained email webhook payloads.
-- Local baseline before the latest auth change: TypeScript build passed; focused lifecycle tests passed 6/6; full suite passed 440 tests across 71 files; `git diff --check` passed. These checks must be rerun against the new commits.
+- Review follow-ups: preserve active warranty and payment-reconciliation obligations; serialize email verification with account deletion; scrub direct customer auth-email deliveries, provider payloads and retained password credentials; and persist capped exponential retry scheduling for worker failures.
+- Prior local baseline predates the review fixes in this follow-up. Build, focused PostgreSQL tests, the full suite, Prisma validation/generation and `git diff --check` must all be rerun before merge.
 - Customer-authored free text is redacted during anonymization; return evidence URLs and Cloudinary public IDs are also cleared, with asset deletion queued through the existing Cloudinary cleanup worker. Staff-authored warranty resolution and return inspection notes remain available. Focused tests cover return/evidence redaction, warranty/review text redaction and retention of staff warranty resolution notes.
 - CI workflow changes are intentionally out of scope for this follow-up and have not been changed.
 - Keep this work on the feature branch until all release gates pass. Do not merge to `dev` before review and verification.
