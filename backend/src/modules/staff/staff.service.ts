@@ -155,14 +155,22 @@ async function queueStaffInvitationEmail(
     throw new AppError("Staff invitation acceptance URL is invalid", 503);
   }
   const encryptedToken = encryptInvitationSecret(input.token, encryptionKey);
+  const templateData: Prisma.InputJsonObject = {
+    invitationId: input.invitationId,
+    encryptedToken: {
+      version: encryptedToken.version,
+      algorithm: encryptedToken.algorithm,
+      keyId: encryptedToken.keyId,
+      nonce: encryptedToken.nonce,
+      authTag: encryptedToken.authTag,
+      ciphertext: encryptedToken.ciphertext,
+    },
+  };
   const delivery = await tx.notificationEmailDelivery.create({
     data: {
       recipientEmail: input.email,
       templateKey: "staff.invitation",
-      templateData: {
-        invitationId: input.invitationId,
-        encryptedToken,
-      } as unknown as Prisma.InputJsonValue,
+      templateData,
       eventRecipientKey: `staff-invitation:${input.invitationId}:${input.tokenHash}`,
       status: "QUEUED",
       nextAttemptAt: new Date(),
