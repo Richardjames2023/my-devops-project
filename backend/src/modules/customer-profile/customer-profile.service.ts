@@ -1,7 +1,8 @@
+import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
-import { verifyPassword } from "../../common/utils/password";
+import { hashPassword, verifyPassword } from "../../common/utils/password";
 import { createAuditLog } from "../../common/utils/audit-log";
 import { enqueueCloudinaryCleanup } from "../../infrastructure/cloudinary/cloudinary-cleanup";
 
@@ -249,6 +250,12 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
       OR: [
         { eventRecipientKey: { endsWith: `:CUSTOMER:${user.id}` } },
         ...(notificationIds.length ? [{ notificationId: { in: notificationIds } }] : []),
+        // Direct customer auth emails do not originate from the notification outbox.
+        // Their dedicated templates distinguish them from staff mail at shared addresses.
+        {
+          recipientEmail: user.email,
+          templateKey: { in: ["customer.email-verification", "customer.password-reset"] },
+        },
       ],
     },
     select: { id: true },
@@ -336,6 +343,7 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
     where: { id: user.id },
     data: {
       email: `deleted+${user.id}@deleted.invalid`,
+      passwordHash: await hashPassword(randomBytes(32).toString("base64url")),
       firstName: "Deleted",
       lastName: "Customer",
       phone: null,
@@ -345,7 +353,7 @@ async function anonymizeCustomer(tx: Prisma.TransactionClient, user: { id: strin
   });
   await tx.customerAccountDeletion.update({
     where: { userId: user.id },
-    data: { status: "COMPLETED", completedAt: now },
+    data: { status: "COMPLETED", completedAt: now, failureCount: 0, lastError: null },
   });
   await createAuditLog(tx, {
     action: "CUSTOMER_ACCOUNT_ANONYMIZED",
@@ -359,8 +367,8 @@ export async function processCustomerAccountDeletionBatch() {
   // Prisma DateTime fields are stored as TIMESTAMP(3) WITHOUT TIME ZONE.
   // Compare them against an explicit UTC database clock to avoid runtime/session
   // timezone differences between Node.js and PostgreSQL.
-  const due = await prisma.$queryRaw<Array<{ id: string; userId: string }>>`
-    SELECT "id", "userId"
+  const due = await prisma.$queryRaw<Array<{ id: string; userId: string; failureCount: number }>>`
+    SELECT "id", "userId", "failureCount"
     FROM "customer_account_deletions"
     WHERE "status" = 'REQUESTED'
       AND "scheduledFor" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
@@ -386,7 +394,7 @@ export async function processCustomerAccountDeletionBatch() {
 
         const user = await tx.user.findUnique({ where: { id: candidate.userId }, select: { id: true, email: true } });
         if (!user) {
-          await tx.customerAccountDeletion.update({ where: { id: candidate.id }, data: { status: "COMPLETED", completedAt: new Date() } });
+          await tx.customerAccountDeletion.update({ where: { id: candidate.id }, data: { status: "COMPLETED", completedAt: new Date(), failureCount: 0, lastError: null } });
           return "COMPLETED";
         }
 
@@ -396,7 +404,9 @@ export async function processCustomerAccountDeletionBatch() {
             UPDATE "customer_account_deletions"
             SET "scheduledFor" = ${deferral.scheduledFor},
                 "lastDeferredAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
-                "deferralCount" = "deferralCount" + 1
+                "deferralCount" = "deferralCount" + 1,
+                "failureCount" = 0,
+                "lastError" = NULL
             WHERE "id" = ${candidate.id}::uuid
               AND "status" = 'REQUESTED'
           `;
@@ -410,7 +420,25 @@ export async function processCustomerAccountDeletionBatch() {
       if (outcome === "DEFERRED") deferred += 1;
     } catch (error) {
       failed += 1;
-      console.error("[CUSTOMER DELETION] Failed to process request", candidate.id, error);
+      const message = error instanceof Error ? error.message : "Unknown deletion processing error";
+      // The anonymization transaction has rolled back. Persist a retry deadline
+      // separately so a poison request cannot occupy every batch forever.
+      const retryDelayMs = Math.min(24 * 60 * 60 * 1000, 60 * 60 * 1000 * 2 ** Math.min(candidate.failureCount, 5));
+      const retryAt = new Date(Date.now() + retryDelayMs);
+      try {
+        const rescheduled = await prisma.customerAccountDeletion.updateMany({
+          where: { id: candidate.id, status: "REQUESTED" },
+          data: { scheduledFor: retryAt, failureCount: { increment: 1 }, lastError: message.slice(0, 2000) },
+        });
+        if (rescheduled.count === 1) {
+          console.error("[CUSTOMER DELETION] Processing failed; request rescheduled", {
+            requestId: candidate.id, failureCount: candidate.failureCount + 1,
+            retryAt: retryAt.toISOString(), message,
+          });
+        }
+      } catch (rescheduleError) {
+        console.error("[CUSTOMER DELETION] Failed to persist retry schedule", candidate.id, rescheduleError);
+      }
     }
   }
   return { claimed: due.length, completed, deferred, failed };
