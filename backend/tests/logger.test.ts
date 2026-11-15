@@ -18,6 +18,21 @@ describe("structured logger", () => {
     expect(typeof entry.timestamp).toBe("string");
   });
 
+  it("omits exception messages and stack traces from structured logs", () => {
+    const write = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const sensitiveMessage = "provider response contained customer@example.com and secret-token";
+    const error = new Error(sensitiveMessage);
+    logger.error("Background operation failed", error);
+    const line = String(write.mock.calls[0]?.[0]);
+    const entry = JSON.parse(line) as { error?: { name?: string; message?: string; stack?: string } };
+
+    expect(entry.error).toEqual({ name: "Error" });
+    expect(line).not.toContain(sensitiveMessage);
+    expect(line).not.toContain("customer@example.com");
+    expect(line).not.toContain("secret-token");
+    expect(line).not.toContain("at ");
+  });
+
   it("redacts secret-like fields and bearer credentials", () => {
     const write = vi.spyOn(process.stdout, "write").mockReturnValue(true);
     logger.warn("credential check", {
