@@ -30,11 +30,9 @@ function sanitize(value: unknown, key = "", seen = new WeakSet<object>()): unkno
   if (sensitiveKey.test(key)) return "[REDACTED]";
   if (typeof value === "string") return redactString(value);
   if (value instanceof Error) {
-    return {
-      name: value.name,
-      message: redactString(value.message),
-      stack: value.stack ? redactString(value.stack) : undefined,
-    };
+    // Exception messages and stacks can contain provider payloads, credentials,
+    // personal data, or internal paths. Emit only the stable error class name.
+    return { name: value.name };
   }
   if (Array.isArray(value)) return value.map((item) => sanitize(item, "", seen));
   if (value && typeof value === "object") {
