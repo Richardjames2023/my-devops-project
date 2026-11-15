@@ -225,7 +225,7 @@ describe("product image management services", () => {
   it("logs Cloudinary cleanup failures when the image database transaction fails", async () => {
     const cleanupError = new Error("Cloudinary unavailable");
     const databaseError = new Error("Database write failed");
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const stderrWriteSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
 
     mocks.transaction.mockRejectedValueOnce(databaseError);
     mocks.destroyAsset.mockRejectedValueOnce(cleanupError);
@@ -234,15 +234,29 @@ describe("product image management services", () => {
       createProductImages(productId, [imageFile]),
     ).rejects.toBe(databaseError);
 
-    expect(errorSpy).toHaveBeenCalledWith(
-      "Cloudinary product image cleanup failed after a database write error:",
-      {
-        publicId: "products/product/front",
-        message: "Cloudinary unavailable",
-      },
+    expect(mocks.upsertCleanup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { publicId: "products/product/front" },
+        create: expect.objectContaining({
+          publicId: "products/product/front",
+          resourceType: "image",
+          deliveryType: "upload",
+        }),
+      }),
     );
 
-    errorSpy.mockRestore();
+    expect(stderrWriteSpy).toHaveBeenCalledOnce();
+    const logEntry = JSON.parse(String(stderrWriteSpy.mock.calls[0]?.[0])) as Record<string, unknown>;
+    expect(logEntry).toMatchObject({
+      level: "error",
+      message: "Cloudinary product image cleanup failed after a database write error",
+      productId,
+      errorName: "Error",
+    });
+    expect(String(stderrWriteSpy.mock.calls[0]?.[0])).not.toContain("Cloudinary unavailable");
+    expect(String(stderrWriteSpy.mock.calls[0]?.[0])).not.toContain("products/product/front");
+
+    stderrWriteSpy.mockRestore();
   });
 
   it("reports pending Cloudinary cleanup without losing the database deletion", async () => {
