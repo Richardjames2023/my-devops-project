@@ -34,6 +34,8 @@ import staffNotificationPreferenceRoutes from "./modules/notifications/staff-not
 import notificationOperationsRoutes from "./modules/notifications/notification-operations.routes";
 import { resendEmailWebhook } from "./modules/notifications/notification-email-webhook.controller";
 import { errorHandler } from "./common/errors/errorHandler";
+import { requestId } from "./common/middleware/requestId";
+import { httpLogger } from "./common/middleware/httpLogger";
 import cookieParser from "cookie-parser";
 import healthRoutes from "./modules/health/health.routes";
 import deliveryZoneRoutes from "./modules/delivery-zones/delivery-zone.routes";
@@ -46,6 +48,8 @@ const app = express();
 const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
 
 app.use(helmet());
+app.use(requestId);
+app.use(httpLogger);
 app.use(
   cors({
     origin: (origin, callback) => {
