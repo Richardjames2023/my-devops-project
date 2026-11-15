@@ -26,7 +26,16 @@ export const createBannerSchema = bannerFieldsSchema.refine(
   },
 );
 
-export const updateBannerSchema = bannerFieldsSchema.partial().refine(
+export const updateBannerSchema = z.object({
+  title: z.string().trim().min(2).max(120).optional(),
+  position: positionSchema.optional(),
+  startAt: z.iso.datetime({ offset: true }).optional(),
+  endAt: z.iso.datetime({ offset: true }).optional(),
+  targetUrl: targetUrlSchema,
+  altText: z.string().trim().max(255).nullable().optional(),
+  priority: z.number().int().min(-1000).max(1000).optional(),
+  status: z.enum(["DRAFT", "PUBLISHED", "PAUSED"]).optional(),
+}).refine(
   (value) => Object.keys(value).length > 0,
   "At least one field must be provided",
 ).refine(
