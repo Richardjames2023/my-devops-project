@@ -11,6 +11,7 @@ import {
 import { renderNotificationEmail, renderStaffInvitationEmail } from "./email/email-templates";
 import { decryptInvitationSecret, getInvitationEncryptionKeyring, type EncryptedSecretEnvelope } from "../staff/staff-invitation-encryption";
 import { hashRefreshToken } from "../../common/utils/refreshToken";
+import { logger } from "../../config/logger";
 
 const BATCH_SIZE = 10;
 const LEASE_MS = 2 * 60 * 1000;
@@ -339,7 +340,7 @@ export async function processNotificationEmailBatch(
             : new Error("Staff invitation email could not be prepared or sent");
           await markFailed(delivery, safeError);
         } catch (recordError) {
-          console.error("[NOTIFICATION EMAIL] Failed to record delivery failure", delivery.id, recordError);
+          logger.error("Failed to record notification email delivery failure", recordError, { deliveryId: delivery.id });
         }
         console.error("[NOTIFICATION EMAIL] Delivery failed", delivery.id, "Staff invitation email failed");
       }
@@ -366,9 +367,9 @@ export async function processNotificationEmailBatch(
       try {
         await markFailed(delivery, error);
       } catch (recordError) {
-        console.error("[NOTIFICATION EMAIL] Failed to record delivery failure", delivery.id, recordError);
+        logger.error("Failed to record notification email delivery failure", recordError, { deliveryId: delivery.id });
       }
-      console.error("[NOTIFICATION EMAIL] Delivery failed", delivery.id, error);
+      logger.error("Notification email delivery failed", error, { deliveryId: delivery.id, templateKey: delivery.templateKey });
       continue;
     }
 
