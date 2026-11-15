@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type NotificationCategory } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
+import { logger } from "../../config/logger";
 
 const BATCH_SIZE = 25;
 const LEASE_MS = 5 * 60 * 1000;
