@@ -1139,6 +1139,7 @@ enum PromotionBannerPosition {
 
 enum PromotionBannerStatus {
   DRAFT
+  PUBLISHED
   PAUSED
 }
 
