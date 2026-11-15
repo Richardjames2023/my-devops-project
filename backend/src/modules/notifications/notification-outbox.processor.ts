@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, type NotificationCategory } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
+import { logger } from "../../config/logger";
 
 const BATCH_SIZE = 25;
 const LEASE_MS = 5 * 60 * 1000;
@@ -776,9 +777,9 @@ export async function processNotificationOutboxBatch(options: { eventId?: string
       try {
         await recordFailure(event, workerId, error);
       } catch (recordError) {
-        console.error("[NOTIFICATION OUTBOX] Failed to record event failure", event.id, recordError);
+        logger.error("Failed to record notification outbox event failure", undefined, { eventId: event.id, errorName: recordError instanceof Error ? recordError.name : "UnknownError" });
       }
-      console.error("[NOTIFICATION OUTBOX] Event processing failed", event.id, event.eventType, error);
+      logger.error("Notification outbox event processing failed", undefined, { eventId: event.id, eventType: event.eventType, errorName: error instanceof Error ? error.name : "UnknownError" });
     }
   }
   return { claimed: events.length, processed, failed };

@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import { getCloudinary } from "../../config/cloudinary";
+import { logger } from "../../config/logger";
 import { enqueueCloudinaryCleanup, deleteCloudinaryAsset } from "../../infrastructure/cloudinary/cloudinary-cleanup";
 import type { UpdateProductImageInput } from "./product-image.validation";
 import { MAX_PRODUCT_IMAGES } from "./product-image.upload";
@@ -36,11 +37,7 @@ function uploadToCloudinary(
       },
       (error, result) => {
         if (error || !result) {
-          console.error("Cloudinary product image upload failed:", {
-            message: error?.message,
-            http_code: error?.http_code,
-            name: error?.name,
-          });
+          logger.error("Cloudinary product image upload failed", undefined, { providerStatusCode: error?.http_code, errorName: error?.name ?? "UnknownError" });
           reject(new AppError("Product image upload failed", 502));
           return;
         }
@@ -218,18 +215,9 @@ export async function createProductImages(
         try {
           if (asset) await enqueueCloudinaryCleanup(asset.publicId);
         } catch (queueError) {
-          console.error("Could not persist Cloudinary cleanup task:", { publicId: asset?.publicId, queueError });
+          logger.error("Cloudinary cleanup task could not be persisted", undefined, { productId, errorName: queueError instanceof Error ? queueError.name : "UnknownError" });
         }
-        console.error(
-          "Cloudinary product image cleanup failed after a database write error:",
-          {
-            publicId: asset?.publicId,
-            message:
-              result.reason instanceof Error
-                ? result.reason.message
-                : "Unknown cleanup error",
-          },
-        );
+        logger.error("Cloudinary product image cleanup failed after a database write error", undefined, { productId, errorName: result.reason instanceof Error ? result.reason.name : "UnknownError" });
       }
     }
 
@@ -353,11 +341,7 @@ export async function deleteProductImage(productId: string, imageId: string) {
       await prisma.cloudinaryCleanupTask.deleteMany({ where: { publicId: deletedImage.publicId, status: "PENDING" } });
     } catch (error) {
       cloudinaryCleanupPending = true;
-      console.error("Product image was removed from the database but Cloudinary cleanup failed:", {
-        productImageId: deletedImage.id,
-        publicId: deletedImage.publicId,
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
+      logger.error("Product image was removed from the database but Cloudinary cleanup failed", undefined, { productImageId: deletedImage.id, errorName: error instanceof Error ? error.name : "UnknownError" });
     }
   }
 

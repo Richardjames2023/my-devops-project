@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { logger } from "../../config/logger";
 import { Prisma } from "@prisma/client";
 import prisma from "../../infrastructure/prisma/client";
 import { AppError } from "../../common/errors/AppError";
@@ -465,18 +466,10 @@ export async function processCustomerAccountDeletionBatch() {
           return { failureCount: current.failureCount + 1, retryAt };
         });
         if (rescheduled) {
-          console.error("[CUSTOMER DELETION] Processing failed; request rescheduled", {
-            requestId: candidate.id,
-            failureCount: rescheduled.failureCount,
-            retryAt: rescheduled.retryAt.toISOString(),
-            errorCode,
-          });
+          logger.error("Customer account deletion processing failed; request rescheduled", undefined, { deletionRequestId: candidate.id, failureCount: rescheduled.failureCount, retryAt: rescheduled.retryAt.toISOString(), errorCode });
         }
       } catch (rescheduleError) {
-        console.error("[CUSTOMER DELETION] Failed to persist retry schedule", {
-          requestId: candidate.id,
-          errorName: rescheduleError instanceof Error ? rescheduleError.name : "UNKNOWN",
-        });
+        logger.error("Customer account deletion retry schedule could not be persisted", undefined, { deletionRequestId: candidate.id, errorName: rescheduleError instanceof Error ? rescheduleError.name : "UnknownError" });
       }
     }
   }

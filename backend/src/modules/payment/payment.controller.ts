@@ -24,6 +24,7 @@ import {
   reconcileRefund,
 } from "../refund/refund.service";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
+import { logger } from "../../config/logger";
 
 const paymentIdSchema = z.object({
   paymentId: z.uuid("Invalid payment ID"),
@@ -448,10 +449,7 @@ export async function paystackWebhook(
             where: { eventKey },
           });
         } catch (lookupError) {
-          console.error(
-            "[PAYSTACK WEBHOOK] Could not inspect duplicate event:",
-            lookupError,
-          );
+          logger.error("Paystack webhook duplicate-event lookup failed", undefined, { errorName: lookupError instanceof Error ? lookupError.name : "UnknownError" });
 
           res.status(500).json({
             message: "Webhook recovery required",
@@ -470,7 +468,7 @@ export async function paystackWebhook(
         return;
       }
 
-      console.error("[PAYSTACK WEBHOOK] Could not claim refund event:", error);
+      logger.error("Paystack refund webhook event could not be claimed", undefined, { errorName: error instanceof Error ? error.name : "UnknownError" });
 
       res.status(500).json({
         message: "Webhook processing unavailable",
@@ -513,10 +511,7 @@ export async function paystackWebhook(
 
       res.sendStatus(200);
     } catch (error) {
-      console.error(
-        "[PAYSTACK WEBHOOK] Refund processing or event recording failed:",
-        error,
-      );
+      logger.error("Paystack refund webhook processing or event recording failed", undefined, { errorName: error instanceof Error ? error.name : "UnknownError", eventType: event.event });
 
       if (!refundProcessingSucceeded) {
         try {
@@ -535,10 +530,7 @@ export async function paystackWebhook(
             },
           });
         } catch (recordError) {
-          console.error(
-            "[PAYSTACK WEBHOOK] Could not record event failure:",
-            recordError,
-          );
+          logger.error("Paystack refund webhook failure state could not be recorded", undefined, { errorName: recordError instanceof Error ? recordError.name : "UnknownError" });
         }
       } else {
         try {
@@ -554,10 +546,7 @@ export async function paystackWebhook(
             },
           });
         } catch (recordError) {
-          console.error(
-            "[PAYSTACK WEBHOOK] Could not record recovery requirement:",
-            recordError,
-          );
+          logger.error("Paystack refund webhook recovery requirement could not be recorded", undefined, { errorName: recordError instanceof Error ? recordError.name : "UnknownError" });
         }
       }
 
@@ -589,13 +578,7 @@ export async function paystackWebhook(
     const result = await processPaystackSuccessfulWebhook(event.data.reference);
 
     if (result.reconciliationRequired) {
-      console.error(
-        "[PAYSTACK WEBHOOK] Payment succeeded but inventory requires manual reconciliation.",
-        {
-          paymentId: result.paymentId,
-          reference: event.data.reference,
-        },
-      );
+      logger.error("Paystack payment succeeded but inventory requires manual reconciliation", undefined, { paymentId: result.paymentId });
     }
 
     res.status(200).json({
@@ -604,7 +587,7 @@ export async function paystackWebhook(
       reconciliationRequired: result.reconciliationRequired,
     });
   } catch (error) {
-    console.error("[PAYSTACK WEBHOOK] Processing failed:", error);
+    logger.error("Paystack charge webhook processing failed", undefined, { errorName: error instanceof Error ? error.name : "UnknownError" });
 
     res.status(500).json({
       message: "Webhook processing failed",
@@ -655,7 +638,7 @@ export async function listStaleWebhookEvents(
       events,
     });
   } catch (error) {
-    console.error("[PAYSTACK WEBHOOK] Failed to list stale events:", error);
+    logger.error("Paystack stale webhook events could not be listed", undefined, { errorName: error instanceof Error ? error.name : "UnknownError" });
     res.status(500).json({
       message: "Could not retrieve stale webhook events",
     });
@@ -845,7 +828,7 @@ export async function reconcileStaleWebhookEvent(
       refund,
     });
   } catch (error) {
-    console.error("[WEBHOOK RECOVERY] Failed to reconcile stale event:", error);
+    logger.error("Paystack stale webhook event reconciliation failed", undefined, { eventId, errorName: error instanceof Error ? error.name : "UnknownError" });
 
     if (claimed) {
       try {
@@ -866,10 +849,7 @@ export async function reconcileStaleWebhookEvent(
           },
         });
       } catch (releaseError) {
-        console.error(
-          "[WEBHOOK RECOVERY] Could not release recovery claim:",
-          releaseError,
-        );
+        logger.error("Paystack webhook recovery claim could not be released", undefined, { eventId, errorName: releaseError instanceof Error ? releaseError.name : "UnknownError" });
       }
     }
 
