@@ -84,6 +84,9 @@ const roles = {
     "deliveries.read",
     "deliveries.manage",
   ],
+  DELIVERY_ZONE_MANAGER: [
+    "delivery_zones.manage",
+  ],
 } as const;
 
 async function seedNationwideDeliveryZones(
