@@ -2,6 +2,7 @@ import { Prisma, PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import "dotenv/config";
 import { hashPassword } from "../src/common/utils/password";
+import { assertNoActiveStaff, assertPendingOwnerAccount } from "./bootstrap-staff-owner.policy";
 
 /**
  * Retrieves and validates a required environment variable.
@@ -51,11 +52,7 @@ async function main(): Promise<void> {
       where: { status: "ACTIVE" },
     });
 
-    if (activeStaffCount > 0) {
-      throw new Error(
-        "An active staff account already exists. Bootstrap is only allowed before staff activation.",
-      );
-    }
+    assertNoActiveStaff(activeStaffCount);
 
     const ownerRole = await tx.role.findUnique({
       where: { name: "BUSINESS_OWNER" },
@@ -70,17 +67,7 @@ async function main(): Promise<void> {
       include: { roles: { include: { role: { select: { name: true } } } } },
     });
 
-    if (existing && (existing.status !== "PENDING_SETUP" || existing.passwordHash)) {
-      throw new Error(
-        "An account already exists for this email and is not an uninitialized pending account. Bootstrap cannot modify it.",
-      );
-    }
-
-    if (existing && existing.roles.some(({ role }) => role.name !== "BUSINESS_OWNER")) {
-      throw new Error(
-        "The pending account has unexpected role assignments. Review them before bootstrapping.",
-      );
-    }
+    assertPendingOwnerAccount(existing);
 
     const staff = existing
       ? await tx.staffAccount.update({
