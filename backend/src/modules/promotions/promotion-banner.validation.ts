@@ -7,7 +7,7 @@ const targetUrlSchema = z.string().trim().max(2048).nullable().optional().refine
   "Target URL must be a relative path or HTTPS URL",
 );
 
-export const createBannerSchema = z.object({
+const bannerFieldsSchema = z.object({
   title: z.string().trim().min(2).max(120),
   position: positionSchema,
   startAt: z.iso.datetime({ offset: true }),
@@ -16,13 +16,28 @@ export const createBannerSchema = z.object({
   altText: z.string().trim().max(255).nullable().optional(),
   priority: z.number().int().min(-1000).max(1000).default(0),
   status: z.enum(["DRAFT", "PUBLISHED", "PAUSED"]).default("DRAFT"),
-}).refine((value) => new Date(value.endAt) > new Date(value.startAt), {
-  path: ["endAt"], message: "End date must be later than start date",
 });
 
-export const updateBannerSchema = createBannerSchema.partial().refine(
+export const createBannerSchema = bannerFieldsSchema.refine(
+  (value) => new Date(value.endAt) > new Date(value.startAt),
+  {
+    path: ["endAt"],
+    message: "End date must be later than start date",
+  },
+);
+
+export const updateBannerSchema = bannerFieldsSchema.partial().refine(
   (value) => Object.keys(value).length > 0,
   "At least one field must be provided",
+).refine(
+  (value) =>
+    value.startAt === undefined ||
+    value.endAt === undefined ||
+    new Date(value.endAt) > new Date(value.startAt),
+  {
+    path: ["endAt"],
+    message: "End date must be later than start date",
+  },
 );
 
 export const listBannersQuerySchema = z.object({
