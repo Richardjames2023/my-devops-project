@@ -34,7 +34,13 @@ export async function list(req: AuthenticatedRequest, res: Response): Promise<vo
     res.status(400).json({ message: "Validation failed", errors: z.flattenError(parsed.error).fieldErrors });
     return;
   }
-  res.status(200).json({ message: "Promotion banners retrieved successfully", ...await listBanners(parsed.data) });
+  const filters = {
+    page: parsed.data.page,
+    limit: parsed.data.limit,
+    ...(parsed.data.position !== undefined ? { position: parsed.data.position } : {}),
+    ...(parsed.data.status !== undefined ? { status: parsed.data.status } : {}),
+  };
+  res.status(200).json({ message: "Promotion banners retrieved successfully", ...await listBanners(filters) });
 }
 export async function getById(req: AuthenticatedRequest, res: Response): Promise<void> {
   res.status(200).json({ message: "Promotion banner retrieved successfully", banner: await getBanner(uuid(req.params.bannerId, "banner")) });
