@@ -776,9 +776,9 @@ export async function processNotificationOutboxBatch(options: { eventId?: string
       try {
         await recordFailure(event, workerId, error);
       } catch (recordError) {
-        console.error("[NOTIFICATION OUTBOX] Failed to record event failure", event.id, recordError);
+        logger.error("Failed to record notification outbox event failure", recordError, { eventId: event.id });
       }
-      console.error("[NOTIFICATION OUTBOX] Event processing failed", event.id, event.eventType, error);
+      logger.error("Notification outbox event processing failed", error, { eventId: event.id, eventType: event.eventType });
     }
   }
   return { claimed: events.length, processed, failed };
