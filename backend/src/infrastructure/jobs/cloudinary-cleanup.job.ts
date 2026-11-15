@@ -1,4 +1,5 @@
 import { processCloudinaryCleanupBatch } from "../cloudinary/cloudinary-cleanup";
+import { logger } from "../../config/logger";
 
 export function startCloudinaryCleanupJob(): void {
   let running = false;
@@ -6,9 +7,10 @@ export function startCloudinaryCleanupJob(): void {
     if (running) return;
     running = true;
     try {
-      await processCloudinaryCleanupBatch();
+      const result = await processCloudinaryCleanupBatch();
+      if (result.claimed) logger.info("Cloudinary cleanup batch completed", result);
     } catch (error) {
-      console.error("Cloudinary cleanup worker failed:", error);
+      logger.error("Cloudinary cleanup worker failed", error);
     } finally {
       running = false;
     }
