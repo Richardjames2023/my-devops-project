@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import prisma from "../prisma/client";
 import { getCloudinary } from "../../config/cloudinary";
+import { logger } from "../../config/logger";
 
 type CloudinaryResourceType = "image" | "video" | "raw";
 type CloudinaryDeliveryType = "upload" | "authenticated";
@@ -94,7 +95,13 @@ export async function processCloudinaryCleanupBatch(limit = 20): Promise<number>
           lastError: message.slice(0, 2000),
         },
       });
-      console.error("Cloudinary cleanup queued for retry:", { publicId: claimed.publicId, message });
+      logger.error("Cloudinary cleanup queued for retry", undefined, {
+        taskId: claimed.id,
+        resourceType: claimed.resourceType,
+        deliveryType: claimed.deliveryType,
+        attempt: attempts,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
     }
     processed++;
   }
