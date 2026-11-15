@@ -98,6 +98,8 @@ async function createFixture(): Promise<Fixture> {
     const ngnReturnRequestId = randomUUID();
     const ngnReturnItemId = randomUUID();
     const ngnRefundId = randomUUID();
+    const secondNgNRefundId = randomUUID();
+    const failedNgNRefundId = randomUUID();
 
     await pool.query(
       `INSERT INTO return_requests
@@ -111,14 +113,14 @@ async function createFixture(): Promise<Fixture> {
       `INSERT INTO return_items
        (id, "returnRequestId", "orderItemId", quantity, "receivedQuantity",
         "acceptedQuantity", condition, "createdAt")
-       VALUES ($1, $2, $3, 1, 1, 1, 'USED', NOW())`,
+       VALUES ($1, $2, $3, 2, 2, 2, 'USED', NOW())`,
       [ngnReturnItemId, ngnReturnRequestId, ngnItem.rows[0].id],
     );
 
     await pool.query(
       `INSERT INTO refunds
        (id, "orderId", reference, status, amount, currency, reason, "createdAt", "updatedAt")
-       VALUES ($1, $2, $3, 'SUCCESS', 100.01, 'NGN', 'Analytics refund fixture', NOW(), NOW())`,
+       VALUES ($1, $2, $3, 'SUCCESS', 50.01, 'NGN', 'Analytics refund fixture', NOW(), NOW())`,
       [ngnRefundId, ngnOrderId, `ANALYTICS-REFUND-${suffix}`],
     );
     fixture.refundIds.push(ngnRefundId);
@@ -126,9 +128,31 @@ async function createFixture(): Promise<Fixture> {
     await pool.query(
       `INSERT INTO refund_items
       (id, "refundId", "returnItemId", quantity, amount)
-      VALUES ($1, $2, $3, 1, 100.01)`,
+      VALUES ($1, $2, $3, 1, 50.01)`,
       [randomUUID(), ngnRefundId, ngnReturnItemId],
     );
+
+    await pool.query(
+      `INSERT INTO refunds
+       (id, "orderId", reference, status, amount, currency, reason, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, 'SUCCESS', 50.01, 'NGN', 'Second partial refund', NOW(), NOW())`,
+      [secondNgNRefundId, ngnOrderId, `ANALYTICS-REFUND-SECOND-${suffix}`],
+    );
+    fixture.refundIds.push(secondNgNRefundId);
+
+    await pool.query(
+      `INSERT INTO refund_items (id, "refundId", "returnItemId", quantity, amount)
+       VALUES ($1, $2, $3, 1, 50.01)`,
+      [randomUUID(), secondNgNRefundId, ngnReturnItemId],
+    );
+
+    await pool.query(
+      `INSERT INTO refunds
+       (id, "orderId", reference, status, amount, currency, reason, "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, 'FAILED', 999.99, 'NGN', 'Failed refund must be excluded', NOW(), NOW())`,
+      [failedNgNRefundId, ngnOrderId, `ANALYTICS-REFUND-FAILED-${suffix}`],
+    );
+    fixture.refundIds.push(failedNgNRefundId);
 
     const usdRefundId = randomUUID();
     await pool.query(
@@ -247,10 +271,10 @@ describe("PostgreSQL staff analytics overview", () => {
       expect(ngn).toMatchObject({
         paidOrders: 1,
         merchandiseRevenue: 999.89,
-        successfulRefunds: 100.01,
-        netMerchandiseRevenue: 899.88,
+        successfulRefunds: 100.02,
+        netMerchandiseRevenue: 899.87,
         knownCostOfGoodsSold: 123.45,
-        grossProfit: 776.43,
+        grossProfit: 776.42,
         costCoveragePercent: 100,
         costedUnits: 1,
         unitsWithoutCost: 0,
@@ -275,8 +299,8 @@ describe("PostgreSQL staff analytics overview", () => {
           expect.objectContaining({
             currency: "NGN",
             merchandiseRevenue: 999.89,
-            refunds: 100.01,
-            netMerchandiseRevenue: 899.88,
+            refunds: 100.02,
+            netMerchandiseRevenue: 899.87,
           }),
           expect.objectContaining({
             currency: "USD",
