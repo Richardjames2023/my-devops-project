@@ -33,7 +33,7 @@ async function runPaymentReconciliation() {
         // Never release inventory because verification failed or timed out.
         logger.warn("Payment remains unresolved after reconciliation attempt", {
           paymentId: payment.id,
-          error,
+          errorName: error instanceof Error ? error.name : "UnknownError",
         });
       }
     }
