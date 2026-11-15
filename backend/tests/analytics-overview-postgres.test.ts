@@ -78,7 +78,7 @@ async function createFixture(): Promise<Fixture> {
       currency: "NGN",
       subtotal: "1000.00",
       discount: "0.11",
-      itemQuantity: 2,
+      itemQuantity: 3,
       unitCost: "123.45",
     });
 
@@ -207,7 +207,7 @@ async function createPaidOrder(
      VALUES ($1, $2, $3, 'Analytics Fixture Product', 'Analytics Variant',
              $4, $5, $6, $7, 0, $8, FALSE, NOW())`,
     [itemId, orderId, fixture.variantId, `ANALYTICS-ITEM-${itemId}`,
-      options.itemQuantity, options.currency === "NGN" ? "500.00" : "20.02",
+      options.itemQuantity, options.currency === "NGN" ? "333.33" : "20.02",
       options.unitCost, options.subtotal],
   );
 
@@ -261,6 +261,14 @@ describe("PostgreSQL staff analytics overview", () => {
     const from = new Date("2000-01-15T00:00:00.000Z");
     const to = new Date("2000-01-15T23:59:59.999Z");
     const baseline = await getAnalyticsOverview({ from, to });
+    const currentPeriodStart = new Date();
+    currentPeriodStart.setUTCHours(0, 0, 0, 0);
+    const currentPeriodEnd = new Date(currentPeriodStart);
+    currentPeriodEnd.setUTCHours(23, 59, 59, 999);
+    const currentPeriodBaseline = await getAnalyticsOverview({
+      from: currentPeriodStart,
+      to: currentPeriodEnd,
+    });
     const fixture = await createFixture();
 
     try {
@@ -311,6 +319,14 @@ describe("PostgreSQL staff analytics overview", () => {
         ]),
       );
       expect(analytics.activeCustomers.count).toBe(baseline.activeCustomers.count);
+
+      // The order belongs to January 2000 even though its successful refunds
+      // were processed now. They must not reduce the current reporting period.
+      const currentPeriodAfterRefunds = await getAnalyticsOverview({
+        from: currentPeriodStart,
+        to: currentPeriodEnd,
+      });
+      expect(currentPeriodAfterRefunds.currencies).toEqual(currentPeriodBaseline.currencies);
 
       for (const currency of Object.values(analytics.currencies)) {
         for (const key of [
