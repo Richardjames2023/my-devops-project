@@ -41,8 +41,6 @@ model User {
   createdAt                               DateTime                         @default(now())
   updatedAt                               DateTime                         @updatedAt
   auditLogs                               AuditLog[]
-  createdPromotionBanners                  PromotionBanner[] @relation("PromotionBannerCreator")
-  updatedPromotionDefaults                  PromotionBannerDefault[] @relation("PromotionBannerDefaultUpdater")
   carts                                   Cart[]
   orders                                  Order[]
   returnRequests                          ReturnRequest[]
@@ -141,6 +139,8 @@ model StaffAccount {
   assignedDeliveries                      Delivery[]                        @relation("DeliveryAssignedStaff")
   refreshTokens                           StaffRefreshToken[]
   auditLogs                               AuditLog[]
+  createdPromotionBanners                 PromotionBanner[]        @relation("PromotionBannerCreator")
+  updatedPromotionDefaults                PromotionBannerDefault[] @relation("PromotionBannerDefaultUpdater")
   createdInvitations                      StaffInvitation[]                @relation("StaffInvitationCreator")
   assignedRoleRecords                     StaffAccountRole[]               @relation("StaffRoleAssigner")
   inspectedReturnItems                    ReturnItemInspection[]           @relation("StaffReturnItemInspections")
