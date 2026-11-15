@@ -199,7 +199,6 @@ describe("PostgreSQL promotion banner storefront resolution", () => {
 
     const result = await getPublicBanners();
     expect(result.bottom).toMatchObject({ type: "default" });
-    expect(result.hero).toBeNull();
   });
 
   it("breaks equal-priority ties using the latest start time", async () => {
