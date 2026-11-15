@@ -76,8 +76,8 @@ async function createFixture(): Promise<Fixture> {
     const ngnOrderId = await createPaidOrder(fixture, {
       suffix: `${suffix}-NGN`,
       currency: "NGN",
-      subtotal: "1000.00",
-      discount: "0.11",
+      subtotal: "999.99",
+      discount: "0.10",
       itemQuantity: 3,
       unitCost: "123.45",
     });
