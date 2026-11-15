@@ -44,6 +44,17 @@ function retryDelay(attemptCount: number): number {
   return Math.min(30_000 * 2 ** Math.max(0, attemptCount - 1), MAX_BACKOFF_MS);
 }
 
+function safeEmailErrorContext(error: unknown): Record<string, unknown> {
+  if (error instanceof EmailProviderError) {
+    return {
+      errorName: error.name,
+      retryable: error.retryable,
+      ...(error.statusCode ? { providerStatusCode: error.statusCode } : {}),
+    };
+  }
+  return { errorName: error instanceof Error ? error.name : "UnknownError" };
+}
+
 async function suppressPolicyDisallowedOutboxEmails(): Promise<void> {
   // Older deployments may already have queued routine event emails. Suppress
   // them before claiming work so the new policy also applies to the backlog.
@@ -340,9 +351,9 @@ export async function processNotificationEmailBatch(
             : new Error("Staff invitation email could not be prepared or sent");
           await markFailed(delivery, safeError);
         } catch (recordError) {
-          logger.error("Failed to record notification email delivery failure", recordError, { deliveryId: delivery.id });
+          logger.error("Failed to record notification email delivery failure", undefined, { deliveryId: delivery.id, ...safeEmailErrorContext(recordError) });
         }
-        console.error("[NOTIFICATION EMAIL] Delivery failed", delivery.id, "Staff invitation email failed");
+        logger.error("Staff invitation email delivery failed", undefined, { deliveryId: delivery.id, ...safeEmailErrorContext(error) });
       }
       continue;
     }
@@ -369,7 +380,7 @@ export async function processNotificationEmailBatch(
       } catch (recordError) {
         logger.error("Failed to record notification email delivery failure", recordError, { deliveryId: delivery.id });
       }
-      logger.error("Notification email delivery failed", error, { deliveryId: delivery.id, templateKey: delivery.templateKey });
+      logger.error("Notification email delivery failed", undefined, { deliveryId: delivery.id, templateKey: delivery.templateKey, ...safeEmailErrorContext(error) });
       continue;
     }
 
@@ -378,7 +389,7 @@ export async function processNotificationEmailBatch(
       accepted += 1;
     } catch (error) {
       failed += 1;
-      console.error("[NOTIFICATION EMAIL] Provider accepted email but acceptance could not be recorded", delivery.id, error);
+      logger.error("Email provider accepted delivery but database acceptance could not be recorded", undefined, { deliveryId: delivery.id, errorName: error instanceof Error ? error.name : "UnknownError" });
     }
   }
 
