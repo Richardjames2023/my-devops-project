@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   deactivateCategory: vi.fn(),
   createProductVariant: vi.fn(),
   updateProductVariant: vi.fn(),
+  updateProductVariantCost: vi.fn(),
   setProductVariantActive: vi.fn(),
   deactivateProductVariant: vi.fn(),
 }));
@@ -50,6 +51,7 @@ vi.mock("../src/modules/products/category.service", () => ({
 vi.mock("../src/modules/products/product-variant.service", () => ({
   createProductVariant: mocks.createProductVariant,
   updateProductVariant: mocks.updateProductVariant,
+  updateProductVariantCost: mocks.updateProductVariantCost,
   setProductVariantActive: mocks.setProductVariantActive,
   deactivateProductVariant: mocks.deactivateProductVariant,
 }));
@@ -111,6 +113,7 @@ describe("product and category administration routes", () => {
     mocks.updateCategory.mockResolvedValue({ id: categoryId, name: "Updated category" });
     mocks.deactivateCategory.mockResolvedValue({ id: categoryId, isActive: false });
     mocks.updateProductVariant.mockResolvedValue({ id: variantId, name: "Updated variant" });
+    mocks.updateProductVariantCost.mockResolvedValue({ id: variantId, sku: "SKU-001", costPrice: "95.00" });
     mocks.setProductVariantActive.mockResolvedValue({ id: variantId, isActive: false });
   });
 
@@ -217,6 +220,29 @@ describe("product and category administration routes", () => {
     });
   });
 
+  it("requires products.cost.manage to update confidential variant costs", async () => {
+    const response = await request(app)
+      .patch("/api/v1/product-variants/" + variantId + "/cost")
+      .set(authorizeAs("INVENTORY_MANAGER", ["products.manage"]))
+      .send({ costPrice: "95.00" });
+
+    expect(response.status).toBe(403);
+    expect(mocks.updateProductVariantCost).not.toHaveBeenCalled();
+  });
+
+  it("updates variant cost for staff with products.cost.manage", async () => {
+    const response = await request(app)
+      .patch("/api/v1/product-variants/" + variantId + "/cost")
+      .set(authorizeAs("BUSINESS_OWNER", ["products.cost.manage"]))
+      .send({ costPrice: "95.00" });
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateProductVariantCost).toHaveBeenCalledWith(
+      variantId,
+      { costPrice: "95.00" },
+      staffId,
+    );
+  });
   it("uses a soft deactivation for product variants", async () => {
     const response = await request(app)
       .delete(`/api/v1/product-variants/${variantId}`)
