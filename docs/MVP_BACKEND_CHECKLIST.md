@@ -150,6 +150,8 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Run full build and test suite against the dedicated test database before the latest merge: TypeScript build passed; full Vitest suite passed (69 files, 423 tests). Prisma migration status was up to date on `shop_db_test`.
 - [ ] Repeat build, migration validation, and full test suite against `shop_db_test` before each subsequent merge; never point integration tests at `shop_db` or production.
 
+- [~] Promotion banner management: scheduled HERO/TOP/BOTTOM banners, optional per-position defaults, staff permission/audit logging, Cloudinary uploads, and public fallback response are under implementation; local Prisma validation, migration application, API tests, and full-suite verification remain outstanding.
+
 ## MVP scope decisions
 
 | Capability | MVP decision |
