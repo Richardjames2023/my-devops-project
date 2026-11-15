@@ -7,8 +7,8 @@ export function startCloudinaryCleanupJob(): void {
     if (running) return;
     running = true;
     try {
-      const result = await processCloudinaryCleanupBatch();
-      if (result.claimed) logger.info("Cloudinary cleanup batch completed", result);
+      const processed = await processCloudinaryCleanupBatch();
+      if (processed > 0) logger.info("Cloudinary cleanup batch completed", { processed });
     } catch (error) {
       logger.error("Cloudinary cleanup worker failed", error);
     } finally {
