@@ -1,4 +1,4 @@
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import { AppError } from "../../common/errors/AppError";
@@ -71,6 +71,6 @@ export async function removeDefault(req: AuthenticatedRequest, res: Response): P
   if (!parsed.success) throw new AppError("Invalid banner position", 400);
   res.status(200).json({ message: "Default promotion banner deleted successfully", ...await deleteDefaultBanner(parsed.data, actor(req)) });
 }
-export async function storefront(_req: AuthenticatedRequest, res: Response): Promise<void> {
+export async function storefront(_req: Request, res: Response): Promise<void> {
   res.status(200).json({ message: "Promotion banners retrieved successfully", banners: await getPublicBanners() });
 }
