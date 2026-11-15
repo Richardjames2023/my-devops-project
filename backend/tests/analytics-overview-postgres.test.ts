@@ -124,9 +124,10 @@ async function createFixture(): Promise<Fixture> {
     fixture.refundIds.push(ngnRefundId);
 
     await pool.query(
-      `INSERT INTO refund_items ("refundId", "returnItemId", quantity, amount)
-       VALUES ($1, $2, 1, 100.01)`,
-      [ngnRefundId, ngnReturnItemId],
+      `INSERT INTO refund_items
+      (id, "refundId", "returnItemId", quantity, amount)
+      VALUES ($1, $2, $3, 1, 100.01)`,
+      [randomUUID(), ngnRefundId, ngnReturnItemId],
     );
 
     const usdRefundId = randomUUID();
@@ -294,7 +295,10 @@ describe("PostgreSQL staff analytics overview", () => {
           "netMerchandiseRevenue",
           "knownCostOfGoodsSold",
         ] as const) {
-          expect(Number.isInteger(currency[key] * 100)).toBe(true);
+          expect(currency[key] * 100).toBeCloseTo(
+            Math.round(currency[key] * 100),
+            8,
+          );
         }
       }
     } finally {

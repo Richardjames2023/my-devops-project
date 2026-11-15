@@ -11,7 +11,13 @@ function toCents(value: { toString(): string }): Cents {
     throw new Error(`Invalid monetary decimal: ${decimal}`);
   }
 
-  const [, sign, whole, fraction = ""] = match;
+  const sign = match[1];
+  const whole = match[2];
+  const fraction = match[3] ?? "";
+
+  if (sign === undefined || whole === undefined) {
+    throw new Error(`Invalid monetary decimal: ${decimal}`);
+  }
   const paddedFraction = fraction.padEnd(3, "0");
   let cents = BigInt(whole) * 100n + BigInt(paddedFraction.slice(0, 2));
 
