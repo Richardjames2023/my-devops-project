@@ -166,8 +166,7 @@ export async function deleteBanner(id: string, staffId: string, metadata: { ipAd
       ...auditMetadata(metadata),
     });
   });
-  await cleanupAsset({ publicId: banner.publicId, url: banner.imageUrl });
-  return { id, deleted: true };
+  return { id, deleted: true, cloudinaryCleanupQueued: true };
 }
 
 export async function setDefaultBanner(
@@ -213,8 +212,7 @@ export async function deleteDefaultBanner(position: "HERO" | "TOP" | "BOTTOM", s
       oldValues: { position },
     });
   });
-  await cleanupAsset({ publicId: existing.publicId, url: existing.imageUrl });
-  return { position, deleted: true };
+  return { position, deleted: true, cloudinaryCleanupQueued: true };
 }
 
 export async function getPublicBanners() {
