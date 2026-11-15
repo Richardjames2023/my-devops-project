@@ -165,7 +165,7 @@ async function createPaidOrder(
      (id, "userId", "orderNumber", status, subtotal, "discountAmount",
       "deliveryFee", "totalAmount", currency, "shippingAddress", "createdAt", "updatedAt")
      VALUES ($1, $2, $3, 'COMPLETED', $4, $5, 500, $6, $7, $8::jsonb,
-             NOW() - INTERVAL '2 days', NOW())`,
+             '2000-01-15T12:00:00Z'::timestamptz, NOW())`,
     [orderId, fixture.userId, `ANALYTICS-ORDER-${options.suffix}`,
       options.subtotal, options.discount,
       (Number(options.subtotal) - Number(options.discount) + 500).toFixed(2),
@@ -233,11 +233,13 @@ describe("PostgreSQL staff analytics overview", () => {
   });
 
   it("keeps monetary totals to exact cents across refunds and separate currencies", async () => {
+    const from = new Date("2000-01-15T00:00:00.000Z");
+    const to = new Date("2000-01-15T23:59:59.999Z");
+    const baseline = await getAnalyticsOverview({ from, to });
     const fixture = await createFixture();
 
     try {
-      const from = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      const analytics = await getAnalyticsOverview({ from });
+      const analytics = await getAnalyticsOverview({ from, to });
       const ngn = analytics.currencies.NGN;
       const usd = analytics.currencies.USD;
 
@@ -283,7 +285,7 @@ describe("PostgreSQL staff analytics overview", () => {
           }),
         ]),
       );
-      expect(analytics.activeCustomers.count).toBeGreaterThanOrEqual(1);
+      expect(analytics.activeCustomers.count).toBe(baseline.activeCustomers.count);
 
       for (const currency of Object.values(analytics.currencies)) {
         for (const key of [
