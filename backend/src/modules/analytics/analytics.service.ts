@@ -1,8 +1,35 @@
 import prisma from "../../infrastructure/prisma/client";
 import type { AnalyticsQuery } from "./analytics.validation";
 
-function amount(value: { toString(): string }): number {
-  return Number(value.toString());
+type Cents = bigint;
+
+function toCents(value: { toString(): string }): Cents {
+  const decimal = value.toString();
+  const match = /^(-?)(\\d+)(?:\\.(\\d+))?$/.exec(decimal);
+
+  if (!match) {
+    throw new Error(`Invalid monetary decimal: ${decimal}`);
+  }
+
+  const [, sign, whole, fraction = ""] = match;
+  const paddedFraction = fraction.padEnd(3, "0");
+  let cents = BigInt(whole) * 100n + BigInt(paddedFraction.slice(0, 2));
+
+  // Database monetary columns use DECIMAL(..., 2). Keep this conversion
+  // exact even if a Decimal value with extra fractional digits is supplied.
+  if (Number(paddedFraction[2] ?? "0") >= 5) {
+    cents += 1n;
+  }
+
+  return sign === "-" ? -cents : cents;
+}
+
+function fromCents(value: Cents): number {
+  return Number(value) / 100;
+}
+
+function percentage(numerator: Cents, denominator: Cents): number {
+  return Number(((Number(numerator) / Number(denominator)) * 100).toFixed(2));
 }
 
 export async function getAnalyticsOverview(query: AnalyticsQuery) {
@@ -65,10 +92,10 @@ export async function getAnalyticsOverview(query: AnalyticsQuery) {
 
   type CurrencyTotals = {
     paidOrders: number;
-    merchandiseRevenue: number;
-    successfulRefunds: number;
-    netMerchandiseRevenue: number;
-    knownCostOfGoodsSold: number;
+    merchandiseRevenue: Cents;
+    successfulRefunds: Cents;
+    netMerchandiseRevenue: Cents;
+    knownCostOfGoodsSold: Cents;
     grossProfit: number | null;
     grossMarginPercent: number | null;
     costCoveragePercent: number;
@@ -76,17 +103,25 @@ export async function getAnalyticsOverview(query: AnalyticsQuery) {
     unitsWithoutCost: number;
   };
 
+  type DailyTotals = {
+    currency: string;
+    paidOrders: number;
+    merchandiseRevenue: Cents;
+    refunds: Cents;
+    netMerchandiseRevenue: Cents;
+  };
+
   const totalsByCurrency: Record<string, CurrencyTotals> = {};
-  const trendByDay = new Map<string, { currency: string; paidOrders: number; merchandiseRevenue: number; refunds: number; netMerchandiseRevenue: number }>();
+  const trendByDay = new Map<string, DailyTotals>();
 
   for (const order of orders) {
     const currency = order.currency;
     const totals = totalsByCurrency[currency] ??= {
       paidOrders: 0,
-      merchandiseRevenue: 0,
-      successfulRefunds: 0,
-      netMerchandiseRevenue: 0,
-      knownCostOfGoodsSold: 0,
+      merchandiseRevenue: 0n,
+      successfulRefunds: 0n,
+      netMerchandiseRevenue: 0n,
+      knownCostOfGoodsSold: 0n,
       grossProfit: null,
       grossMarginPercent: null,
       costCoveragePercent: 100,
@@ -94,8 +129,11 @@ export async function getAnalyticsOverview(query: AnalyticsQuery) {
       unitsWithoutCost: 0,
     };
 
-    const merchandiseRevenue = amount(order.subtotal) - amount(order.discountAmount);
-    const refunds = order.refunds.reduce((sum, refund) => sum + amount(refund.amount), 0);
+    const merchandiseRevenue = toCents(order.subtotal) - toCents(order.discountAmount);
+    const refunds = order.refunds.reduce(
+      (sum, refund) => sum + toCents(refund.amount),
+      0n,
+    );
     const netRevenue = merchandiseRevenue - refunds;
 
     totals.paidOrders += 1;
@@ -117,7 +155,7 @@ export async function getAnalyticsOverview(query: AnalyticsQuery) {
         totals.unitsWithoutCost += netQuantity;
       } else {
         totals.costedUnits += netQuantity;
-        totals.knownCostOfGoodsSold += amount(item.unitCostSnapshot) * netQuantity;
+        totals.knownCostOfGoodsSold += toCents(item.unitCostSnapshot) * BigInt(netQuantity);
       }
     }
 
@@ -126,9 +164,9 @@ export async function getAnalyticsOverview(query: AnalyticsQuery) {
     const daily = trendByDay.get(key) ?? {
       currency,
       paidOrders: 0,
-      merchandiseRevenue: 0,
-      refunds: 0,
-      netMerchandiseRevenue: 0,
+      merchandiseRevenue: 0n,
+      refunds: 0n,
+      netMerchandiseRevenue: 0n,
     };
     daily.paidOrders += 1;
     daily.merchandiseRevenue += merchandiseRevenue;
@@ -137,16 +175,42 @@ export async function getAnalyticsOverview(query: AnalyticsQuery) {
     trendByDay.set(key, daily);
   }
 
-  for (const totals of Object.values(totalsByCurrency)) {
-    const totalUnits = totals.costedUnits + totals.unitsWithoutCost;
-    totals.costCoveragePercent = totalUnits === 0 ? 100 : Number(((totals.costedUnits / totalUnits) * 100).toFixed(2));
-    if (totals.unitsWithoutCost === 0) {
-      totals.grossProfit = totals.netMerchandiseRevenue - totals.knownCostOfGoodsSold;
-      totals.grossMarginPercent = totals.netMerchandiseRevenue === 0
-        ? null
-        : Number(((totals.grossProfit / totals.netMerchandiseRevenue) * 100).toFixed(2));
-    }
-  }
+  const currencies = Object.fromEntries(
+    Object.entries(totalsByCurrency).map(([currency, totals]) => {
+      const totalUnits = totals.costedUnits + totals.unitsWithoutCost;
+      const costCoveragePercent = totalUnits === 0
+        ? 100
+        : Number(((totals.costedUnits / totalUnits) * 100).toFixed(2));
+      const grossProfitCents = totals.netMerchandiseRevenue - totals.knownCostOfGoodsSold;
+      const hasCompleteCostCoverage = totals.unitsWithoutCost === 0;
+
+      return [currency, {
+        paidOrders: totals.paidOrders,
+        merchandiseRevenue: fromCents(totals.merchandiseRevenue),
+        successfulRefunds: fromCents(totals.successfulRefunds),
+        netMerchandiseRevenue: fromCents(totals.netMerchandiseRevenue),
+        knownCostOfGoodsSold: fromCents(totals.knownCostOfGoodsSold),
+        grossProfit: hasCompleteCostCoverage ? fromCents(grossProfitCents) : null,
+        grossMarginPercent: hasCompleteCostCoverage && totals.netMerchandiseRevenue !== 0n
+          ? percentage(grossProfitCents, totals.netMerchandiseRevenue)
+          : null,
+        costCoveragePercent,
+        costedUnits: totals.costedUnits,
+        unitsWithoutCost: totals.unitsWithoutCost,
+      }];
+    }),
+  );
+
+  const salesTrend = [...trendByDay.entries()]
+    .map(([key, value]) => ({
+      date: key.slice(key.indexOf(":") + 1),
+      currency: value.currency,
+      paidOrders: value.paidOrders,
+      merchandiseRevenue: fromCents(value.merchandiseRevenue),
+      refunds: fromCents(value.refunds),
+      netMerchandiseRevenue: fromCents(value.netMerchandiseRevenue),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.currency.localeCompare(b.currency));
 
   return {
     period: {
@@ -158,10 +222,8 @@ export async function getAnalyticsOverview(query: AnalyticsQuery) {
       definition: "Registered active customers with at least one successfully paid order in the previous 30 days; guest checkouts are excluded.",
       windowDays: 30,
     },
-    currencies: totalsByCurrency,
-    salesTrend: [...trendByDay.entries()]
-      .map(([key, value]) => ({ date: key.slice(key.indexOf(":") + 1), ...value }))
-      .sort((a, b) => a.date.localeCompare(b.date) || a.currency.localeCompare(b.currency)),
+    currencies,
+    salesTrend,
     accountingNotes: [
       "Sales include only orders with a successful payment.",
       "Merchandise revenue is order subtotal less order-level discounts; delivery fees are excluded.",
