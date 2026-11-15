@@ -1,5 +1,5 @@
 CREATE TYPE "PromotionBannerPosition" AS ENUM ('HERO', 'TOP', 'BOTTOM');
-CREATE TYPE "PromotionBannerStatus" AS ENUM ('DRAFT', 'PAUSED');
+CREATE TYPE "PromotionBannerStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'PAUSED');
 
 CREATE TABLE "promotion_banners" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
