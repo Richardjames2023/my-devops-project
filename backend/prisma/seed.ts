@@ -25,6 +25,7 @@ const permissions = [
   "orders.read",
   "orders.manage",
   "coupons.manage",
+  "promotions.manage",
   "payments.read",
   "payments.manage",
   "fulfillment.read",
