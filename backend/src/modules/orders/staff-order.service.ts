@@ -117,7 +117,26 @@ export async function getStaffOrder(orderId: string) {
       user: {
         select: { id: true, firstName: true, lastName: true, email: true },
       },
-      items: true,
+      items: {
+        select: {
+          id: true,
+          orderId: true,
+          productVariantId: true,
+          productName: true,
+          variantName: true,
+          sku: true,
+          quantity: true,
+          unitPrice: true,
+          discountAmount: true,
+          totalPrice: true,
+          hasWarranty: true,
+          warrantyDuration: true,
+          warrantyTerms: true,
+          warrantyStartedAt: true,
+          warrantyExpiresAt: true,
+          createdAt: true,
+        },
+      },
       payments: { orderBy: { createdAt: "desc" } },
       inventoryReservations: { orderBy: [{ expiresAt: "asc" }, { inventoryId: "asc" }] },
       fulfillment: {
@@ -125,7 +144,30 @@ export async function getStaffOrder(orderId: string) {
           packages: {
             orderBy: { createdAt: "asc" },
             include: {
-              items: { include: { orderItem: true } },
+              items: {
+                include: {
+                  orderItem: {
+                    select: {
+                      id: true,
+                      orderId: true,
+                      productVariantId: true,
+                      productName: true,
+                      variantName: true,
+                      sku: true,
+                      quantity: true,
+                      unitPrice: true,
+                      discountAmount: true,
+                      totalPrice: true,
+                      hasWarranty: true,
+                      warrantyDuration: true,
+                      warrantyTerms: true,
+                      warrantyStartedAt: true,
+                      warrantyExpiresAt: true,
+                      createdAt: true,
+                    },
+                  },
+                },
+              },
               delivery: {
                 include: {
                   attempts: { orderBy: { attemptedAt: "desc" } },

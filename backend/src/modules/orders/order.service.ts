@@ -180,6 +180,7 @@ async function createOrderFromCart(
       }
 
       const unitPrice = variant.price;
+      const unitCostSnapshot = variant.costPrice;
       const totalPrice = unitPrice.mul(item.quantity);
 
       subtotal = subtotal.plus(totalPrice);
@@ -191,6 +192,7 @@ async function createOrderFromCart(
         sku: variant.sku,
         quantity: item.quantity,
         unitPrice,
+        unitCostSnapshot,
         discountAmount: new Prisma.Decimal(0),
         totalPrice,
 
@@ -281,7 +283,25 @@ async function createOrderFromCart(
         },
       },
       include: {
-        items: true,
+        items: {
+          select: {
+            id: true,
+            productVariantId: true,
+            productName: true,
+            variantName: true,
+            sku: true,
+            quantity: true,
+            unitPrice: true,
+            discountAmount: true,
+            totalPrice: true,
+            hasWarranty: true,
+            warrantyDuration: true,
+            warrantyTerms: true,
+            warrantyStartedAt: true,
+            warrantyExpiresAt: true,
+            createdAt: true,
+          },
+        },
       },
     });
     if (couponResult) {
@@ -384,7 +404,25 @@ export async function getGuestOrder(orderId: string, guestAccessToken: string) {
       shippingAddress: true,
       createdAt: true,
       updatedAt: true,
-      items: true,
+      items: {
+          select: {
+            id: true,
+            productVariantId: true,
+            productName: true,
+            variantName: true,
+            sku: true,
+            quantity: true,
+            unitPrice: true,
+            discountAmount: true,
+            totalPrice: true,
+            hasWarranty: true,
+            warrantyDuration: true,
+            warrantyTerms: true,
+            warrantyStartedAt: true,
+            warrantyExpiresAt: true,
+            createdAt: true,
+          },
+        },
       payments: {
         select: {
           status: true,

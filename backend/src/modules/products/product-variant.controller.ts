@@ -1,15 +1,18 @@
 import type { Request, Response } from "express";
+import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import { z } from "zod";
 import {
   createProductVariantSchema,
   productVariantStatusSchema,
   updateProductVariantSchema,
+  updateProductVariantCostSchema,
 } from "./product-variant.validation";
 import {
   createProductVariant,
   deactivateProductVariant,
   setProductVariantActive,
   updateProductVariant,
+  updateProductVariantCost,
 } from "./product-variant.service";
 
 const variantIdParamsSchema = z.object({
@@ -85,6 +88,40 @@ export async function remove(req: Request, res: Response): Promise<void> {
   const variant = await deactivateProductVariant(params.data.variantId);
   res.status(200).json({
     message: "Product variant deactivated successfully",
+    variant,
+  });
+}
+
+
+export async function updateCost(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const params = variantIdParamsSchema.safeParse(req.params);
+  const body = updateProductVariantCostSchema.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: {
+        ...(!params.success ? { variantId: ["Invalid product variant ID"] } : {}),
+        ...(body.success ? {} : z.flattenError(body.error).fieldErrors),
+      },
+    });
+    return;
+  }
+
+  if (!req.user?.id) {
+    res.status(401).json({ message: "Authentication required" });
+    return;
+  }
+
+  const variant = await updateProductVariantCost(
+    params.data.variantId,
+    body.data,
+    req.user.id,
+  );
+  res.status(200).json({
+    message: "Product variant cost updated successfully",
     variant,
   });
 }

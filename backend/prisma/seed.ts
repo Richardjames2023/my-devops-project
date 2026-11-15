@@ -16,6 +16,7 @@ const permissions = [
   "staff.manage",
   "products.read",
   "products.manage",
+  "products.cost.manage",
   "categories.read",
   "categories.manage",
   "inventory.read",
@@ -83,6 +84,9 @@ const roles = {
   DELIVERY_AGENT: [
     "deliveries.read",
     "deliveries.manage",
+  ],
+  DELIVERY_ZONE_MANAGER: [
+    "delivery_zones.manage",
   ],
 } as const;
 

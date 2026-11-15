@@ -64,7 +64,20 @@ const adminProductInclude = {
   },
   variants: {
     orderBy: { createdAt: "asc" as const },
-    include: { inventory: true },
+    select: {
+      id: true,
+      productId: true,
+      sku: true,
+      name: true,
+      price: true,
+      hasWarranty: true,
+      warrantyDuration: true,
+      warrantyTerms: true,
+      isActive: true,
+      createdAt: true,
+      updatedAt: true,
+      inventory: true,
+    },
   },
 } satisfies Prisma.ProductInclude;
 
