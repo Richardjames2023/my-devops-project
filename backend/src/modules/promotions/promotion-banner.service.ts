@@ -225,65 +225,38 @@ export async function updateBanner(
   staffId: string,
   metadata: { ipAddress?: string; userAgent?: string } = {},
 ) {
-  const existing = await getBanner(id);
-  const asset = file
-    ? await uploadImage(file, "promotions/banners")
-    : undefined;
+  const asset = file ? await uploadImage(file, "promotions/banners") : undefined;
 
   try {
-    const updated = await prisma.$transaction(async (tx) => {
-      const nextStart =
-        input.startAt === undefined
-          ? existing.startAt
-          : new Date(input.startAt);
+    return await prisma.$transaction(async (tx) => {
+      // Serialize update/delete operations for this banner and read the asset
+      // identifiers only after acquiring the row lock.
+      await tx.$queryRaw`SELECT id FROM promotion_banners WHERE id = ${id}::uuid FOR UPDATE`;
+      const existing = await tx.promotionBanner.findUnique({ where: { id } });
+      if (!existing) throw new AppError("Promotion banner not found", 404);
 
-      const nextEnd =
-        input.endAt === undefined
-          ? existing.endAt
-          : new Date(input.endAt);
-
+      const nextStart = input.startAt === undefined ? existing.startAt : new Date(input.startAt);
+      const nextEnd = input.endAt === undefined ? existing.endAt : new Date(input.endAt);
       if (nextEnd <= nextStart) {
-        throw new AppError(
-          "End date must be later than start date",
-          400,
-        );
+        throw new AppError("End date must be later than start date", 400);
       }
 
       const banner = await tx.promotionBanner.update({
         where: { id },
         data: {
-          ...(input.title !== undefined
-            ? { title: input.title }
-            : {}),
-          ...(input.position !== undefined
-            ? { position: input.position }
-            : {}),
-          ...(input.startAt !== undefined
-            ? { startAt: nextStart }
-            : {}),
-          ...(input.endAt !== undefined
-            ? { endAt: nextEnd }
-            : {}),
-          ...(input.targetUrl !== undefined
-            ? { targetUrl: input.targetUrl }
-            : {}),
-          ...(input.altText !== undefined
-            ? { altText: input.altText }
-            : {}),
-          ...(input.priority !== undefined
-            ? { priority: input.priority }
-            : {}),
-          ...(input.status !== undefined
-            ? { status: input.status }
-            : {}),
-          ...(asset
-            ? {
-                imageUrl: asset.url,
-                publicId: asset.publicId,
-              }
-            : {}),
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.position !== undefined ? { position: input.position } : {}),
+          ...(input.startAt !== undefined ? { startAt: nextStart } : {}),
+          ...(input.endAt !== undefined ? { endAt: nextEnd } : {}),
+          ...(input.targetUrl !== undefined ? { targetUrl: input.targetUrl } : {}),
+          ...(input.altText !== undefined ? { altText: input.altText } : {}),
+          ...(input.priority !== undefined ? { priority: input.priority } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+          ...(asset ? { imageUrl: asset.url, publicId: asset.publicId } : {}),
         },
       });
+
+      if (asset) await enqueueCloudinaryCleanup(existing.publicId, tx);
 
       await createAuditLog(tx, {
         staffAccountId: staffId,
@@ -314,23 +287,10 @@ export async function updateBanner(
         },
         ...auditMetadata(metadata),
       });
-
       return banner;
     });
-
-    if (asset) {
-      await cleanupAsset({
-        publicId: existing.publicId,
-        url: existing.imageUrl,
-      });
-    }
-
-    return updated;
   } catch (error) {
-    if (asset) {
-      await cleanupAsset(asset);
-    }
-
+    if (asset) await cleanupAsset(asset);
     throw error;
   }
 }
@@ -340,14 +300,14 @@ export async function deleteBanner(
   staffId: string,
   metadata: { ipAddress?: string; userAgent?: string } = {},
 ) {
-  const banner = await getBanner(id);
-
   await prisma.$transaction(async (tx) => {
-    await enqueueCloudinaryCleanup(banner.publicId, tx);
+    await tx.$queryRaw`SELECT id FROM promotion_banners WHERE id = ${id}::uuid FOR UPDATE`;
+    const banner = await tx.promotionBanner.findUnique({ where: { id } });
+    if (!banner) throw new AppError("Promotion banner not found", 404);
 
-    await tx.promotionBanner.delete({
-      where: { id },
-    });
+    await enqueueCloudinaryCleanup(banner.publicId, tx);
+    if (banner.mobilePublicId) await enqueueCloudinaryCleanup(banner.mobilePublicId, tx);
+    await tx.promotionBanner.delete({ where: { id } });
 
     await createAuditLog(tx, {
       staffAccountId: staffId,
@@ -358,16 +318,13 @@ export async function deleteBanner(
         title: banner.title,
         position: banner.position,
         publicId: banner.publicId,
+        mobilePublicId: banner.mobilePublicId,
       },
       ...auditMetadata(metadata),
     });
   });
 
-  return {
-    id,
-    deleted: true,
-    cloudinaryCleanupQueued: true,
-  };
+  return { id, deleted: true, cloudinaryCleanupQueued: true };
 }
 
 export async function setDefaultBanner(
@@ -378,72 +335,44 @@ export async function setDefaultBanner(
   staffId: string,
   metadata: { ipAddress?: string; userAgent?: string } = {},
 ) {
-  if (!file) {
-    throw new AppError("A default banner image is required", 400);
-  }
-
+  if (!file) throw new AppError("A default banner image is required", 400);
   const asset = await uploadImage(file, "promotions/defaults");
 
   try {
-    const existing = await prisma.promotionBannerDefault.findUnique({
-      where: { position },
-    });
-
-    const result = await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx) => {
+      // Advisory locking also serializes first-time inserts when no default row exists.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`promotion-banner-default:${position}`}))`;
+      const existing = await tx.promotionBannerDefault.findUnique({ where: { position } });
       const value = await tx.promotionBannerDefault.upsert({
         where: { position },
         create: {
-          position,
-          imageUrl: asset.url,
-          publicId: asset.publicId,
-          targetUrl,
-          altText,
-          updatedByStaffAccountId: staffId,
+          position, imageUrl: asset.url, publicId: asset.publicId,
+          targetUrl, altText, updatedByStaffAccountId: staffId,
         },
         update: {
-          imageUrl: asset.url,
-          publicId: asset.publicId,
-          targetUrl,
-          altText,
-          updatedByStaffAccountId: staffId,
+          imageUrl: asset.url, publicId: asset.publicId,
+          targetUrl, altText, updatedByStaffAccountId: staffId,
         },
       });
 
-    await createAuditLog(tx, {
-      staffAccountId: staffId,
-      action: existing
-        ? "PROMOTION_BANNER_DEFAULT_UPDATED"
-        : "PROMOTION_BANNER_DEFAULT_CREATED",
-      entity: "PromotionBannerDefault",
-      entityId: value.id,
-      ...(existing
-        ? {
-            oldValues: {
-              position: existing.position,
-              targetUrl: existing.targetUrl,
-              altText: existing.altText,
-            },
-          }
-        : {}),
-      newValues: {
-        position,
-        targetUrl,
-        altText,
-      },
-      ...auditMetadata(metadata),
-    });
-
+      if (existing) await enqueueCloudinaryCleanup(existing.publicId, tx);
+      await createAuditLog(tx, {
+        staffAccountId: staffId,
+        action: existing ? "PROMOTION_BANNER_DEFAULT_UPDATED" : "PROMOTION_BANNER_DEFAULT_CREATED",
+        entity: "PromotionBannerDefault",
+        entityId: value.id,
+        ...(existing ? {
+          oldValues: {
+            position: existing.position,
+            targetUrl: existing.targetUrl,
+            altText: existing.altText,
+          },
+        } : {}),
+        newValues: { position, targetUrl, altText },
+        ...auditMetadata(metadata),
+      });
       return value;
     });
-
-    if (existing) {
-      await cleanupAsset({
-        publicId: existing.publicId,
-        url: existing.imageUrl,
-      });
-    }
-
-    return result;
   } catch (error) {
     await cleanupAsset(asset);
     throw error;
@@ -455,38 +384,24 @@ export async function deleteDefaultBanner(
   staffId: string,
   metadata: { ipAddress?: string; userAgent?: string } = {},
 ) {
-  const existing = await prisma.promotionBannerDefault.findUnique({
-    where: { position },
-  });
-
-  if (!existing) {
-    throw new AppError("Default banner not found", 404);
-  }
-
   await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`promotion-banner-default:${position}`}))`;
+    const existing = await tx.promotionBannerDefault.findUnique({ where: { position } });
+    if (!existing) throw new AppError("Default banner not found", 404);
+
     await enqueueCloudinaryCleanup(existing.publicId, tx);
-
-    await tx.promotionBannerDefault.delete({
-      where: { position },
-    });
-
+    if (existing.mobilePublicId) await enqueueCloudinaryCleanup(existing.mobilePublicId, tx);
+    await tx.promotionBannerDefault.delete({ where: { position } });
     await createAuditLog(tx, {
       staffAccountId: staffId,
       action: "PROMOTION_BANNER_DEFAULT_DELETED",
       entity: "PromotionBannerDefault",
       entityId: existing.id,
-      oldValues: {
-        position,
-      },
+      oldValues: { position, publicId: existing.publicId, mobilePublicId: existing.mobilePublicId },
       ...auditMetadata(metadata),
     });
   });
-
-  return {
-    position,
-    deleted: true,
-    cloudinaryCleanupQueued: true,
-  };
+  return { position, deleted: true, cloudinaryCleanupQueued: true };
 }
 
 export async function getPublicBanners() {
