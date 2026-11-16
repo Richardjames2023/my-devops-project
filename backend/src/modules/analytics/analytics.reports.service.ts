@@ -1,5 +1,6 @@
 import prisma from "../../infrastructure/prisma/client";
 import type { AnalyticsQuery } from "./analytics.validation";
+import { getAnalyticsOverview } from "./analytics.service";
 
 type Cents = bigint;
 
@@ -26,7 +27,7 @@ function dateFilter(query: AnalyticsQuery) {
 }
 
 export async function getSalesReport(query: AnalyticsQuery) {
-  const overview = await import("./analytics.service").then((m) => m.getAnalyticsOverview(query));
+  const overview = await getAnalyticsOverview(query);
   return {
     period: overview.period,
     currencies: overview.currencies,
