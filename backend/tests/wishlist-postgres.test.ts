@@ -238,10 +238,12 @@ describe("PostgreSQL customer wishlist", () => {
         [fixture.productIds[0]],
       );
 
-      const adding = addWishlistItem(fixture.userIds[0], fixture.productIds[0]);
+      const adding = expect(
+        addWishlistItem(fixture.userIds[0], fixture.productIds[0]),
+      ).rejects.toMatchObject({ statusCode: 404 });
       await client.query("COMMIT");
 
-      await expect(adding).rejects.toMatchObject({ statusCode: 404 });
+      await adding;
       expect((await getWishlist(fixture.userIds[0])).itemCount).toBe(0);
     } finally {
       try {
