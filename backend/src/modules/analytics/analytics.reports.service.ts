@@ -5,7 +5,7 @@ type Cents = bigint;
 
 function toCents(value: { toString(): string }): Cents {
   const decimal = value.toString();
-  const match = /^(-?)(\\d+)(?:\\.(\\d+))?$/.exec(decimal);
+  const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(decimal);
   if (!match) throw new Error(`Invalid monetary decimal: ${decimal}`);
   const sign = match[1];
   const whole = match[2];
