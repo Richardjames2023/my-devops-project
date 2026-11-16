@@ -354,7 +354,7 @@ export async function setDefaultBanner(
     if (mobileFile) mobileAsset = await uploadImage(mobileFile, "promotions/defaults/mobile");
     return await prisma.$transaction(async (tx) => {
       // Advisory locking also serializes first-time inserts when no default row exists.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`promotion-banner-default:${position}`}))`;
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`promotion-banner-default:${position}`}))`;
       const existing = await tx.promotionBannerDefault.findUnique({ where: { position } });
       const value = await tx.promotionBannerDefault.upsert({
         where: { position },
@@ -404,7 +404,7 @@ export async function deleteDefaultBanner(
   metadata: { ipAddress?: string; userAgent?: string } = {},
 ) {
   await prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`promotion-banner-default:${position}`}))`;
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${`promotion-banner-default:${position}`}))`;
     const existing = await tx.promotionBannerDefault.findUnique({ where: { position } });
     if (!existing) throw new AppError("Default banner not found", 404);
 
