@@ -50,6 +50,27 @@ describe("structured logger", () => {
     expect(line).toContain("[REDACTED]");
   });
 
+
+  it("redacts client secrets and hyphenated API keys in URL query strings", () => {
+    const write = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    logger.info("callback received", {
+      url: "https://example.test/callback?client_secret=client-value&api-key=api-value&state=safe",
+      encoded: "https://example.test/callback?client%5Fsecret=encoded-value",
+    });
+    const line = String(write.mock.calls[0]?.[0]);
+    expect(line).not.toContain("client-value");
+    expect(line).not.toContain("api-value");
+    expect(line).not.toContain("encoded-value");
+    expect(line).toContain("state=safe");
+  });
+
+  it("absorbs asynchronous stdout stream errors", () => {
+    const write = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    expect(() => process.stdout.emit("error", new Error("EPIPE"))).not.toThrow();
+    logger.info("logging remains non-fatal");
+    expect(write).toHaveBeenCalledOnce();
+  });
+
   it("omits exception messages and stacks but preserves safe diagnostic codes", () => {
     const write = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     const error = Object.assign(new Error("customer@example.com secret-token"), { code: "P2002" });
