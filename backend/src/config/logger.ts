@@ -10,7 +10,7 @@ interface RequestLogContext {
 
 const requestContext = new AsyncLocalStorage<RequestLogContext>();
 const sensitiveKey = /password|passphrase|token|secret|authorization|cookie|api[-_]?key|credential|private[-_]?key|signature|session/i;
-const sensitiveQueryKey = /^(?:token|access_token|refresh_token|id_token|code|secret|password|signature|sig|key|api_key|session)$/i;
+const sensitiveQueryKey = /^(?:access[_-]?token|refresh[_-]?token|id[_-]?token|token|code|client[_-]?secret|secret|password|passwd|signature|sig|key|api[_-]?key|x-amz-signature|x-goog-signature|session(?:id)?|credential)$/i;
 const MAX_LOG_DEPTH = 8;
 
 function decodeURIComponentSafe(value: string): string {
@@ -78,9 +78,21 @@ function sanitize(
   return value;
 }
 
+function ignoreOutputError(): void {
+  // Broken pipes and other output failures must not become uncaught stream errors.
+}
+
+// Writable streams emit asynchronous errors separately from write() throwing.
+process.stdout.on("error", ignoreOutputError);
+process.stderr.on("error", ignoreOutputError);
+
 function safeWrite(output: NodeJS.WriteStream, line: string): void {
   try {
-    output.write(line + "\n");
+    output.write(line + "\n", (error?: Error | null) => {
+      if (error) {
+        // The stream-level listener above absorbs the corresponding error event.
+      }
+    });
   } catch {
     // Logging must never break the request or background operation being logged.
   }
