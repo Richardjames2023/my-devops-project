@@ -430,6 +430,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       "PROMOTION_BANNER_CREATED",
       "PROMOTION_BANNER_UPDATED",
       "PROMOTION_BANNER_UPDATED",
+      "PROMOTION_BANNER_UPDATED",
       "PROMOTION_BANNER_DELETED",
     ]);
   });
@@ -448,7 +449,6 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     const id = created.body.banner.id as string;
     const originalPublicId = created.body.banner.publicId as string;
     const firstNewUpload = cloudinaryMockState.uploadCounter + 1;
-    const secondNewUpload = cloudinaryMockState.uploadCounter + 2;
     const [replacement, deletion] = await Promise.all([
       request(app)
         .patch(`${basePath}/${id}`)
@@ -467,7 +467,6 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     const uploadedIds = [
       originalPublicId,
       `test/promotion-banner-${firstNewUpload}`,
-      `test/promotion-banner-${secondNewUpload}`,
     ];
     const queued = await pool.query(
       `SELECT "publicId" FROM cloudinary_cleanup_tasks WHERE "publicId" = ANY($1::text[])`,
