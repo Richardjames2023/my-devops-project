@@ -70,6 +70,10 @@ const customerToken = generateAccessToken({
 });
 
 const basePath = "/api/v1/promotions/banners";
+const validPngImage = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
+  "base64",
+);
 
 describe("Promotion banner HTTP API authorization and validation", () => {
   beforeAll(async () => {
@@ -291,7 +295,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
 
   it("creates, retrieves, updates, and deletes a banner with transactional audit records", async () => {
     const authorization = `Bearer ${authorizedToken}`;
-    const image = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const image = validPngImage;
     const startAt = new Date(Date.now() + 60_000).toISOString();
     const endAt = new Date(Date.now() + 3_600_000).toISOString();
 
