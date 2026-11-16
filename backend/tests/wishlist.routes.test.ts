@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getWishlist: vi.fn(),
   addWishlistItem: vi.fn(),
   removeWishlistItem: vi.fn(),
+  moveWishlistItemToCart: vi.fn(),
   findUser: vi.fn(),
 }));
 
@@ -13,6 +14,7 @@ vi.mock("../src/modules/wishlist/wishlist.service", () => ({
   getWishlist: mocks.getWishlist,
   addWishlistItem: mocks.addWishlistItem,
   removeWishlistItem: mocks.removeWishlistItem,
+  moveWishlistItemToCart: mocks.moveWishlistItemToCart,
 }));
 
 vi.mock("../src/infrastructure/prisma/client", () => ({
@@ -45,6 +47,7 @@ describe("customer wishlist HTTP endpoints", () => {
     mocks.getWishlist.mockResolvedValue({ items: [], itemCount: 0 });
     mocks.addWishlistItem.mockResolvedValue({ items: [], itemCount: 0 });
     mocks.removeWishlistItem.mockResolvedValue({ items: [], itemCount: 0 });
+    mocks.moveWishlistItemToCart.mockResolvedValue({ items: [], itemCount: 0 });
   });
 
   it("requires authentication", async () => {
@@ -90,6 +93,50 @@ describe("customer wishlist HTTP endpoints", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.addWishlistItem).toHaveBeenCalledWith(customerId, productId);
+  });
+
+
+  it("validates the product and selected variant before moving to cart", async () => {
+    const invalidProduct = await request(app)
+      .post("/api/v1/wishlist/not-a-uuid/move-to-cart")
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ productVariantId: productId, quantity: 1 });
+
+    expect(invalidProduct.status).toBe(400);
+
+    const invalidVariant = await request(app)
+      .post(`/api/v1/wishlist/${productId}/move-to-cart`)
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ productVariantId: "not-a-uuid", quantity: 1 });
+
+    expect(invalidVariant.status).toBe(400);
+    expect(mocks.moveWishlistItemToCart).not.toHaveBeenCalled();
+  });
+
+  it("moves a selected product variant into the authenticated customer's cart", async () => {
+    const productVariantId = "e2d7f4e1-5c3a-4b8d-9e6f-1a2c3d4e5f60";
+    const response = await request(app)
+      .post(`/api/v1/wishlist/${productId}/move-to-cart`)
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ productVariantId, quantity: 2 });
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Wishlist product moved to cart successfully");
+    expect(mocks.moveWishlistItemToCart).toHaveBeenCalledWith(
+      customerId,
+      productId,
+      { productVariantId, quantity: 2 },
+    );
+  });
+
+  it("rejects invalid move-to-cart quantities", async () => {
+    const response = await request(app)
+      .post(`/api/v1/wishlist/${productId}/move-to-cart`)
+      .set("Authorization", `Bearer ${token()}`)
+      .send({ productVariantId: productId, quantity: 0 });
+
+    expect(response.status).toBe(400);
+    expect(mocks.moveWishlistItemToCart).not.toHaveBeenCalled();
   });
 
   it("validates product IDs before removal", async () => {
