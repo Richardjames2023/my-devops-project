@@ -1,4 +1,5 @@
 import prisma from "../../infrastructure/prisma/client";
+import type { Prisma } from "@prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import type { AddCartItemInput, UpdateCartItemInput } from "./cart.validation";
 
@@ -211,82 +212,81 @@ export async function getGuestCart(guestSessionId: string) {
   return getGuestCartWithItems(guestSessionId);
 }
 
-export async function addCartItem(userId: string, input: AddCartItemInput) {
-  await prisma.$transaction(async (tx) => {
-    const variant = await tx.productVariant.findUnique({
-      where: { id: input.productVariantId },
-      include: {
-        product: true,
-        inventory: true,
-      },
-    });
-
-    if (!variant || !variant.isActive || !variant.product.isActive) {
-      throw new AppError("Product variant not found or inactive", 404);
-    }
-
-    if (!variant.inventory) {
-      throw new AppError("Inventory not found for this product", 409);
-    }
-
-    const availableStock =
-      variant.inventory.quantity -
-      variant.inventory.reservedQuantity -
-      variant.inventory.quarantineQuantity;
-
-    const cart =
-      (await tx.cart.findUnique({
-        where: { userId },
-      })) ??
-      (await tx.cart.create({
-        data: { userId },
-      }));
-
-    const existingItem = await tx.cartItem.findUnique({
-      where: {
-        cartId_productVariantId: {
-          cartId: cart.id,
-          productVariantId: variant.id,
-        },
-      },
-    });
-
-    const newQuantity = (existingItem?.quantity ?? 0) + input.quantity;
-
-    if (newQuantity > MAX_CART_ITEM_QUANTITY) {
-      throw new AppError(
-        `A maximum of ${MAX_CART_ITEM_QUANTITY} units is allowed per variant`,
-        400,
-      );
-    }
-
-    if (newQuantity > availableStock) {
-      throw new AppError("Requested quantity exceeds available stock", 409);
-    }
-
-    await tx.cartItem.upsert({
-      where: {
-        cartId_productVariantId: {
-          cartId: cart.id,
-          productVariantId: variant.id,
-        },
-      },
-      create: {
-        cartId: cart.id,
-        productVariantId: variant.id,
-        quantity: input.quantity,
-      },
-      update: {
-        quantity: newQuantity,
-      },
-    });
-
-    await tx.cart.update({
-      where: { id: cart.id },
-      data: { updatedAt: new Date() },
-    });
+export async function addCartItemInTransaction(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  input: AddCartItemInput,
+): Promise<void> {
+  const variant = await tx.productVariant.findUnique({
+    where: { id: input.productVariantId },
+    include: {
+      product: true,
+      inventory: true,
+    },
   });
 
+  if (!variant || !variant.isActive || !variant.product.isActive) {
+    throw new AppError("Product variant not found or inactive", 404);
+  }
+
+  if (!variant.inventory) {
+    throw new AppError("Inventory not found for this product", 409);
+  }
+
+  const availableStock =
+    variant.inventory.quantity -
+    variant.inventory.reservedQuantity -
+    variant.inventory.quarantineQuantity;
+
+  const cart =
+    (await tx.cart.findUnique({ where: { userId } })) ??
+    (await tx.cart.create({ data: { userId } }));
+
+  const existingItem = await tx.cartItem.findUnique({
+    where: {
+      cartId_productVariantId: {
+        cartId: cart.id,
+        productVariantId: variant.id,
+      },
+    },
+  });
+
+  const newQuantity = (existingItem?.quantity ?? 0) + input.quantity;
+
+  if (newQuantity > MAX_CART_ITEM_QUANTITY) {
+    throw new AppError(
+      `A maximum of ${MAX_CART_ITEM_QUANTITY} units is allowed per variant`,
+      400,
+    );
+  }
+
+  if (newQuantity > availableStock) {
+    throw new AppError("Requested quantity exceeds available stock", 409);
+  }
+
+  await tx.cartItem.upsert({
+    where: {
+      cartId_productVariantId: {
+        cartId: cart.id,
+        productVariantId: variant.id,
+      },
+    },
+    create: {
+      cartId,
+      productVariantId: variant.id,
+      quantity: input.quantity,
+    },
+    update: { quantity: newQuantity },
+  });
+
+  await tx.cart.update({
+    where: { id: cart.id },
+    data: { updatedAt: new Date() },
+  });
+}
+
+export async function addCartItem(userId: string, input: AddCartItemInput) {
+  await prisma.$transaction((tx) => addCartItemInTransaction(tx, userId, input));
   return getCartWithItems(userId);
 }
 
