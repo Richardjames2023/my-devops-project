@@ -118,14 +118,15 @@ export async function createBanner(
   file: Express.Multer.File | undefined,
   staffId: string,
   metadata: { ipAddress?: string; userAgent?: string } = {},
+  mobileFile?: Express.Multer.File,
 ) {
-  if (!file) {
-    throw new AppError("A banner image is required", 400);
-  }
+  if (!file) throw new AppError("A banner image is required", 400);
 
   const asset = await uploadImage(file, "promotions/banners");
+  let mobileAsset: Asset | undefined;
 
   try {
+    if (mobileFile) mobileAsset = await uploadImage(mobileFile, "promotions/banners/mobile");
     return await prisma.$transaction(async (tx) => {
       const banner = await tx.promotionBanner.create({
         data: {
@@ -139,6 +140,7 @@ export async function createBanner(
           status: input.status,
           imageUrl: asset.url,
           publicId: asset.publicId,
+          ...(mobileAsset ? { mobileImageUrl: mobileAsset.url, mobilePublicId: mobileAsset.publicId } : {}),
           createdByStaffAccountId: staffId,
         },
       });
@@ -165,6 +167,7 @@ export async function createBanner(
     });
   } catch (error) {
     await cleanupAsset(asset);
+    if (mobileAsset) await cleanupAsset(mobileAsset);
     throw error;
   }
 }
@@ -224,10 +227,13 @@ export async function updateBanner(
   file: Express.Multer.File | undefined,
   staffId: string,
   metadata: { ipAddress?: string; userAgent?: string } = {},
+  mobileFile?: Express.Multer.File,
 ) {
   const asset = file ? await uploadImage(file, "promotions/banners") : undefined;
+  let mobileAsset: Asset | undefined;
 
   try {
+    if (mobileFile) mobileAsset = await uploadImage(mobileFile, "promotions/banners/mobile");
     return await prisma.$transaction(async (tx) => {
       // Serialize update/delete operations for this banner and read the asset
       // identifiers only after acquiring the row lock.
@@ -253,10 +259,12 @@ export async function updateBanner(
           ...(input.priority !== undefined ? { priority: input.priority } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
           ...(asset ? { imageUrl: asset.url, publicId: asset.publicId } : {}),
+          ...(mobileAsset ? { mobileImageUrl: mobileAsset.url, mobilePublicId: mobileAsset.publicId } : {}),
         },
       });
 
       if (asset) await enqueueCloudinaryCleanup(existing.publicId, tx);
+      if (mobileAsset && existing.mobilePublicId) await enqueueCloudinaryCleanup(existing.mobilePublicId, tx);
 
       await createAuditLog(tx, {
         staffAccountId: staffId,
@@ -284,6 +292,7 @@ export async function updateBanner(
           priority: banner.priority,
           status: banner.status,
           imageReplaced: Boolean(asset),
+          mobileImageReplaced: Boolean(mobileAsset),
         },
         ...auditMetadata(metadata),
       });
@@ -291,6 +300,7 @@ export async function updateBanner(
     });
   } catch (error) {
     if (asset) await cleanupAsset(asset);
+    if (mobileAsset) await cleanupAsset(mobileAsset);
     throw error;
   }
 }
@@ -334,11 +344,14 @@ export async function setDefaultBanner(
   altText: string | null,
   staffId: string,
   metadata: { ipAddress?: string; userAgent?: string } = {},
+  mobileFile?: Express.Multer.File,
 ) {
   if (!file) throw new AppError("A default banner image is required", 400);
   const asset = await uploadImage(file, "promotions/defaults");
+  let mobileAsset: Asset | undefined;
 
   try {
+    if (mobileFile) mobileAsset = await uploadImage(mobileFile, "promotions/defaults/mobile");
     return await prisma.$transaction(async (tx) => {
       // Advisory locking also serializes first-time inserts when no default row exists.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`promotion-banner-default:${position}`}))`;
@@ -347,15 +360,20 @@ export async function setDefaultBanner(
         where: { position },
         create: {
           position, imageUrl: asset.url, publicId: asset.publicId,
+          ...(mobileAsset ? { mobileImageUrl: mobileAsset.url, mobilePublicId: mobileAsset.publicId } : {}),
           targetUrl, altText, updatedByStaffAccountId: staffId,
         },
         update: {
           imageUrl: asset.url, publicId: asset.publicId,
+          ...(mobileAsset ? { mobileImageUrl: mobileAsset.url, mobilePublicId: mobileAsset.publicId } : {}),
           targetUrl, altText, updatedByStaffAccountId: staffId,
         },
       });
 
-      if (existing) await enqueueCloudinaryCleanup(existing.publicId, tx);
+      if (existing) {
+        await enqueueCloudinaryCleanup(existing.publicId, tx);
+        if (mobileAsset && existing.mobilePublicId) await enqueueCloudinaryCleanup(existing.mobilePublicId, tx);
+      }
       await createAuditLog(tx, {
         staffAccountId: staffId,
         action: existing ? "PROMOTION_BANNER_DEFAULT_UPDATED" : "PROMOTION_BANNER_DEFAULT_CREATED",
@@ -375,6 +393,7 @@ export async function setDefaultBanner(
     });
   } catch (error) {
     await cleanupAsset(asset);
+    if (mobileAsset) await cleanupAsset(mobileAsset);
     throw error;
   }
 }
