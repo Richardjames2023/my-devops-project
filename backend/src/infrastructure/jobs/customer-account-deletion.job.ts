@@ -2,23 +2,25 @@ import { processCustomerAccountDeletionBatch } from "../../modules/customer-prof
 import { logger } from "../../config/logger";
 
 const INTERVAL_MS = 60 * 60 * 1000;
-let isRunning = false;
 
-async function runWorker(): Promise<void> {
-  if (isRunning) return;
-  isRunning = true;
-  try {
-    const result = await processCustomerAccountDeletionBatch();
-    if (result.claimed) logger.info("Customer account deletion batch completed", result);
-  } catch (error) {
-    logger.error("Customer account deletion worker execution failed", error);
-  } finally {
-    isRunning = false;
-  }
-}
-
-export function startCustomerAccountDeletionJob(): void {
+export function startCustomerAccountDeletionJob() {
+  let activeRun: Promise<void> | undefined;
+  const run = () => {
+    if (activeRun) return activeRun;
+    activeRun = (async () => {
+      try {
+        const result = await processCustomerAccountDeletionBatch();
+        if (result.claimed) logger.info("Customer account deletion batch completed", result);
+      } catch (error) {
+        logger.error("Customer account deletion worker execution failed", error);
+      } finally {
+        activeRun = undefined;
+      }
+    })();
+    return activeRun;
+  };
   logger.info("Customer account deletion worker started");
-  void runWorker();
-  setInterval(() => { void runWorker(); }, INTERVAL_MS);
+  const timer = setInterval(() => { void run(); }, INTERVAL_MS);
+  void run();
+  return async () => { clearInterval(timer); await activeRun; };
 }
