@@ -479,6 +479,44 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     }
   });
 
+  it("serializes concurrent default replacement and deletion", async () => {
+    const authorization = `Bearer ${authorizedToken}`;
+    const created = await request(app)
+      .put(`${basePath}/defaults/HERO`)
+      .set("Authorization", authorization)
+      .attach("image", Buffer.from(validPngImage), { filename: "default-concurrent.png", contentType: "image/png" });
+    expect(created.status).toBe(200);
+    const originalPublicId = created.body.banner.publicId as string;
+    const newUploadId = cloudinaryMockState.uploadCounter + 1;
+
+    const [replacement, deletion] = await Promise.all([
+      request(app)
+        .put(`${basePath}/defaults/HERO`)
+        .set("Authorization", authorization)
+        .attach("image", Buffer.from(validPngImage), { filename: "default-concurrent-replacement.png", contentType: "image/png" }),
+      request(app)
+        .delete(`${basePath}/defaults/HERO`)
+        .set("Authorization", authorization),
+    ]);
+    expect(replacement.status).toBe(200);
+    expect(deletion.status).toBe(200);
+
+    const current = await pool.query(
+      `SELECT "publicId" FROM promotion_banner_defaults WHERE position = 'HERO'`,
+    );
+    const queued = await pool.query(
+      `SELECT "publicId" FROM cloudinary_cleanup_tasks WHERE "publicId" = ANY($1::text[])`,
+      [[originalPublicId, `test/promotion-banner-${newUploadId}`]],
+    );
+    const queuedIds = new Set(queued.rows.map((row) => row.publicId));
+    expect(queuedIds.has(originalPublicId)).toBe(true);
+    if (current.rows.length === 0) {
+      expect(queuedIds.has(`test/promotion-banner-${newUploadId}`)).toBe(true);
+    } else {
+      expect(current.rows[0].publicId).toBe(`test/promotion-banner-${newUploadId}`);
+    }
+  });
+
   it("creates, replaces, and deletes a default banner with audit and cleanup records", async () => {
     const authorization = `Bearer ${authorizedToken}`;
     const image = Buffer.from(validPngImage);
