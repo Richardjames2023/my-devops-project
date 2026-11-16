@@ -295,7 +295,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
 
   it("creates, retrieves, updates, and deletes a banner with transactional audit records", async () => {
     const authorization = `Bearer ${authorizedToken}`;
-    const image = validPngImage;
+    const image = Buffer.from(validPngImage);
     const startAt = new Date(Date.now() + 60_000).toISOString();
     const endAt = new Date(Date.now() + 3_600_000).toISOString();
 
@@ -407,7 +407,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
 
   it("creates, replaces, and deletes a default banner with audit and cleanup records", async () => {
     const authorization = `Bearer ${authorizedToken}`;
-    const image = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const image = Buffer.from(validPngImage);
     const first = await request(app)
       .put(`${basePath}/defaults/TOP`)
       .set("Authorization", authorization)
