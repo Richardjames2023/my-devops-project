@@ -309,7 +309,8 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .field("priority", "25")
       .field("status", "DRAFT")
       .field("targetUrl", "/collections/lifecycle")
-      .attach("image", image, { filename: "banner.png", contentType: "image/png" });
+      .attach("image", image, { filename: "banner.png", contentType: "image/png" })
+      .attach("mobileImage", Buffer.from(validPngImage), { filename: "banner-mobile.png", contentType: "image/png" });
 
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     expect(created.body.banner).toMatchObject({
@@ -319,6 +320,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       status: "DRAFT",
       targetUrl: "/collections/lifecycle",
       publicId: expect.stringContaining("test/promotion-banner-"),
+      mobilePublicId: expect.stringContaining("test/promotion-banner-"),
     });
     const bannerId = created.body.banner.id as string;
 
@@ -353,10 +355,18 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     const imageReplaced = await request(app)
       .patch(`${basePath}/${bannerId}`)
       .set("Authorization", authorization)
-      .attach("image", image, { filename: "replacement.png", contentType: "image/png" });
+      .attach("image", image, { filename: "replacement.png", contentType: "image/png" })
+      .attach("mobileImage", Buffer.from(validPngImage), { filename: "replacement-mobile.png", contentType: "image/png" });
     expect(imageReplaced.status).toBe(200);
     expect(imageReplaced.body.banner.publicId).not.toBe(originalPublicId);
-    expect(cloudinaryMockState.destroyedPublicIds).toContain(originalPublicId);
+    expect(imageReplaced.body.banner.mobilePublicId).toBeTruthy();
+    const replacedAssets = await pool.query(
+      `SELECT "publicId", status FROM cloudinary_cleanup_tasks
+       WHERE "publicId" = ANY($1::text[])`,
+      [ [originalPublicId, created.body.banner.mobilePublicId] ],
+    );
+    expect(replacedAssets.rows).toHaveLength(2);
+    expect(replacedAssets.rows.every((row) => row.status === "PENDING")).toBe(true);
 
     const auditUpdated = await pool.query(
       `SELECT action, "oldValues", "newValues"
@@ -372,6 +382,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     expect(auditUpdated.rows[1].oldValues.title).toBe("API lifecycle banner");
     expect(auditUpdated.rows[1].newValues.title).toBe("Updated API lifecycle banner");
     expect(auditUpdated.rows[2].newValues.imageReplaced).toBe(true);
+    expect(auditUpdated.rows[2].newValues.mobileImageReplaced).toBe(true);
 
     const removed = await request(app)
       .delete(`${basePath}/${bannerId}`)
@@ -391,6 +402,12 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     );
     expect(cleanup.rows).toHaveLength(1);
     expect(cleanup.rows[0].status).toBe("PENDING");
+    const mobileCleanup = await pool.query(
+      `SELECT status FROM cloudinary_cleanup_tasks WHERE "publicId" = $1`,
+      [imageReplaced.body.banner.mobilePublicId],
+    );
+    expect(mobileCleanup.rows).toHaveLength(1);
+    expect(mobileCleanup.rows[0].status).toBe("PENDING");
 
     const auditDeleted = await pool.query(
       `SELECT action FROM audit_logs WHERE entity = 'PromotionBanner' AND "entityId" = $1
@@ -413,7 +430,8 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .set("Authorization", authorization)
       .field("targetUrl", "/collections/default-one")
       .field("altText", "Default banner one")
-      .attach("image", image, { filename: "default-one.png", contentType: "image/png" });
+      .attach("image", image, { filename: "default-one.png", contentType: "image/png" })
+      .attach("mobileImage", Buffer.from(validPngImage), { filename: "default-one-mobile.png", contentType: "image/png" });
 
     expect(first.status, JSON.stringify(first.body)).toBe(200);
     expect(first.body.banner).toMatchObject({
@@ -429,7 +447,8 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .set("Authorization", authorization)
       .field("targetUrl", "/collections/default-two")
       .field("altText", "Default banner two")
-      .attach("image", image, { filename: "default-two.png", contentType: "image/png" });
+      .attach("image", image, { filename: "default-two.png", contentType: "image/png" })
+      .attach("mobileImage", Buffer.from(validPngImage), { filename: "default-two-mobile.png", contentType: "image/png" });
 
     expect(replaced.status).toBe(200);
     expect(replaced.body.banner).toMatchObject({
@@ -467,17 +486,22 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     );
     expect(remainingDefault.rows).toHaveLength(0);
 
-    // Replacing a default banner deletes the previous Cloudinary asset immediately.
-    // Deleting the current default queues its asset for asynchronous cleanup.
-    expect(cloudinaryMockState.destroyedPublicIds).toContain(firstPublicId);
+    // Both old default assets are queued transactionally on replacement.
+    const replacedDefaultAssets = await pool.query(
+      `SELECT "publicId", status FROM cloudinary_cleanup_tasks
+       WHERE "publicId" = ANY($1::text[])`,
+      [[firstPublicId, first.body.banner.mobilePublicId]],
+    );
+    expect(replacedDefaultAssets.rows).toHaveLength(2);
+    expect(replacedDefaultAssets.rows.every((row) => row.status === "PENDING")).toBe(true);
 
     const queuedAssets = await pool.query(
       `SELECT "publicId", status FROM cloudinary_cleanup_tasks
-       WHERE "publicId" = $1`,
-      [replaced.body.banner.publicId],
+       WHERE "publicId" = ANY($1::text[])`,
+      [[replaced.body.banner.publicId, replaced.body.banner.mobilePublicId]],
     );
-    expect(queuedAssets.rows).toHaveLength(1);
-    expect(queuedAssets.rows[0].status).toBe("PENDING");
+    expect(queuedAssets.rows).toHaveLength(2);
+    expect(queuedAssets.rows.every((row) => row.status === "PENDING")).toBe(true);
 
     const defaultAuditActions = await pool.query(
       `SELECT action FROM audit_logs WHERE entity = 'PromotionBannerDefault'
