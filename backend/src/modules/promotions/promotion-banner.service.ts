@@ -220,14 +220,14 @@ export async function getPublicBanners() {
   // Store and compare their values as UTC wall-clock timestamps to avoid the
   // session timezone (e.g. Africa/Lagos) shifting NOW() during comparisons.
   const [scheduled, defaults] = await Promise.all([
-    prisma.$queryRaw<Prisma.PromotionBanner[]>\`
+    prisma.$queryRaw<Prisma.PromotionBanner[]>`
       SELECT *
       FROM promotion_banners
       WHERE status = 'PUBLISHED'::"PromotionBannerStatus"
         AND "startAt" <= timezone('UTC', NOW())
         AND "endAt" > timezone('UTC', NOW())
       ORDER BY priority DESC, "startAt" DESC, "createdAt" DESC
-    \`,
+    `,
     prisma.promotionBannerDefault.findMany(),
   ]);
   const output: Record<string, unknown> = { hero: null, top: null, bottom: null };
