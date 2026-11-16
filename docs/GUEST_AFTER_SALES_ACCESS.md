@@ -20,6 +20,18 @@ Revocation invalidates guest order retrieval, delivery tracking, return, and war
 
 The existing seven-day return window, delivered-package checks, and per-order-item quantity reservations continue to apply.
 
+## Guest return evidence endpoints
+
+All evidence routes use the same `X-Guest-Order-Token` header and are scoped to the order in the URL:
+
+- `POST /api/v1/returns/guest/:orderId/:returnRequestId/evidence` — upload up to five image/video files using multipart field `evidence`.
+- `GET /api/v1/returns/guest/:orderId/evidence/:evidenceId/view` — return evidence metadata and the application file-view URL.
+- `GET /api/v1/returns/guest/:orderId/evidence/:evidenceId/file` — stream the private evidence file through the API after rechecking the guest token and order ownership.
+
+Uploads accept JPEG, PNG, WebP, AVIF, MP4, WebM, and QuickTime content. Each file is limited to 20 MB. The service verifies file signatures rather than relying only on the multipart MIME type, stores assets as authenticated Cloudinary resources, and removes uploaded assets if database persistence fails. Evidence can be added only while the return is pending or under review.
+
+The view endpoint does not expose a long-lived Cloudinary URL. The API creates a short-lived private download URL and streams the file with a size limit, `nosniff`, a restrictive content security policy, and `private, no-store` caching.
+
 ## Guest warranty endpoints
 
 - `POST /api/v1/warranty-claims/guest/:orderId` — submit a warranty claim for an order item.
@@ -35,4 +47,4 @@ The order item must belong to the token-authorized guest order. Existing warrant
 - Wrong-order and invalid-token lookups return not-found responses to avoid leaking resource ownership.
 - Guest write and read endpoints use the existing guest checkout/retrieval rate limiters.
 - The revocation timestamp is retained for auditability; the token hash is not cleared.
-- Guest return evidence upload/viewing is not included in this implementation slice and remains a tracked follow-up.
+- Guest return evidence upload and viewing are implemented with token-scoped order ownership checks; evidence remains in authenticated Cloudinary storage and is streamed through the API rather than exposing the storage URL.
