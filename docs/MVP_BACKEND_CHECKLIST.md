@@ -112,7 +112,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
   - [x] Guest token hashing, expiry, explicit revocation, and rate limiting are implemented.
   - [x] Guest token validity is enforced across guest order retrieval, delivery tracking, payment initialization/verification, returns, and warranty claims.
   - [x] PostgreSQL and HTTP coverage exists for guest access, token expiry/revocation, and guest return/warranty routes.
-- [~] Guest return evidence upload and secure viewing are implemented on `dev`: token-scoped upload, metadata, and file-stream routes verify order ownership, token expiry, and revocation; uploads are signature-validated and stored as authenticated Cloudinary assets. HTTP and PostgreSQL tests cover upload/view access, wrong-order tokens, expiry, and revocation. Additional stream-response size/header regression tests are being added and require local verification.
+- [x] Guest return evidence upload and secure viewing are implemented on `dev`: token-scoped upload, metadata, and file-stream routes verify order ownership, token expiry, and revocation; uploads are signature-validated and stored as authenticated Cloudinary assets. HTTP and PostgreSQL tests cover upload/view access, wrong-order tokens, expiry, and revocation. Dedicated streaming tests cover upstream failures, response security headers, and the 20 MB limit. Focused verification passed (18 tests across 3 files) and TypeScript build passed locally.
 - [~] Verify end-to-end stock restoration, refund state, audit trail, and customer notifications for every return/refund outcome; relevant reconciliation and business-event tests exist, but the complete cross-module outcome matrix still needs review.
 
 ## 9. Reviews and customer engagement
