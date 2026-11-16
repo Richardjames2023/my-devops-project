@@ -98,11 +98,12 @@ Removes the product only from the authenticated customer's wishlist. Returns the
 
 ## Error behavior
 
-- `400`: malformed product UUID or request validation failure.
+- `400`: malformed product UUID, request validation failure, or a selected variant that does not belong to the saved product.
 - `401`: missing, invalid, or expired authentication.
 - `403`: identity is not an active, verified customer.
-- `404`: product is missing/inactive on add, the item does not exist in the customer's wishlist, or the selected variant is missing/inactive.
-- `409`: selected quantity exceeds available stock or the cart's per-variant quantity limit.
+- `404`: product is missing/inactive on add, the wishlist item does not exist, or the selected variant is missing/inactive.
+- `409`: selected quantity exceeds available stock.
+- `400`: the resulting cart quantity would exceed the cart's per-variant limit.
 - `429`: wishlist read or mutation rate limit exceeded.
 
 ## MVP boundaries
