@@ -13,6 +13,15 @@ function metadata(req: AuthenticatedRequest) {
   const userAgent = req.get("user-agent");
   return { ...(req.ip ? { ipAddress: req.ip } : {}), ...(userAgent ? { userAgent } : {}) };
 }
+function uploadedFiles(req: AuthenticatedRequest) {
+  const files = req.files as
+    | { [fieldname: string]: Express.Multer.File[] }
+    | undefined;
+  return {
+    image: files?.image?.[0],
+    mobileImage: files?.mobileImage?.[0],
+  };
+}
 function uuid(value: unknown, label: string): string {
   const parsed = z.uuid().safeParse(value);
   if (!parsed.success) throw new AppError(`Invalid ${label} ID`, 400);
@@ -25,7 +34,8 @@ export async function create(req: AuthenticatedRequest, res: Response): Promise<
     res.status(400).json({ message: "Validation failed", errors: z.flattenError(parsed.error).fieldErrors });
     return;
   }
-  const banner = await createBanner(parsed.data, req.file, actor(req), metadata(req));
+  const files = uploadedFiles(req);
+  const banner = await createBanner(parsed.data, files.image, actor(req), metadata(req), files.mobileImage);
   res.status(201).json({ message: "Promotion banner created successfully", banner });
 }
 export async function list(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -47,15 +57,16 @@ export async function getById(req: AuthenticatedRequest, res: Response): Promise
 }
 export async function update(req: AuthenticatedRequest, res: Response): Promise<void> {
   const id = uuid(req.params.bannerId, "banner");
+  const files = uploadedFiles(req);
   const parsed =
-    req.file && Object.keys(req.body ?? {}).length === 0
+    (files.image || files.mobileImage) && Object.keys(req.body ?? {}).length === 0
       ? { success: true as const, data: {} }
       : updateBannerSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ message: "Validation failed", errors: z.flattenError(parsed.error).fieldErrors });
     return;
   }
-  const banner = await updateBanner(id, parsed.data, req.file, actor(req), metadata(req));
+  const banner = await updateBanner(id, parsed.data, files.image, actor(req), metadata(req), files.mobileImage);
   res.status(200).json({ message: "Promotion banner updated successfully", banner });
 }
 export async function remove(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -72,7 +83,8 @@ export async function putDefault(req: AuthenticatedRequest, res: Response): Prom
     res.status(400).json({ message: "Validation failed", errors: z.flattenError(parsed.error).fieldErrors });
     return;
   }
-  const banner = await setDefaultBanner(parsed.data.position, req.file, parsed.data.targetUrl ?? null, parsed.data.altText ?? null, actor(req), metadata(req));
+  const files = uploadedFiles(req);
+  const banner = await setDefaultBanner(parsed.data.position, files.image, parsed.data.targetUrl ?? null, parsed.data.altText ?? null, actor(req), metadata(req), files.mobileImage);
   res.status(200).json({ message: "Default promotion banner saved successfully", banner });
 }
 export async function removeDefault(req: AuthenticatedRequest, res: Response): Promise<void> {
