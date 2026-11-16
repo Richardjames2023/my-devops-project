@@ -111,4 +111,4 @@ Removes the product only from the authenticated customer's wishlist. Returns the
 - Wishlists are authenticated-customer-only; guest wishlists are not supported.
 - Wishlist entries are product-level, not variant-level. All variants and their current availability are included in the response.
 - Moving an item into the cart requires explicit variant and quantity selection and reuses existing cart validation.
-- Wishlist reads are limited to 60 requests per 15 minutes per authenticated customer; wishlist mutations are limited to 30 requests per 15 minutes per IP.
+- Wishlist reads are limited to 60 requests per 15 minutes per authenticated customer; wishlist mutations are limited to 30 requests per 15 minutes per authenticated customer.
