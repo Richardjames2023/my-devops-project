@@ -114,25 +114,33 @@ describe("return evidence file streaming", () => {
 
   it("enforces the file size limit while streaming when content length is absent or understated", async () => {
     const oversizedChunk = new Uint8Array(MAX_FILE_SIZE + 1);
-    fetchMock.mockResolvedValue(
-      new Response(
-        new ReadableStream<Uint8Array>({
-          start(controller) {
-            controller.enqueue(oversizedChunk);
-          },
-        }),
-        { status: 200 },
-      ),
-    );
 
-    await expect(
-      streamEvidenceSource(
-        { type: "video/mp4", signedUrl: "https://cloudinary.example/signed" },
-        createResponseRecorder() as never,
-      ),
-    ).rejects.toMatchObject({
-      message: "Evidence file exceeds the allowed size",
-      statusCode: 413,
-    });
+    for (const headers of [{}, { "content-length": "1" }]) {
+      fetchMock.mockResolvedValueOnce(
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(oversizedChunk);
+            },
+          }),
+          {
+            status: 200,
+            headers,
+          },
+        ),
+      );
+
+      await expect(
+        streamEvidenceSource(
+          { type: "video/mp4", signedUrl: "https://cloudinary.example/signed" },
+          createResponseRecorder() as never,
+        ),
+      ).rejects.toMatchObject({
+        message: "Evidence file exceeds the allowed size",
+        statusCode: 413,
+      });
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
