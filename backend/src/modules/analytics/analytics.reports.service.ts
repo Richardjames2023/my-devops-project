@@ -53,6 +53,7 @@ export async function getProductPerformanceReport(query: AnalyticsQuery) {
       sku: true,
       quantity: true,
       totalPrice: true,
+      discountAmount: true,
       unitCostSnapshot: true,
       order: { select: { id: true, currency: true, subtotal: true, discountAmount: true } },
       returnItems: {
@@ -88,14 +89,27 @@ export async function getProductPerformanceReport(query: AnalyticsQuery) {
     itemsByOrder.set(item.order.id, orderItems);
   }
   for (const orderItems of itemsByOrder.values()) {
-    const discount = toCents(orderItems[0]!.order.discountAmount);
+    // Checkout allocates coupon discounts to OrderItem.discountAmount and
+    // persists OrderItem.totalPrice after that discount. Only allocate any
+    // legacy/unallocated remainder from Order.discountAmount; never deduct
+    // the portion already represented on the individual items a second time.
+    const orderDiscount = toCents(orderItems[0]!.order.discountAmount);
+    const recordedItemDiscount = orderItems.reduce(
+      (sum, item) => sum + toCents(item.discountAmount),
+      0n,
+    );
+    const remainingDiscount = orderDiscount > recordedItemDiscount
+      ? orderDiscount - recordedItemDiscount
+      : 0n;
     const lineTotals = orderItems.map((item) => toCents(item.totalPrice));
     const denominator = lineTotals.reduce((sum, value) => sum + value, 0n);
     let allocated = 0n;
     orderItems.forEach((item, index) => {
       const share = index === orderItems.length - 1
-        ? discount - allocated
-        : denominator === 0n ? 0n : (discount * lineTotals[index]!) / denominator;
+        ? remainingDiscount - allocated
+        : denominator === 0n
+          ? 0n
+          : (remainingDiscount * lineTotals[index]!) / denominator;
       discountByItem.set(item.id, share);
       allocated += share;
     });
