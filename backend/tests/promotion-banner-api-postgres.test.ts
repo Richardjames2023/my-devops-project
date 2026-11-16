@@ -467,13 +467,17 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     );
     expect(remainingDefault.rows).toHaveLength(0);
 
+    // Replacing a default banner deletes the previous Cloudinary asset immediately.
+    // Deleting the current default queues its asset for asynchronous cleanup.
+    expect(cloudinaryMockState.destroyedPublicIds).toContain(firstPublicId);
+
     const queuedAssets = await pool.query(
       `SELECT "publicId", status FROM cloudinary_cleanup_tasks
-       WHERE "publicId" = ANY($1::text[]) ORDER BY "publicId"`,
-      [[firstPublicId, replaced.body.banner.publicId]],
+       WHERE "publicId" = $1`,
+      [replaced.body.banner.publicId],
     );
-    expect(queuedAssets.rows).toHaveLength(2);
-    expect(queuedAssets.rows.every((row) => row.status === "PENDING")).toBe(true);
+    expect(queuedAssets.rows).toHaveLength(1);
+    expect(queuedAssets.rows[0].status).toBe("PENDING");
 
     const defaultAuditActions = await pool.query(
       `SELECT action FROM audit_logs WHERE entity = 'PromotionBannerDefault'
