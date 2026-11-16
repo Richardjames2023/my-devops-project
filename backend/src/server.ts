@@ -8,6 +8,7 @@ import { startNotificationOutboxJob } from "./infrastructure/jobs/notification-o
 import { startNotificationEmailJob } from "./infrastructure/jobs/notification-email.job";
 import { startCloudinaryCleanupJob } from "./infrastructure/jobs/cloudinary-cleanup.job";
 import { startCustomerAccountDeletionJob } from "./infrastructure/jobs/customer-account-deletion.job";
+import { runGracefulShutdown } from "./infrastructure/shutdown/graceful-shutdown";
 
 async function startServer(): Promise<void> {
   try {
@@ -37,44 +38,17 @@ async function startServer(): Promise<void> {
       shuttingDown = true;
       logger.info("Server shutdown requested");
 
-      const shutdownDeadline = setTimeout(() => {
-        logger.error("Graceful shutdown deadline exceeded; forcing process exit", undefined, {
-          timeoutMs: shutdownTimeoutMs,
-        });
-        server.closeAllConnections?.();
-        process.exit(1);
-      }, shutdownTimeoutMs);
-
-      try {
-        // Stop future job ticks immediately, while allowing in-flight HTTP requests
-        // and active job executions to drain concurrently before Prisma disconnects.
-        const shutdownResults = await Promise.allSettled([
-          new Promise<void>((resolve, reject) => {
-            server.close((error) => error ? reject(error) : resolve());
-          }),
-          ...stopJobs.map((stop) => stop()),
-        ]);
-
-        const shutdownErrors = shutdownResults.flatMap((result) =>
-          result.status === "rejected" ? [result.reason] : [],
-        );
-        for (const error of shutdownErrors) {
-          logger.error("Server or background job did not stop cleanly", error);
-        }
-
-        // Every server/job drain has settled before Prisma is disconnected.
-        await disconnectDatabase();
-        clearTimeout(shutdownDeadline);
-        if (shutdownErrors.length > 0) {
-          throw new Error("One or more server shutdown tasks failed");
-        }
-        logger.info("Server shutdown complete");
-        process.exit(0);
-      } catch (error) {
-        clearTimeout(shutdownDeadline);
-        logger.error("Server shutdown failed", error);
-        process.exit(1);
-      }
+      await runGracefulShutdown({
+        closeServer: () => new Promise<void>((resolve, reject) => {
+          server.close((error) => error ? reject(error) : resolve());
+        }),
+        closeAllConnections: () => server.closeAllConnections?.(),
+        stopJobs,
+        disconnectDatabase,
+        timeoutMs: shutdownTimeoutMs,
+        logger,
+        exit: (code) => process.exit(code),
+      });
     };
 
     process.once("SIGINT", () => { void shutdown(); });
