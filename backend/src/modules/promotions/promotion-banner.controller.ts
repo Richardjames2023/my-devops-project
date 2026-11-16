@@ -1,4 +1,4 @@
-import type { Request, Response } from "express";
+import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import { AppError } from "../../common/errors/AppError";
