@@ -18,6 +18,7 @@ process.env.DATABASE_URL = databaseUrl;
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
 const { default: prisma } = await import("../src/infrastructure/prisma/client");
 const { getAnalyticsOverview } = await import("../src/modules/analytics/analytics.service");
+const { getProductPerformanceReport, getInventoryReport, getSalesReport } = await import("../src/modules/analytics/analytics.reports.service");
 
 interface Fixture {
   userId: string;
@@ -205,10 +206,14 @@ async function createPaidOrder(
       quantity, "unitPrice", "unitCostSnapshot", "discountAmount", "totalPrice",
       "hasWarranty", "createdAt")
      VALUES ($1, $2, $3, 'Analytics Fixture Product', 'Analytics Variant',
-             $4, $5, $6, $7, 0, $8, FALSE, NOW())`,
+             $4, $5, $6, $7, $8, $9, FALSE, NOW())`,
     [itemId, orderId, fixture.variantId, `ANALYTICS-ITEM-${itemId}`,
       options.itemQuantity, options.currency === "NGN" ? "333.33" : "20.02",
-      options.unitCost, options.subtotal],
+      options.unitCost,
+      // NGN models checkout's allocated coupon discount. USD models a legacy
+      // order whose order-level discount was not allocated to its item.
+      options.currency === "NGN" ? options.discount : "0",
+      (Number(options.subtotal) - (options.currency === "NGN" ? Number(options.discount) : 0)).toFixed(2)],
   );
 
   await pool.query(
@@ -345,4 +350,122 @@ describe("PostgreSQL staff analytics overview", () => {
       await cleanupFixture(fixture);
     }
   });
+
+  it("reports product discounts, item-linked refunds, cost coverage, and current inventory valuation", async () => {
+    const from = new Date("2000-01-15T00:00:00.000Z");
+    const to = new Date("2000-01-15T23:59:59.999Z");
+    const fixture = await createFixture();
+
+    try {
+      const sales = await getSalesReport({ from, to });
+      expect(sales.currencies.NGN).toMatchObject({
+        merchandiseRevenue: 999.89,
+        successfulRefunds: 100.02,
+        netMerchandiseRevenue: 899.87,
+      });
+      expect(sales.currencies.USD).toMatchObject({
+        merchandiseRevenue: 20.01,
+        successfulRefunds: 0.01,
+        netMerchandiseRevenue: 20,
+      });
+
+      const productReport = await getProductPerformanceReport({ from, to });
+      const ngnProduct = productReport.products.find((row) => row.currency === "NGN");
+      const usdProduct = productReport.products.find((row) => row.currency === "USD");
+
+      expect(ngnProduct).toMatchObject({
+        productVariantId: fixture.variantId,
+        unitsSold: 3,
+        unitsRefunded: 2,
+        netUnitsSold: 1,
+        revenue: 999.89,
+        refunds: 100.02,
+        netRevenue: 899.87,
+        costOfGoodsSold: 123.45,
+        grossProfit: 776.42,
+        grossMarginPercent: 86.28,
+        costCoveragePercent: 100,
+        unitsWithoutCost: 0,
+      });
+      expect(usdProduct).toMatchObject({
+        productVariantId: fixture.variantId,
+        unitsSold: 1,
+        unitsRefunded: 0,
+        netUnitsSold: 1,
+        revenue: 20.01,
+        refunds: 0,
+        netRevenue: 20.01,
+        costOfGoodsSold: 0,
+        grossProfit: null,
+        grossMarginPercent: null,
+        costCoveragePercent: 0,
+        unitsWithoutCost: 1,
+      });
+
+      const inventoryBaseline = await getInventoryReport({ from, to });
+      const inventoryId = randomUUID();
+      await pool.query(
+        `INSERT INTO inventory
+         (id, "productVariantId", quantity, "reservedQuantity", "quarantineQuantity",
+          "lowStockThreshold", "createdAt", "updatedAt")
+         VALUES ($1, $2, 10, 2, 1, 4, NOW(), NOW())`,
+        [inventoryId, fixture.variantId],
+      );
+      await pool.query(
+        `INSERT INTO stock_movements
+         (id, "inventoryId", type, quantity, reference, reason, "createdAt")
+         VALUES
+         ($1, $3, 'RECEIVED', 10, $4, 'Analytics fixture receipt', $5),
+         ($2, $3, 'DAMAGED', 2, $4, 'Analytics fixture damage', $5)`,
+        [
+          randomUUID(),
+          randomUUID(),
+          inventoryId,
+          `ANALYTICS-MOVEMENT-${fixture.variantId}`,
+          new Date("2000-01-15T15:00:00.000Z"),
+        ],
+      );
+
+      const inventoryReport = await getInventoryReport({ from, to });
+      const fixtureStock = inventoryReport.stock.find(
+        (row) => row.productVariantId === fixture.variantId,
+      );
+      expect(fixtureStock).toMatchObject({
+        productVariantId: fixture.variantId,
+        onHand: 10,
+        reserved: 2,
+        quarantined: 1,
+        available: 7,
+        lowStockThreshold: 4,
+        lowStock: false,
+        unitCost: 123.45,
+        stockCostValue: 1234.5,
+      });
+      expect(inventoryReport.summary.onHandUnits).toBe(inventoryBaseline.summary.onHandUnits + 10);
+      expect(inventoryReport.summary.valuedUnits).toBe(inventoryBaseline.summary.valuedUnits + 10);
+      expect(inventoryReport.summary.knownStockCostValue).toBe(
+        Number((inventoryBaseline.summary.knownStockCostValue + 1234.5).toFixed(2)),
+      );
+
+      const baselineReceived = inventoryBaseline.movements.find((row) => row.type === "RECEIVED");
+      const baselineDamaged = inventoryBaseline.movements.find((row) => row.type === "DAMAGED");
+      const reportedReceived = inventoryReport.movements.find((row) => row.type === "RECEIVED");
+      const reportedDamaged = inventoryReport.movements.find((row) => row.type === "DAMAGED");
+      expect(reportedReceived).toEqual({
+        type: "RECEIVED",
+        count: (baselineReceived?.count ?? 0) + 1,
+        quantity: (baselineReceived?.quantity ?? 0) + 10,
+      });
+      expect(reportedDamaged).toEqual({
+        type: "DAMAGED",
+        count: (baselineDamaged?.count ?? 0) + 1,
+        quantity: (baselineDamaged?.quantity ?? 0) + 2,
+      });
+
+      await pool.query("DELETE FROM inventory WHERE id = $1", [inventoryId]);
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
 });
