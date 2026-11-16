@@ -209,8 +209,11 @@ async function createPaidOrder(
              $4, $5, $6, $7, $8, $9, FALSE, NOW())`,
     [itemId, orderId, fixture.variantId, `ANALYTICS-ITEM-${itemId}`,
       options.itemQuantity, options.currency === "NGN" ? "333.33" : "20.02",
-      options.unitCost, options.discount,
-      (Number(options.subtotal) - Number(options.discount)).toFixed(2)],
+      options.unitCost,
+      // NGN models checkout's allocated coupon discount. USD models a legacy
+      // order whose order-level discount was not allocated to its item.
+      options.currency === "NGN" ? options.discount : "0",
+      (Number(options.subtotal) - (options.currency === "NGN" ? Number(options.discount) : 0)).toFixed(2)],
   );
 
   await pool.query(
