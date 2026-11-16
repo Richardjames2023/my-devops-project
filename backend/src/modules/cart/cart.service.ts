@@ -225,7 +225,24 @@ export async function addCartItemInTransaction(
     },
   });
 
-  if (!variant || !variant.isActive || !variant.product.isActive) {
+  const activeVariantRows = variant
+    ? await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT pv.id
+        FROM product_variants pv
+        INNER JOIN products p ON p.id = pv."productId"
+        WHERE pv.id = ${input.productVariantId}::uuid
+          AND pv."isActive" = true
+          AND p."isActive" = true
+        FOR SHARE OF pv, p
+      `
+    : [];
+
+  if (
+    !variant ||
+    !variant.isActive ||
+    !variant.product.isActive ||
+    activeVariantRows.length === 0
+  ) {
     throw new AppError("Product variant not found or inactive", 404);
   }
 
