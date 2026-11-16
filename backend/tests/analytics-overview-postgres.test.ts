@@ -206,10 +206,11 @@ async function createPaidOrder(
       quantity, "unitPrice", "unitCostSnapshot", "discountAmount", "totalPrice",
       "hasWarranty", "createdAt")
      VALUES ($1, $2, $3, 'Analytics Fixture Product', 'Analytics Variant',
-             $4, $5, $6, $7, 0, $8, FALSE, NOW())`,
+             $4, $5, $6, $7, $8, $9, FALSE, NOW())`,
     [itemId, orderId, fixture.variantId, `ANALYTICS-ITEM-${itemId}`,
       options.itemQuantity, options.currency === "NGN" ? "333.33" : "20.02",
-      options.unitCost, options.subtotal],
+      options.unitCost, options.discount,
+      (Number(options.subtotal) - Number(options.discount)).toFixed(2)],
   );
 
   await pool.query(
