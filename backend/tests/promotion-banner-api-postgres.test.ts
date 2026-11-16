@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { generateAccessToken } from "../src/common/utils/jwt";
 
 
-const cloudinaryMockState = vi.hoisted(() => ({ uploadCounter: 0 }));
+const cloudinaryMockState = vi.hoisted(() => ({ uploadCounter: 0, destroyedPublicIds: [] as string[] }));
 
 vi.mock("../src/config/cloudinary", () => ({
   getCloudinary: () => ({
@@ -23,7 +23,7 @@ vi.mock("../src/config/cloudinary", () => ({
           });
         },
       }),
-      destroy: async () => ({ result: "ok" }),
+      destroy: async (publicId: string) => { cloudinaryMockState.destroyedPublicIds.push(publicId); return { result: "ok" }; },
     },
   }),
 }));
@@ -314,7 +314,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       priority: 25,
       status: "DRAFT",
       targetUrl: "/collections/lifecycle",
-      publicId: expect.stringMatching(/^test\\/promotion-banner-/),
+      publicId: expect.stringContaining("test/promotion-banner-"),
     });
     const bannerId = created.body.banner.id as string;
 
@@ -345,6 +345,15 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       priority: 40,
     });
 
+    const originalPublicId = created.body.banner.publicId as string;
+    const imageReplaced = await request(app)
+      .patch(`${basePath}/${bannerId}`)
+      .set("Authorization", authorization)
+      .attach("image", image, { filename: "replacement.png", contentType: "image/png" });
+    expect(imageReplaced.status).toBe(200);
+    expect(imageReplaced.body.banner.publicId).not.toBe(originalPublicId);
+    expect(cloudinaryMockState.destroyedPublicIds).toContain(originalPublicId);
+
     const auditUpdated = await pool.query(
       `SELECT action, "oldValues", "newValues"
        FROM audit_logs WHERE entity = 'PromotionBanner' AND "entityId" = $1
@@ -354,9 +363,11 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     expect(auditUpdated.rows.map((row) => row.action)).toEqual([
       "PROMOTION_BANNER_CREATED",
       "PROMOTION_BANNER_UPDATED",
+      "PROMOTION_BANNER_UPDATED",
     ]);
     expect(auditUpdated.rows[1].oldValues.title).toBe("API lifecycle banner");
     expect(auditUpdated.rows[1].newValues.title).toBe("Updated API lifecycle banner");
+    expect(auditUpdated.rows[2].newValues.imageReplaced).toBe(true);
 
     const removed = await request(app)
       .delete(`${basePath}/${bannerId}`)
@@ -372,7 +383,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
 
     const cleanup = await pool.query(
       `SELECT status FROM cloudinary_cleanup_tasks WHERE "publicId" = $1`,
-      [created.body.banner.publicId],
+      [imageReplaced.body.banner.publicId],
     );
     expect(cleanup.rows).toHaveLength(1);
     expect(cleanup.rows[0].status).toBe("PENDING");
@@ -384,6 +395,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     );
     expect(auditDeleted.rows.map((row) => row.action)).toEqual([
       "PROMOTION_BANNER_CREATED",
+      "PROMOTION_BANNER_UPDATED",
       "PROMOTION_BANNER_UPDATED",
       "PROMOTION_BANNER_DELETED",
     ]);
