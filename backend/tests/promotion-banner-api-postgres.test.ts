@@ -111,9 +111,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("banners");
-    expect(response.body.banners).toEqual(
-      expect.objectContaining({ hero: expect.anything(), top: expect.anything(), bottom: expect.anything() }),
-    );
+    expect(Object.keys(response.body.banners).sort()).toEqual(["bottom", "hero", "top"]);
   });
 
   it("rejects staff management requests without a bearer token", async () => {
