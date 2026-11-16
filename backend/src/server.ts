@@ -35,20 +35,25 @@ async function startServer(): Promise<void> {
       try {
         // Stop future job ticks immediately, while allowing in-flight HTTP requests
         // and active job executions to drain concurrently before Prisma disconnects.
-        const [serverCloseResult, jobStopResults] = await Promise.all([
+        const shutdownResults = await Promise.allSettled([
           new Promise<void>((resolve, reject) => {
             server.close((error) => error ? reject(error) : resolve());
           }),
-          Promise.allSettled(stopJobs.map((stop) => stop())),
+          ...stopJobs.map((stop) => stop()),
         ]);
 
-        for (const result of jobStopResults) {
-          if (result.status === "rejected") {
-            logger.error("Background job did not stop cleanly", result.reason);
-          }
+        const shutdownErrors = shutdownResults.flatMap((result) =>
+          result.status === "rejected" ? [result.reason] : [],
+        );
+        for (const error of shutdownErrors) {
+          logger.error("Server or background job did not stop cleanly", error);
         }
 
+        // Every server/job drain has settled before Prisma is disconnected.
         await disconnectDatabase();
+        if (shutdownErrors.length > 0) {
+          throw new Error("One or more server shutdown tasks failed");
+        }
         logger.info("Server shutdown complete");
         process.exit(0);
       } catch (error) {
