@@ -47,7 +47,10 @@ export async function getById(req: AuthenticatedRequest, res: Response): Promise
 }
 export async function update(req: AuthenticatedRequest, res: Response): Promise<void> {
   const id = uuid(req.params.bannerId, "banner");
-  const parsed = updateBannerSchema.safeParse(req.body);
+  const parsed =
+    req.file && Object.keys(req.body ?? {}).length === 0
+      ? { success: true as const, data: {} }
+      : updateBannerSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ message: "Validation failed", errors: z.flattenError(parsed.error).fieldErrors });
     return;
