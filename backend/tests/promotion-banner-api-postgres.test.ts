@@ -307,7 +307,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .field("targetUrl", "/collections/lifecycle")
       .attach("image", image, { filename: "banner.png", contentType: "image/png" });
 
-    expect(created.status).toBe(201);
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
     expect(created.body.banner).toMatchObject({
       title: "API lifecycle banner",
       position: "HERO",
@@ -411,7 +411,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .field("altText", "Default banner one")
       .attach("image", image, { filename: "default-one.png", contentType: "image/png" });
 
-    expect(first.status).toBe(200);
+    expect(first.status, JSON.stringify(first.body)).toBe(200);
     expect(first.body.banner).toMatchObject({
       position: "TOP",
       targetUrl: "/collections/default-one",
