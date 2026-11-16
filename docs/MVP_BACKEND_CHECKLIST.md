@@ -88,7 +88,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
   - [x] Validate product existence and allow only active products to be newly added.
   - [x] Retain previously saved products if later deactivated or unavailable and expose their current status.
   - [x] Enforce customer ownership; guest and staff identities are excluded.
-- [x] Move a wishlist product into the cart with explicit variant and quantity selection; cart validation/pricing is reused and cart insertion plus wishlist removal are atomic.
+- [~] Move a wishlist product into the cart with explicit variant and quantity selection; cart validation/pricing is reused and cart insertion plus wishlist removal are atomic (PR #40; local validation and merge pending).
 
 ## 7. Coupons and discounts
 
@@ -145,7 +145,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Prisma migrations and generated client workflow.
 - [~] Verify actual production secrets, webhook secrets, courier credentials, and coupon HMAC secret are configured securely in deployment environments. Repository code cannot prove deployment secret values.
 - [~] Complete a rate-limit and abuse-protection audit across authentication, guest order access, checkout, wishlist, reviews, and public endpoints.
-- [x] Wishlist reads and mutations have dedicated per-customer rate limits (60 reads and 30 mutations per 15 minutes); broader abuse-protection audit remains in progress.
+- [~] Wishlist reads and mutations have dedicated per-customer rate limits (60 reads and 30 mutations per 15 minutes) on PR #40; local validation and merge pending. The broader abuse-protection audit remains in progress.
 - [~] Structured JSON logging, development TTY color output, request correlation IDs, HTTP request timing/status logs, centralized error logging, and structured logs across inventory reservation, Paystack payment reconciliation/webhooks/recovery, notification outbox/email, Cloudinary cleanup/product-image operations, and customer account deletion workers are implemented on `feat/structured-logging-observability`; focused and full local verification are required before merge.
 - [ ] Verify backup/restore procedure and production migration/rollback runbook.
 - [x] Run full build and test suite against the dedicated test database before the latest merge: TypeScript build passed; full Vitest suite passed (69 files, 423 tests). Prisma migration status was up to date on `shop_db_test`.
