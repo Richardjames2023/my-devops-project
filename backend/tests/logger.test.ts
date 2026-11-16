@@ -76,6 +76,6 @@ describe("structured logger", () => {
     const write = vi.spyOn(process.stdout, "write").mockReturnValue(true);
     const proxy = new Proxy({}, { ownKeys: () => { throw new Error("blocked"); } });
     expect(() => logger.info("safe fallback", { proxy })).not.toThrow();
-    expect(String(write.mock.calls[0]?.[0])).toContain("Log entry could not be serialized");
+    expect(String(write.mock.calls[0]?.[0])).toContain("[Unserializable]");
   });
 });
