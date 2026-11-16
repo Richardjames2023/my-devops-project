@@ -9,74 +9,119 @@ interface RequestLogContext {
 }
 
 const requestContext = new AsyncLocalStorage<RequestLogContext>();
-const levels: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, error: 40 };
-const colors: Record<LogLevel, string> = {
-  debug: "\u001b[90m",
-  info: "\u001b[36m",
-  warn: "\u001b[33m",
-  error: "\u001b[31m",
-};
-const reset = "\u001b[0m";
-const sensitiveKey = /password|token|secret|authorization|cookie|api[-_]?key|credential|private[-_]?key/i;
+const sensitiveKey = /password|passphrase|token|secret|authorization|cookie|api[-_]?key|credential|private[-_]?key|signature|session/i;
+const sensitiveQueryKey = /^(?:access[_-]?token|refresh[_-]?token|id[_-]?token|token|code|client[_-]?secret|secret|password|passwd|signature|sig|key|api[_-]?key|x-amz-signature|x-goog-signature|session(?:id)?|credential)$/i;
+const MAX_LOG_DEPTH = 8;
+
+function decodeURIComponentSafe(value: string): string {
+  try {
+    return decodeURIComponent(value).toLowerCase();
+  } catch {
+    return value.toLowerCase();
+  }
+}
 
 function redactString(value: string): string {
   return value
     .replace(/(Bearer\s+)[A-Za-z0-9._~+\/-]+=*/gi, "$1[REDACTED]")
-    .replace(/([?&#](?:token|access_token|refresh_token|code|secret)=)[^&#\s]*/gi, "$1[REDACTED]")
+    .replace(/([?&#])([^=&#\s]+)=([^&#\s]*)/g, (match, separator: string, key: string) =>
+      sensitiveQueryKey.test(decodeURIComponentSafe(key))
+        ? separator + key + "=[REDACTED]"
+        : match,
+    )
     .replace(/(#(?:token)=)[^\s]*/gi, "$1[REDACTED]");
 }
 
-function sanitize(value: unknown, key = "", seen = new WeakSet<object>()): unknown {
+function sanitize(
+  value: unknown,
+  key = "",
+  seen = new WeakSet<object>(),
+  depth = 0,
+): unknown {
   if (sensitiveKey.test(key)) return "[REDACTED]";
+  if (depth > MAX_LOG_DEPTH) return "[MaxDepth]";
   if (typeof value === "string") return redactString(value);
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "function") return "[Function]";
+  if (typeof value === "symbol") return String(value);
   if (value instanceof Error) {
-    // Exception messages and stacks can contain provider payloads, credentials,
-    // personal data, or internal paths. Emit only the stable error class name.
-    return { name: value.name };
+    const code = "code" in value && typeof value.code === "string" && /^[A-Z0-9_.-]{1,64}$/i.test(value.code)
+      ? value.code
+      : undefined;
+    return {
+      name: redactString(value.name || "Error"),
+      ...(code ? { code } : {}),
+      ...(value.cause !== undefined ? { cause: sanitize(value.cause, "cause", seen, depth + 1) } : {}),
+    };
   }
-  if (Array.isArray(value)) return value.map((item) => sanitize(item, "", seen));
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? "[InvalidDate]" : value.toISOString();
+  if (typeof Buffer !== "undefined" && Buffer.isBuffer(value)) return "[Buffer]";
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return "[Circular]";
+    seen.add(value);
+    return value.map((item) => sanitize(item, "", seen, depth + 1));
+  }
   if (value && typeof value === "object") {
     if (seen.has(value)) return "[Circular]";
     seen.add(value);
-    return Object.fromEntries(
-      Object.entries(value).map(([childKey, childValue]) => [
-        childKey,
-        sanitize(childValue, childKey, seen),
-      ]),
-    );
+    try {
+      return Object.fromEntries(
+        Object.entries(value).map(([childKey, childValue]) => [
+          childKey,
+          sanitize(childValue, childKey, seen, depth + 1),
+        ]),
+      );
+    } catch {
+      return "[Unserializable]";
+    }
   }
   return value;
 }
 
-function write(level: LogLevel, message: string, context: LogContext = {}): void {
-  const timestamp = new Date().toISOString();
-  const requestId = requestContext.getStore()?.requestId;
-  const entry = sanitize({
-    timestamp,
-    level,
-    service: "my-devops-project-api",
-    environment: process.env.NODE_ENV ?? "development",
-    ...(requestId ? { requestId } : {}),
-    message,
-    ...context,
-  }) as Record<string, unknown>;
+function ignoreOutputError(): void {
+  // Broken pipes and other output failures must not become uncaught stream errors.
+}
 
-  if (process.env.NODE_ENV !== "production" && process.stdout.isTTY) {
-    const { timestamp: time, level: severity, message: text, ...details } = entry;
-    const line = [
-      `${colors[level]}${String(severity).toUpperCase().padEnd(5)}${reset}`,
-      `\u001b[90m${time}${reset}`,
-      String(text),
-      Object.keys(details).length ? JSON.stringify(details) : "",
-    ].filter(Boolean).join(" ");
-    const output = level === "error" ? process.stderr : process.stdout;
-    output.write(line + "\n");
-    return;
+// Writable streams emit asynchronous errors separately from write() throwing.
+process.stdout.on("error", ignoreOutputError);
+process.stderr.on("error", ignoreOutputError);
+
+function safeWrite(output: NodeJS.WriteStream, line: string): void {
+  try {
+    output.write(line + "\n", (error?: Error | null) => {
+      if (error) {
+        // The stream-level listener above absorbs the corresponding error event.
+      }
+    });
+  } catch {
+    // Logging must never break the request or background operation being logged.
   }
+}
 
-  const line = JSON.stringify(entry);
+function write(level: LogLevel, message: string, context: LogContext = {}): void {
   const output = level === "error" ? process.stderr : process.stdout;
-  output.write(line + "\n");
+  try {
+    const requestId = requestContext.getStore()?.requestId;
+    const entry = sanitize({
+      ...context,
+      timestamp: new Date().toISOString(),
+      level,
+      service: "my-devops-project-api",
+      environment: process.env.NODE_ENV ?? "development",
+      // Always overwrite caller-supplied request IDs. Undefined is omitted by JSON.stringify.
+      requestId: requestId ?? undefined,
+      message,
+    }) as Record<string, unknown>;
+    safeWrite(output, JSON.stringify(entry));
+  } catch {
+    safeWrite(output, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level,
+      service: "my-devops-project-api",
+      environment: process.env.NODE_ENV ?? "development",
+      message: "Log entry could not be serialized",
+    }));
+  }
 }
 
 export const logger = {

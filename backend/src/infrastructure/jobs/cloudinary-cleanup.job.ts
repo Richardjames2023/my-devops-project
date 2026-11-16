@@ -1,19 +1,10 @@
 import { processCloudinaryCleanupBatch } from "../cloudinary/cloudinary-cleanup";
 import { logger } from "../../config/logger";
+import { startPeriodicJob } from "./periodic-job";
 
-export function startCloudinaryCleanupJob(): void {
-  let running = false;
-  const timer = setInterval(async () => {
-    if (running) return;
-    running = true;
-    try {
-      const processed = await processCloudinaryCleanupBatch();
-      if (processed > 0) logger.info("Cloudinary cleanup batch completed", { processed });
-    } catch (error) {
-      logger.error("Cloudinary cleanup worker failed", error);
-    } finally {
-      running = false;
-    }
-  }, 30_000);
-  timer.unref();
+export function startCloudinaryCleanupJob() {
+  return startPeriodicJob("cloudinary-cleanup", 30_000, async () => {
+    const processed = await processCloudinaryCleanupBatch();
+    if (processed > 0) logger.info("Cloudinary cleanup batch completed", { processed });
+  }, { runImmediately: false, unref: true });
 }
