@@ -139,6 +139,8 @@ model StaffAccount {
   assignedDeliveries                      Delivery[]                        @relation("DeliveryAssignedStaff")
   refreshTokens                           StaffRefreshToken[]
   auditLogs                               AuditLog[]
+  createdPromotionBanners                 PromotionBanner[]        @relation("PromotionBannerCreator")
+  updatedPromotionDefaults                PromotionBannerDefault[] @relation("PromotionBannerDefaultUpdater")
   createdInvitations                      StaffInvitation[]                @relation("StaffInvitationCreator")
   assignedRoleRecords                     StaffAccountRole[]               @relation("StaffRoleAssigner")
   inspectedReturnItems                    ReturnItemInspection[]           @relation("StaffReturnItemInspections")
@@ -393,6 +395,48 @@ model WishlistItem {
   @@index([userId, createdAt])
   @@index([productId])
   @@map("wishlist_items")
+}
+
+model PromotionBanner {
+  id                      String                @id @default(uuid()) @db.Uuid
+  title                   String
+  imageUrl                String
+  publicId                String                @unique
+  mobileImageUrl          String?
+  mobilePublicId          String?               @unique
+  position                PromotionBannerPosition
+  targetUrl               String?
+  altText                 String?
+  startAt                 DateTime
+  endAt                   DateTime
+  status                  PromotionBannerStatus @default(DRAFT)
+  priority                Int                   @default(0)
+  createdByStaffAccountId String                @db.Uuid
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  createdBy               StaffAccount          @relation("PromotionBannerCreator", fields: [createdByStaffAccountId], references: [id], onDelete: Restrict)
+
+  @@index([position, status, startAt, endAt, priority])
+  @@index([createdByStaffAccountId, createdAt])
+  @@map("promotion_banners")
+}
+
+model PromotionBannerDefault {
+  id                      String                @id @default(uuid()) @db.Uuid
+  position                PromotionBannerPosition @unique
+  imageUrl                String
+  publicId                String                @unique
+  mobileImageUrl          String?
+  mobilePublicId          String?               @unique
+  targetUrl               String?
+  altText                 String?
+  updatedByStaffAccountId String                @db.Uuid
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  updatedBy               StaffAccount          @relation("PromotionBannerDefaultUpdater", fields: [updatedByStaffAccountId], references: [id], onDelete: Restrict)
+
+  @@index([updatedByStaffAccountId, updatedAt])
+  @@map("promotion_banner_defaults")
 }
 
 model ProductImage {
@@ -1085,6 +1129,18 @@ model NotificationPreference {
   @@index([customerUserId, category])
   @@index([staffAccountId, category])
   @@map("notification_preferences")
+}
+
+enum PromotionBannerPosition {
+  HERO
+  TOP
+  BOTTOM
+}
+
+enum PromotionBannerStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
 }
 
 enum NotificationRecipientType {
