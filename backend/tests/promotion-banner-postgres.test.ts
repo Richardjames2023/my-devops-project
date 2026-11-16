@@ -30,6 +30,12 @@ const staffId = randomUUID();
 const createdBannerIds: string[] = [];
 const createdDefaultIds: string[] = [];
 
+function toUtcTimestamp(value: Date): string {
+  // PostgreSQL TIMESTAMP WITHOUT TIME ZONE must receive a UTC wall-clock value,
+  // not a JavaScript Date serialized with a timezone offset.
+  return value.toISOString().replace("T", " ").replace("Z", "");
+}
+
 async function insertBanner(options: {
   position: "HERO" | "TOP" | "BOTTOM";
   title: string;
@@ -54,12 +60,12 @@ async function insertBanner(options: {
       `https://images.example.test/${id}.jpg`,
       publicId,
       options.position,
-      options.startAt,
-      options.endAt,
+      toUtcTimestamp(options.startAt),
+      toUtcTimestamp(options.endAt),
       options.status ?? "PUBLISHED",
       options.priority ?? 0,
       staffId,
-      options.createdAt ?? new Date(),
+      toUtcTimestamp(options.createdAt ?? new Date()),
     ],
   );
   return id;
