@@ -164,17 +164,6 @@ describe("PostgreSQL promotion banner storefront resolution", () => {
       priority: 100,
     });
 
-    const diagnostic = await pool.query(
-      `SELECT current_setting('TimeZone') AS timezone, NOW() AS database_now,
-              "startAt", "endAt", status,
-              ("startAt" <= NOW() AND "endAt" > NOW()) AS active_by_database_clock
-       FROM promotion_banners WHERE id = $1`,
-      [winningId],
-    );
-    console.log("Promotion banner scheduling diagnostic", {
-      applicationNow: new Date().toISOString(),
-      database: diagnostic.rows[0],
-    });
     const result = await getPublicBanners();
     expect(result.hero).toMatchObject({
       type: "scheduled",
