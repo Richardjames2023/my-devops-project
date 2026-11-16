@@ -127,12 +127,11 @@ export async function addWishlistItem(
       throw new AppError("Product not found or inactive", 404);
     }
 
-    await tx.wishlistItem.upsert({
-      where: {
-        userId_productId: { userId, productId },
-      },
-      create: { userId, productId },
-      update: {},
+    // PostgreSQL's unique constraint makes duplicate additions idempotent.
+    // skipDuplicates avoids a race where concurrent upserts can surface P2002.
+    await tx.wishlistItem.createMany({
+      data: [{ userId, productId }],
+      skipDuplicates: true,
     });
   });
 
