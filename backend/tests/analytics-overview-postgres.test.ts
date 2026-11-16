@@ -398,6 +398,7 @@ describe("PostgreSQL staff analytics overview", () => {
         unitsWithoutCost: 1,
       });
 
+      const inventoryBaseline = await getInventoryReport({ from, to });
       const inventoryId = randomUUID();
       await pool.query(
         `INSERT INTO inventory
@@ -436,19 +437,26 @@ describe("PostgreSQL staff analytics overview", () => {
         unitCost: 123.45,
         stockCostValue: 1234.5,
       });
-      expect(inventoryReport.summary).toMatchObject({
-        onHandUnits: expect.any(Number),
-        valuedUnits: expect.any(Number),
-        knownStockCostValue: expect.any(Number),
-      });
-      expect(inventoryReport.summary.onHandUnits).toBeGreaterThanOrEqual(10);
-      expect(inventoryReport.summary.knownStockCostValue).toBeGreaterThanOrEqual(1234.5);
-      expect(inventoryReport.movements).toEqual(
-        expect.arrayContaining([
-          { type: "RECEIVED", count: 1, quantity: 10 },
-          { type: "DAMAGED", count: 1, quantity: 2 },
-        ]),
+      expect(inventoryReport.summary.onHandUnits).toBe(inventoryBaseline.summary.onHandUnits + 10);
+      expect(inventoryReport.summary.valuedUnits).toBe(inventoryBaseline.summary.valuedUnits + 10);
+      expect(inventoryReport.summary.knownStockCostValue).toBe(
+        Number((inventoryBaseline.summary.knownStockCostValue + 1234.5).toFixed(2)),
       );
+
+      const baselineReceived = inventoryBaseline.movements.find((row) => row.type === "RECEIVED");
+      const baselineDamaged = inventoryBaseline.movements.find((row) => row.type === "DAMAGED");
+      const reportedReceived = inventoryReport.movements.find((row) => row.type === "RECEIVED");
+      const reportedDamaged = inventoryReport.movements.find((row) => row.type === "DAMAGED");
+      expect(reportedReceived).toEqual({
+        type: "RECEIVED",
+        count: (baselineReceived?.count ?? 0) + 1,
+        quantity: (baselineReceived?.quantity ?? 0) + 10,
+      });
+      expect(reportedDamaged).toEqual({
+        type: "DAMAGED",
+        count: (baselineDamaged?.count ?? 0) + 1,
+        quantity: (baselineDamaged?.quantity ?? 0) + 2,
+      });
 
       await pool.query("DELETE FROM inventory WHERE id = $1", [inventoryId]);
     } finally {
