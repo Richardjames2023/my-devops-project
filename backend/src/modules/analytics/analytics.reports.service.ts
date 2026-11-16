@@ -52,7 +52,7 @@ export async function getProductPerformanceReport(query: AnalyticsQuery) {
       quantity: true,
       totalPrice: true,
       unitCostSnapshot: true,
-      order: { select: { currency: true } },
+      order: { select: { id: true, currency: true, subtotal: true, discountAmount: true } },
       returnItems: {
         select: {
           refundItems: {
@@ -78,6 +78,26 @@ export async function getProductPerformanceReport(query: AnalyticsQuery) {
     unitsWithoutCost: number;
   };
   const grouped = new Map<string, Totals>();
+  const discountByItem = new Map<string, Cents>();
+  const itemsByOrder = new Map<string, typeof items>();
+  for (const item of items) {
+    const orderItems = itemsByOrder.get(item.order.id) ?? [];
+    orderItems.push(item);
+    itemsByOrder.set(item.order.id, orderItems);
+  }
+  for (const orderItems of itemsByOrder.values()) {
+    const discount = toCents(orderItems[0]!.order.discountAmount);
+    const lineTotals = orderItems.map((item) => toCents(item.totalPrice));
+    const denominator = lineTotals.reduce((sum, value) => sum + value, 0n);
+    let allocated = 0n;
+    orderItems.forEach((item, index) => {
+      const share = index === orderItems.length - 1
+        ? discount - allocated
+        : denominator === 0n ? 0n : (discount * lineTotals[index]!) / denominator;
+      discountByItem.set(item.id, share);
+      allocated += share;
+    });
+  }
 
   for (const item of items) {
     const key = `${item.productVariantId}:${item.order.currency}`;
@@ -99,7 +119,7 @@ export async function getProductPerformanceReport(query: AnalyticsQuery) {
     const netUnits = Math.max(0, item.quantity - refundedUnits);
     row.unitsSold += item.quantity;
     row.unitsRefunded += Math.min(item.quantity, refundedUnits);
-    row.revenue += toCents(item.totalPrice);
+    row.revenue += toCents(item.totalPrice) - (discountByItem.get(item.id) ?? 0n);
     row.refunds += refunded.reduce((sum, r) => sum + toCents(r.amount), 0n);
     if (item.unitCostSnapshot === null) row.unitsWithoutCost += netUnits;
     else row.cost += toCents(item.unitCostSnapshot) * BigInt(netUnits);
