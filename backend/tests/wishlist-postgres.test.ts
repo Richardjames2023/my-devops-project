@@ -11,13 +11,14 @@ if (parsedUrl.pathname !== "/shop_db_test") {
 process.env.DATABASE_URL = databaseUrl;
 
 const pool = new Pool({ connectionString: databaseUrl, max: 2 });
-const { addWishlistItem, getWishlist, removeWishlistItem, disconnectDatabase } =
+const { addWishlistItem, getWishlist, removeWishlistItem, moveWishlistItemToCart, disconnectDatabase } =
   await import("../src/modules/wishlist/wishlist.service").then(async (service) => {
     const database = await import("../src/infrastructure/prisma/client");
     return {
       addWishlistItem: service.addWishlistItem,
       getWishlist: service.getWishlist,
       removeWishlistItem: service.removeWishlistItem,
+      moveWishlistItemToCart: service.moveWishlistItemToCart,
       disconnectDatabase: database.disconnectDatabase,
     };
   });
@@ -129,6 +130,128 @@ describe("PostgreSQL customer wishlist", () => {
       await expect(addWishlistItem(fixture.userIds[0], fixture.productIds[1])).rejects.toMatchObject({ statusCode: 404 });
     } finally {
       await cleanupFixture(fixture);
+    }
+  });
+
+
+  it("handles concurrent duplicate additions without creating duplicate rows", async () => {
+    const fixture = await createFixture();
+    try {
+      await Promise.all(
+        Array.from({ length: 8 }, () =>
+          addWishlistItem(fixture.userIds[0], fixture.productIds[0]),
+        ),
+      );
+
+      const result = await getWishlist(fixture.userIds[0]);
+      expect(result.itemCount).toBe(1);
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("moves a selected variant into the cart and removes the wishlist entry atomically", async () => {
+    const fixture = await createFixture();
+    try {
+      await addWishlistItem(fixture.userIds[0], fixture.productIds[0]);
+
+      const cart = await moveWishlistItemToCart(
+        fixture.userIds[0],
+        fixture.productIds[0],
+        { productVariantId: fixture.variantIds[0], quantity: 2 },
+      );
+
+      expect(cart.items).toHaveLength(1);
+      expect(cart.items[0]).toMatchObject({
+        productVariantId: fixture.variantIds[0],
+        productId: fixture.productIds[0],
+        quantity: 2,
+        isAvailable: true,
+      });
+      expect((await getWishlist(fixture.userIds[0])).itemCount).toBe(0);
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("keeps the wishlist entry when the selected variant does not belong to the saved product", async () => {
+    const fixture = await createFixture();
+    try {
+      await addWishlistItem(fixture.userIds[0], fixture.productIds[0]);
+
+      await expect(
+        moveWishlistItemToCart(
+          fixture.userIds[0],
+          fixture.productIds[0],
+          { productVariantId: fixture.variantIds[1], quantity: 1 },
+        ),
+      ).rejects.toMatchObject({ statusCode: 400 });
+
+      expect((await getWishlist(fixture.userIds[0])).itemCount).toBe(1);
+      const cart = await pool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM cart_items ci
+         INNER JOIN carts c ON c.id = ci."cartId"
+         WHERE c."userId" = $1`,
+        [fixture.userIds[0]],
+      );
+      expect(cart.rows[0].count).toBe(0);
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("keeps the wishlist entry when cart stock validation rejects the requested quantity", async () => {
+    const fixture = await createFixture();
+    try {
+      await addWishlistItem(fixture.userIds[0], fixture.productIds[0]);
+
+      await expect(
+        moveWishlistItemToCart(
+          fixture.userIds[0],
+          fixture.productIds[0],
+          { productVariantId: fixture.variantIds[0], quantity: 8 },
+        ),
+      ).rejects.toMatchObject({ statusCode: 409 });
+
+      expect((await getWishlist(fixture.userIds[0])).itemCount).toBe(1);
+      const cart = await pool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM cart_items ci
+         INNER JOIN carts c ON c.id = ci."cartId"
+         WHERE c."userId" = $1`,
+        [fixture.userIds[0]],
+      );
+      expect(cart.rows[0].count).toBe(0);
+    } finally {
+      await cleanupFixture(fixture);
+    }
+  });
+
+  it("rejects a wishlist add that races with product deactivation", async () => {
+    const fixture = await createFixture();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `UPDATE products SET "isActive" = false WHERE id = $1`,
+        [fixture.productIds[0]],
+      );
+
+      const adding = expect(
+        addWishlistItem(fixture.userIds[0], fixture.productIds[0]),
+      ).rejects.toMatchObject({ statusCode: 404 });
+      await client.query("COMMIT");
+
+      await adding;
+      expect((await getWishlist(fixture.userIds[0])).itemCount).toBe(0);
+    } finally {
+      try {
+        await client.query("ROLLBACK");
+      } finally {
+        client.release();
+        await cleanupFixture(fixture);
+      }
     }
   });
 

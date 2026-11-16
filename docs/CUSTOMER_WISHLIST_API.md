@@ -73,6 +73,23 @@ Request:
 
 Only active products can be newly added. Repeated additions are idempotent and do not create duplicate entries. The response contains the updated wishlist.
 
+## Move a wishlist product into the cart
+
+`POST /api/v1/wishlist/:productId/move-to-cart`
+
+Request:
+
+```json
+{
+  "productVariantId": "variant-uuid",
+  "quantity": 1
+}
+```
+
+The selected variant must belong to the saved product. The operation uses the same active-product, active-variant, stock, and quantity checks as the regular customer cart. The cart update and wishlist removal happen in one database transaction: if validation or the cart update fails, the saved item remains in the wishlist and no partial cart change is committed.
+
+On success, the response contains the updated cart and the product is removed from the wishlist. Prices are calculated by the existing cart service; clients must not submit prices.
+
 ## Remove a product
 
 `DELETE /api/v1/wishlist/:productId`
@@ -81,13 +98,17 @@ Removes the product only from the authenticated customer's wishlist. Returns the
 
 ## Error behavior
 
-- `400`: malformed product UUID or request validation failure.
+- `400`: malformed product UUID, request validation failure, or a selected variant that does not belong to the saved product.
 - `401`: missing, invalid, or expired authentication.
 - `403`: identity is not an active, verified customer.
-- `404`: product is missing/inactive on add, or the item does not exist in the customer's wishlist on remove.
+- `404`: product is missing/inactive on add, the wishlist item does not exist, or the selected variant is missing/inactive.
+- `409`: selected quantity exceeds available stock.
+- `400`: the resulting cart quantity would exceed the cart's per-variant limit.
+- `429`: wishlist read or mutation rate limit exceeded.
 
 ## MVP boundaries
 
 - Wishlists are authenticated-customer-only; guest wishlists are not supported.
 - Wishlist entries are product-level, not variant-level. All variants and their current availability are included in the response.
-- Adding an item to the cart remains a separate cart operation and must continue to use existing cart validation.
+- Moving an item into the cart requires explicit variant and quantity selection and reuses existing cart validation.
+- Wishlist reads are limited to 60 requests per 15 minutes per authenticated customer; wishlist mutations are limited to 30 requests per 15 minutes per authenticated customer.

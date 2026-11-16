@@ -6,8 +6,9 @@ import {
   addWishlistItem,
   getWishlist,
   removeWishlistItem,
+  moveWishlistItemToCart,
 } from "./wishlist.service";
-import { addWishlistItemSchema } from "./wishlist.validation";
+import { addWishlistItemSchema, moveWishlistItemToCartSchema } from "./wishlist.validation";
 
 function getCustomerId(req: AuthenticatedRequest): string {
   if (!req.user) {
@@ -44,6 +45,37 @@ export async function add(
   res.status(200).json({
     message: "Product added to wishlist successfully",
     wishlist,
+  });
+}
+
+
+export async function moveToCart(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const productId = req.params.productId;
+  if (typeof productId !== "string" || !z.uuid().safeParse(productId).success) {
+    res.status(400).json({ message: "Invalid product ID" });
+    return;
+  }
+
+  const parsed = moveWishlistItemToCartSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: z.flattenError(parsed.error).fieldErrors,
+    });
+    return;
+  }
+
+  const cart = await moveWishlistItemToCart(
+    getCustomerId(req),
+    productId,
+    parsed.data,
+  );
+  res.status(200).json({
+    message: "Wishlist product moved to cart successfully",
+    cart,
   });
 }
 

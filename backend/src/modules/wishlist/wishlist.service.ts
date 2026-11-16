@@ -1,6 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { AppError } from "../../common/errors/AppError";
 import prisma from "../../infrastructure/prisma/client";
+import { addCartItemInTransaction, getCart } from "../cart/cart.service";
+import type { AddCartItemInput } from "../cart/cart.validation";
 
 const wishlistProductSelect = {
   id: true,
@@ -110,35 +112,71 @@ export async function addWishlistItem(
   userId: string,
   productId: string,
 ) {
-  const product = await prisma.product.findFirst({
-    where: {
-      id: productId,
-      isActive: true,
-    },
-    select: {
-      id: true,
-    },
-  });
+  await prisma.$transaction(async (tx) => {
+    // Hold a shared row lock until the wishlist insert commits. A concurrent
+    // product deactivation must wait, so an inactive product cannot slip in.
+    const activeProducts = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM products
+      WHERE id = ${productId}::uuid
+        AND "isActive" = true
+      FOR SHARE
+    `;
 
-  if (!product) {
-    throw new AppError("Product not found or inactive", 404);
-  }
+    if (activeProducts.length === 0) {
+      throw new AppError("Product not found or inactive", 404);
+    }
 
-  await prisma.wishlistItem.upsert({
-    where: {
-      userId_productId: {
-        userId,
-        productId,
-      },
-    },
-    create: {
-      userId,
-      productId,
-    },
-    update: {},
+    // PostgreSQL's unique constraint makes duplicate additions idempotent.
+    // skipDuplicates avoids a race where concurrent upserts can surface P2002.
+    await tx.wishlistItem.createMany({
+      data: [{ userId, productId }],
+      skipDuplicates: true,
+    });
   });
 
   return getWishlist(userId);
+}
+
+export async function moveWishlistItemToCart(
+  userId: string,
+  productId: string,
+  input: AddCartItemInput,
+) {
+  await prisma.$transaction(async (tx) => {
+    const wishlistItem = await tx.wishlistItem.findUnique({
+      where: {
+        userId_productId: { userId, productId },
+      },
+      select: { id: true },
+    });
+
+    if (!wishlistItem) {
+      throw new AppError("Wishlist item not found", 404);
+    }
+
+    const selectedVariant = await tx.productVariant.findFirst({
+      where: {
+        id: input.productVariantId,
+        productId,
+      },
+      select: { id: true },
+    });
+
+    if (!selectedVariant) {
+      throw new AppError(
+        "Selected variant does not belong to this wishlist product",
+        400,
+      );
+    }
+
+    // Reuse the cart's stock, active-state, and quantity validation. Both
+    // the cart update and wishlist removal commit or roll back together.
+    await addCartItemInTransaction(tx, userId, input);
+    await tx.wishlistItem.delete({ where: { id: wishlistItem.id } });
+  });
+
+  return getCart(userId);
 }
 
 export async function removeWishlistItem(
