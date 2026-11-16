@@ -272,7 +272,7 @@ export async function addCartItemInTransaction(
       },
     },
     create: {
-      cartId,
+      cartId: cart.id,
       productVariantId: variant.id,
       quantity: input.quantity,
     },
