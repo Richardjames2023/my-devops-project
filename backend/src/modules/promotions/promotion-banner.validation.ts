@@ -27,7 +27,7 @@ const bannerFieldsSchema = z.object({
   endAt: z.iso.datetime({ offset: true }),
   targetUrl: targetUrlSchema,
   altText: z.string().trim().max(255).nullable().optional(),
-  priority: z.number().int().min(-1000).max(1000).default(0),
+  priority: z.coerce.number().int().min(-1000).max(1000).default(0),
   status: z.enum(["DRAFT", "PUBLISHED", "PAUSED"]).default("DRAFT"),
 });
 
@@ -46,7 +46,7 @@ export const updateBannerSchema = z.object({
   endAt: z.iso.datetime({ offset: true }).optional(),
   targetUrl: targetUrlSchema,
   altText: z.string().trim().max(255).nullable().optional(),
-  priority: z.number().int().min(-1000).max(1000).optional(),
+  priority: z.coerce.number().int().min(-1000).max(1000).optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "PAUSED"]).optional(),
 }).refine(
   (value) => Object.keys(value).length > 0,
