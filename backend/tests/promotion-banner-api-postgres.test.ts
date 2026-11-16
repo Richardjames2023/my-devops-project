@@ -188,7 +188,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .field("status", "DRAFT");
 
     expect(response.status).toBe(400);
-    expect(response.body.message).toMatch(/image is required/i);
+    expect(response.body.message).toMatch(/banner image is required/i);
   });
 
   it("rejects unsupported upload MIME types at the HTTP boundary", async () => {
