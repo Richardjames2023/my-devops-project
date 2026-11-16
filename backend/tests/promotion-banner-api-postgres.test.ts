@@ -351,7 +351,17 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       priority: 40,
     });
 
+    const desktopPublicIdBeforeMobileUpdate = updated.body.banner.publicId as string;
+    const mobileOnlyUpdate = await request(app)
+      .patch(`${basePath}/${bannerId}`)
+      .set("Authorization", authorization)
+      .attach("mobileImage", Buffer.from(validPngImage), { filename: "mobile-only.png", contentType: "image/png" });
+    expect(mobileOnlyUpdate.status).toBe(200);
+    expect(mobileOnlyUpdate.body.banner.publicId).toBe(desktopPublicIdBeforeMobileUpdate);
+    expect(mobileOnlyUpdate.body.banner.mobilePublicId).not.toBe(created.body.banner.mobilePublicId);
+
     const originalPublicId = created.body.banner.publicId as string;
+    const previousMobilePublicId = mobileOnlyUpdate.body.banner.mobilePublicId as string;
     const imageReplaced = await request(app)
       .patch(`${basePath}/${bannerId}`)
       .set("Authorization", authorization)
@@ -363,7 +373,7 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     const replacedAssets = await pool.query(
       `SELECT "publicId", status FROM cloudinary_cleanup_tasks
        WHERE "publicId" = ANY($1::text[])`,
-      [ [originalPublicId, created.body.banner.mobilePublicId] ],
+      [ [originalPublicId, previousMobilePublicId] ],
     );
     expect(replacedAssets.rows).toHaveLength(2);
     expect(replacedAssets.rows.every((row) => row.status === "PENDING")).toBe(true);
@@ -378,11 +388,13 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       "PROMOTION_BANNER_CREATED",
       "PROMOTION_BANNER_UPDATED",
       "PROMOTION_BANNER_UPDATED",
+      "PROMOTION_BANNER_UPDATED",
     ]);
     expect(auditUpdated.rows[1].oldValues.title).toBe("API lifecycle banner");
     expect(auditUpdated.rows[1].newValues.title).toBe("Updated API lifecycle banner");
-    expect(auditUpdated.rows[2].newValues.imageReplaced).toBe(true);
     expect(auditUpdated.rows[2].newValues.mobileImageReplaced).toBe(true);
+    expect(auditUpdated.rows[3].newValues.imageReplaced).toBe(true);
+    expect(auditUpdated.rows[3].newValues.mobileImageReplaced).toBe(true);
 
     const removed = await request(app)
       .delete(`${basePath}/${bannerId}`)
@@ -420,6 +432,52 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       "PROMOTION_BANNER_UPDATED",
       "PROMOTION_BANNER_DELETED",
     ]);
+  });
+
+  it("serializes a concurrent banner replacement and deletion without orphaning uploaded assets", async () => {
+    const authorization = `Bearer ${authorizedToken}`;
+    const created = await request(app)
+      .post(basePath)
+      .set("Authorization", authorization)
+      .field("title", "Concurrent lifecycle banner")
+      .field("position", "BOTTOM")
+      .field("startAt", new Date(Date.now() + 60_000).toISOString())
+      .field("endAt", new Date(Date.now() + 3_600_000).toISOString())
+      .attach("image", Buffer.from(validPngImage), { filename: "concurrent.png", contentType: "image/png" });
+    expect(created.status).toBe(201);
+    const id = created.body.banner.id as string;
+    const originalPublicId = created.body.banner.publicId as string;
+    const firstNewUpload = cloudinaryMockState.uploadCounter + 1;
+    const secondNewUpload = cloudinaryMockState.uploadCounter + 2;
+    const [replacement, deletion] = await Promise.all([
+      request(app)
+        .patch(`${basePath}/${id}`)
+        .set("Authorization", authorization)
+        .attach("image", Buffer.from(validPngImage), { filename: "concurrent-replacement.png", contentType: "image/png" }),
+      request(app)
+        .delete(`${basePath}/${id}`)
+        .set("Authorization", authorization),
+    ]);
+
+    expect([200, 404]).toContain(replacement.status);
+    expect(deletion.status).toBe(200);
+    const current = await pool.query(`SELECT id FROM promotion_banners WHERE id = $1`, [id]);
+    expect(current.rows).toHaveLength(0);
+
+    const uploadedIds = [
+      originalPublicId,
+      `test/promotion-banner-${firstNewUpload}`,
+      `test/promotion-banner-${secondNewUpload}`,
+    ];
+    const queued = await pool.query(
+      `SELECT "publicId" FROM cloudinary_cleanup_tasks WHERE "publicId" = ANY($1::text[])`,
+      [uploadedIds],
+    );
+    const queuedIds = new Set(queued.rows.map((row) => row.publicId));
+    const destroyedIds = new Set(cloudinaryMockState.destroyedPublicIds);
+    for (const publicId of uploadedIds) {
+      expect(queuedIds.has(publicId) || destroyedIds.has(publicId)).toBe(true);
+    }
   });
 
   it("creates, replaces, and deletes a default banner with audit and cleanup records", async () => {
