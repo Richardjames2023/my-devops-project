@@ -208,6 +208,59 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     expect(response.body.message).toMatch(/only jpeg, png, webp, and avif/i);
   });
 
+  it("rejects image uploads whose file signature does not match an allowed image", async () => {
+    const response = await request(app)
+      .post(basePath)
+      .set("Authorization", `Bearer ${authorizedToken}`)
+      .field("title", "Invalid image signature")
+      .field("position", "HERO")
+      .field("startAt", new Date(Date.now() + 60_000).toISOString())
+      .field("endAt", new Date(Date.now() + 3_600_000).toISOString())
+      .attach("image", Buffer.from("this is not a PNG image"), {
+        filename: "banner.png",
+        contentType: "image/png",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/not a supported image/i);
+  });
+
+  it("rejects banner images larger than 8 MB", async () => {
+    const oversizedImage = Buffer.alloc(8 * 1024 * 1024 + 1, 1);
+    const response = await request(app)
+      .post(basePath)
+      .set("Authorization", `Bearer ${authorizedToken}`)
+      .field("title", "Oversized banner")
+      .field("position", "HERO")
+      .field("startAt", new Date(Date.now() + 60_000).toISOString())
+      .field("endAt", new Date(Date.now() + 3_600_000).toISOString())
+      .attach("image", oversizedImage, {
+        filename: "large.png",
+        contentType: "image/png",
+      });
+
+    expect(response.status).toBe(413);
+    expect(response.body.message).toMatch(/8 MB or smaller/i);
+  });
+
+  it("rejects malformed banner IDs before querying the database", async () => {
+    const response = await request(app)
+      .get(`${basePath}/not-a-uuid`)
+      .set("Authorization", `Bearer ${authorizedToken}`);
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/invalid banner ID/i);
+  });
+
+  it("returns not found for a valid but unknown banner ID", async () => {
+    const response = await request(app)
+      .get(`${basePath}/${randomUUID()}`)
+      .set("Authorization", `Bearer ${authorizedToken}`);
+
+    expect(response.status).toBe(404);
+    expect(response.body.message).toMatch(/promotion banner not found/i);
+  });
+
   it("rejects unauthenticated default-banner mutations", async () => {
     const response = await request(app)
       .put(`${basePath}/defaults/HERO`)
