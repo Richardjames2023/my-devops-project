@@ -2,7 +2,7 @@
 
 **Target branch:** `dev`  
 **Tracking branch:** `docs/reconcile-mvp-backend-checklist`  
-**Last reconciled against:** `dev` at `9955efceb0cd3c5bf0385007ae2764ac8b2a540c` (14 November 2026)  
+**Last reconciled against:** `dev` at `9f68ca8f866fe0098cce6f8aea04b9264317b443` (16 November 2026)  
 **Purpose:** Track backend MVP capabilities through implementation, review, database migration (where applicable), and automated tests.
 
 This checklist is an implementation tracker, not a claim that every item has already been fully audited. Mark an item complete only after its API/service behavior, authorization, persistence, failure handling, and relevant automated tests have been reviewed.
@@ -112,7 +112,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
   - [x] Guest token hashing, expiry, explicit revocation, and rate limiting are implemented.
   - [x] Guest token validity is enforced across guest order retrieval, delivery tracking, payment initialization/verification, returns, and warranty claims.
   - [x] PostgreSQL and HTTP coverage exists for guest access, token expiry/revocation, and guest return/warranty routes.
-- [ ] Add guest-specific return evidence upload and secure evidence viewing. Existing evidence upload/view controllers require authenticated users; guest-token authorization is not established by those controllers.
+- [~] Guest return evidence upload and secure viewing are implemented on `dev`: token-scoped upload, metadata, and file-stream routes verify order ownership, token expiry, and revocation; uploads are signature-validated and stored as authenticated Cloudinary assets. HTTP and PostgreSQL tests cover upload/view access, wrong-order tokens, expiry, and revocation. Additional stream-response size/header regression tests are being added and require local verification.
 - [~] Verify end-to-end stock restoration, refund state, audit trail, and customer notifications for every return/refund outcome; relevant reconciliation and business-event tests exist, but the complete cross-module outcome matrix still needs review.
 
 ## 9. Reviews and customer engagement
@@ -151,7 +151,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [ ] Repeat build, migration validation, and full test suite against `shop_db_test` before each subsequent merge; never point integration tests at `shop_db` or production.
 
 - [x] Promotion banner management: scheduled HERO/TOP/BOTTOM banners, optional per-position defaults, staff permission/audit logging, Cloudinary uploads, and public fallback response are merged in PR #36 and passed local Prisma validation, build, focused tests, and the full regression suite (80 files, 498 tests).
-- [~] Analytics reporting expansion: protected sales, product-performance, and inventory valuation/stock-movement report endpoints are implemented on `feat/analytics-reporting-expansion`; focused PostgreSQL report tests (3 tests), HTTP authorization/validation tests (5 tests), TypeScript build, and full regression suite (82 files, 505 tests) passed locally against `shop_db_test`. Pending PR review and merge into `dev`.
+- [x] Analytics reporting expansion: protected sales, product-performance, and inventory valuation/stock-movement report endpoints are merged into `dev` in PR #37. Pre-merge verification passed (82 test files, 505 tests); post-merge local verification passed TypeScript build and all 8 focused analytics tests across 3 files against `shop_db_test`.
 
 ## MVP scope decisions
 
@@ -161,7 +161,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 | Multiple payment providers | Exclude from MVP |
 | External courier integration | On hold pending logistics partner selection; retain manual delivery workflow |
 | Customer wishlist | Include; merged and tested on `dev` |
-| Guest returns/warranty claims | Include; token-scoped API merged; guest evidence upload/view remains outstanding |
+| Guest returns/warranty claims | Include; token-scoped API and guest evidence upload/view are implemented and covered by HTTP/PostgreSQL tests |
 | Automated courier rate quoting at checkout | Decision required |
 | Move wishlist item to cart | Decision required |
 
