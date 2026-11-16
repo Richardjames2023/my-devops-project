@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import { AppError } from "../../common/errors/AppError";
-import { createBannerSchema, listBannersQuerySchema, positionSchema, updateBannerSchema } from "./promotion-banner.validation";
+import { createBannerSchema, listBannersQuerySchema, positionSchema, targetUrlSchema, updateBannerSchema } from "./promotion-banner.validation";
 import { createBanner, deleteBanner, deleteDefaultBanner, getBanner, getPublicBanners, listBanners, setDefaultBanner, updateBanner } from "./promotion-banner.service";
 
 function actor(req: AuthenticatedRequest): string {
@@ -62,7 +62,7 @@ export async function remove(req: AuthenticatedRequest, res: Response): Promise<
 export async function putDefault(req: AuthenticatedRequest, res: Response): Promise<void> {
   const parsed = z.object({
     position: positionSchema,
-    targetUrl: z.string().trim().max(2048).nullable().optional(),
+   targetUrl: targetUrlSchema,
     altText: z.string().trim().max(255).nullable().optional(),
   }).safeParse({ ...req.body, position: req.params.position });
   if (!parsed.success) {
@@ -75,7 +75,7 @@ export async function putDefault(req: AuthenticatedRequest, res: Response): Prom
 export async function removeDefault(req: AuthenticatedRequest, res: Response): Promise<void> {
   const parsed = positionSchema.safeParse(req.params.position);
   if (!parsed.success) throw new AppError("Invalid banner position", 400);
-  res.status(200).json({ message: "Default promotion banner deleted successfully", ...await deleteDefaultBanner(parsed.data, actor(req)) });
+  res.status(200).json({ message: "Default promotion banner deleted successfully", ...await deleteDefaultBanner(parsed.data, actor(req), metadata(req)) });
 }
 export async function storefront(_req: Request, res: Response): Promise<void> {
   res.status(200).json({ message: "Promotion banners retrieved successfully", banners: await getPublicBanners() });

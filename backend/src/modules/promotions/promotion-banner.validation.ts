@@ -2,10 +2,23 @@ import { z } from "zod";
 
 export const positionSchema = z.enum(["HERO", "TOP", "BOTTOM"]);
 
-const targetUrlSchema = z.string().trim().max(2048).nullable().optional().refine(
-  (value) => value == null || value.startsWith("/") || /^https:\/\//i.test(value),
-  "Target URL must be a relative path or HTTPS URL",
-);
+export const targetUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .nullable()
+  .optional()
+  .refine(
+    (value) =>
+      value == null ||
+      (
+        value.startsWith("/") &&
+        !value.startsWith("//") &&
+        !value.includes("\\")
+      ) ||
+      /^https:\/\/[^/\s?#]+(?:[/?#][^\s]*)?$/i.test(value),
+    "Target URL must be a root-relative path or valid HTTPS URL",
+  );
 
 const bannerFieldsSchema = z.object({
   title: z.string().trim().min(2).max(120),

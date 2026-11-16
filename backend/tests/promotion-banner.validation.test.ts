@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createBannerSchema, updateBannerSchema } from "../src/modules/promotions/promotion-banner.validation";
+import {
+  createBannerSchema,
+  targetUrlSchema,
+  updateBannerSchema,
+} from "../src/modules/promotions/promotion-banner.validation";
 
 const valid = {
   title: "November campaign",
@@ -27,6 +31,18 @@ describe("promotion banner validation", () => {
 
   it("rejects non-HTTPS external destinations", () => {
     expect(createBannerSchema.safeParse({ ...valid, targetUrl: "http://example.com" }).success).toBe(false);
+  });
+
+    it("rejects protocol-relative external destinations", () => {
+    expect(targetUrlSchema.safeParse("//example.com").success).toBe(false);
+  });
+
+  it("rejects backslash-based URL destinations", () => {
+    expect(targetUrlSchema.safeParse("/\\example.com").success).toBe(false);
+  });
+
+  it("accepts valid HTTPS destinations", () => {
+    expect(targetUrlSchema.safeParse("https://example.com/sale").success).toBe(true);
   });
 
   it("allows relative storefront destinations", () => {
