@@ -63,8 +63,8 @@ async function startServer(): Promise<void> {
         }
 
         // Every server/job drain has settled before Prisma is disconnected.
-        clearTimeout(shutdownDeadline);
         await disconnectDatabase();
+        clearTimeout(shutdownDeadline);
         if (shutdownErrors.length > 0) {
           throw new Error("One or more server shutdown tasks failed");
         }
