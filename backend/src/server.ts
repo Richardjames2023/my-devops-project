@@ -27,10 +27,23 @@ async function startServer(): Promise<void> {
     });
 
     let shuttingDown = false;
+    const configuredShutdownTimeout = Number(process.env.SHUTDOWN_TIMEOUT_MS ?? 30_000);
+    const shutdownTimeoutMs = Number.isSafeInteger(configuredShutdownTimeout) && configuredShutdownTimeout > 0
+      ? configuredShutdownTimeout
+      : 30_000;
+
     const shutdown = async (): Promise<void> => {
       if (shuttingDown) return;
       shuttingDown = true;
       logger.info("Server shutdown requested");
+
+      const shutdownDeadline = setTimeout(() => {
+        logger.error("Graceful shutdown deadline exceeded; forcing process exit", undefined, {
+          timeoutMs: shutdownTimeoutMs,
+        });
+        server.closeAllConnections?.();
+        process.exit(1);
+      }, shutdownTimeoutMs);
 
       try {
         // Stop future job ticks immediately, while allowing in-flight HTTP requests
@@ -50,6 +63,7 @@ async function startServer(): Promise<void> {
         }
 
         // Every server/job drain has settled before Prisma is disconnected.
+        clearTimeout(shutdownDeadline);
         await disconnectDatabase();
         if (shutdownErrors.length > 0) {
           throw new Error("One or more server shutdown tasks failed");
@@ -57,6 +71,7 @@ async function startServer(): Promise<void> {
         logger.info("Server shutdown complete");
         process.exit(0);
       } catch (error) {
+        clearTimeout(shutdownDeadline);
         logger.error("Server shutdown failed", error);
         process.exit(1);
       }
