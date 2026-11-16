@@ -45,6 +45,7 @@ export async function getProductPerformanceReport(query: AnalyticsQuery) {
       },
     },
     select: {
+      id: true,
       productVariantId: true,
       productName: true,
       variantName: true,
