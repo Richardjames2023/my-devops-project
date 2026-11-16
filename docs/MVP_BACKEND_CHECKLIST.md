@@ -164,7 +164,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 | Customer wishlist | Include; merged and tested on `dev` |
 | Guest returns/warranty claims | Include; token-scoped API and guest evidence upload/view are implemented and covered by HTTP/PostgreSQL tests |
 | Automated courier rate quoting at checkout | Decision required |
-| Move wishlist item to cart | Decision required |
+| Move wishlist item to cart | Include; explicit variant/quantity selection, atomic cart addition and wishlist removal |
 
 ## Definition of done
 
