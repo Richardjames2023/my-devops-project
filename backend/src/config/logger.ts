@@ -96,7 +96,8 @@ function write(level: LogLevel, message: string, context: LogContext = {}): void
       level,
       service: "my-devops-project-api",
       environment: process.env.NODE_ENV ?? "development",
-      ...(requestId ? { requestId } : {}),
+      // Always overwrite caller-supplied request IDs. Undefined is omitted by JSON.stringify.
+      requestId: requestId ?? undefined,
       message,
     }) as Record<string, unknown>;
     safeWrite(output, JSON.stringify(entry));
