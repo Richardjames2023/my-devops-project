@@ -2,23 +2,25 @@ import { processNotificationOutboxBatch } from "../../modules/notifications/noti
 import { logger } from "../../config/logger";
 
 const INTERVAL_MS = 5 * 1000;
-let isRunning = false;
 
-async function runWorker(): Promise<void> {
-  if (isRunning) return;
-  isRunning = true;
-  try {
-    const result = await processNotificationOutboxBatch();
-    if (result.claimed) logger.info("Notification outbox batch completed", result);
-  } catch (error) {
-    logger.error("Notification outbox worker execution failed", error);
-  } finally {
-    isRunning = false;
-  }
-}
-
-export function startNotificationOutboxJob(): void {
+export function startNotificationOutboxJob() {
+  let activeRun: Promise<void> | undefined;
+  const run = () => {
+    if (activeRun) return activeRun;
+    activeRun = (async () => {
+      try {
+        const result = await processNotificationOutboxBatch();
+        if (result.claimed) logger.info("Notification outbox batch completed", result);
+      } catch (error) {
+        logger.error("Notification outbox worker execution failed", error);
+      } finally {
+        activeRun = undefined;
+      }
+    })();
+    return activeRun;
+  };
   logger.info("Notification outbox worker started");
-  void runWorker();
-  setInterval(() => { void runWorker(); }, INTERVAL_MS);
+  const timer = setInterval(() => { void run(); }, INTERVAL_MS);
+  void run();
+  return async () => { clearInterval(timer); await activeRun; };
 }
