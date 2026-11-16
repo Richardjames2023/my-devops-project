@@ -1,8 +1,32 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import request from "supertest";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { generateAccessToken } from "../src/common/utils/jwt";
+
+
+const cloudinaryMockState = vi.hoisted(() => ({ uploadCounter: 0 }));
+
+vi.mock("../src/config/cloudinary", () => ({
+  getCloudinary: () => ({
+    uploader: {
+      upload_stream: (
+        _options: unknown,
+        callback: (error: Error | null, result?: { public_id: string; secure_url: string }) => void,
+      ) => ({
+        end: (_buffer: Buffer) => {
+          cloudinaryMockState.uploadCounter += 1;
+          const id = `test/promotion-banner-${cloudinaryMockState.uploadCounter}`;
+          callback(null, {
+            public_id: id,
+            secure_url: `https://res.cloudinary.com/test/image/upload/${id}.png`,
+          });
+        },
+      }),
+      destroy: async () => ({ result: "ok" }),
+    },
+  }),
+}));
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) throw new Error("TEST_DATABASE_URL is required");
@@ -92,6 +116,9 @@ describe("Promotion banner HTTP API authorization and validation", () => {
   });
 
   afterAll(async () => {
+    await pool.query(`DELETE FROM promotion_banners WHERE "createdByStaffAccountId" = $1`, [authorizedStaffId]);
+    await pool.query(`DELETE FROM promotion_banner_defaults WHERE "updatedByStaffAccountId" = $1`, [authorizedStaffId]);
+    await pool.query(`DELETE FROM cloudinary_cleanup_tasks WHERE "publicId" LIKE 'test/promotion-banner-%'`);
     await pool.query(
       `DELETE FROM audit_logs WHERE "staffAccountId" = ANY($1::uuid[])`,
       [[authorizedStaffId, unauthorizedStaffId]],
@@ -259,6 +286,189 @@ describe("Promotion banner HTTP API authorization and validation", () => {
 
     expect(response.status).toBe(404);
     expect(response.body.message).toMatch(/promotion banner not found/i);
+  });
+
+
+  it("creates, retrieves, updates, and deletes a banner with transactional audit records", async () => {
+    const authorization = `Bearer ${authorizedToken}`;
+    const image = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const startAt = new Date(Date.now() + 60_000).toISOString();
+    const endAt = new Date(Date.now() + 3_600_000).toISOString();
+
+    const created = await request(app)
+      .post(basePath)
+      .set("Authorization", authorization)
+      .field("title", "API lifecycle banner")
+      .field("position", "HERO")
+      .field("startAt", startAt)
+      .field("endAt", endAt)
+      .field("priority", "25")
+      .field("status", "DRAFT")
+      .field("targetUrl", "/collections/lifecycle")
+      .attach("image", image, { filename: "banner.png", contentType: "image/png" });
+
+    expect(created.status).toBe(201);
+    expect(created.body.banner).toMatchObject({
+      title: "API lifecycle banner",
+      position: "HERO",
+      priority: 25,
+      status: "DRAFT",
+      targetUrl: "/collections/lifecycle",
+      publicId: expect.stringMatching(/^test\\/promotion-banner-/),
+    });
+    const bannerId = created.body.banner.id as string;
+
+    const auditCreated = await pool.query(
+      `SELECT action, "newValues", "ipAddress", "userAgent"
+       FROM audit_logs WHERE entity = 'PromotionBanner' AND "entityId" = $1
+         AND "staffAccountId" = $2`,
+      [bannerId, authorizedStaffId],
+    );
+    expect(auditCreated.rows).toHaveLength(1);
+    expect(auditCreated.rows[0].action).toBe("PROMOTION_BANNER_CREATED");
+    expect(auditCreated.rows[0].newValues.title).toBe("API lifecycle banner");
+
+    const retrieved = await request(app)
+      .get(`${basePath}/${bannerId}`)
+      .set("Authorization", authorization);
+    expect(retrieved.status).toBe(200);
+    expect(retrieved.body.banner.id).toBe(bannerId);
+
+    const updated = await request(app)
+      .patch(`${basePath}/${bannerId}`)
+      .set("Authorization", authorization)
+      .field("title", "Updated API lifecycle banner")
+      .field("priority", "40");
+    expect(updated.status).toBe(200);
+    expect(updated.body.banner).toMatchObject({
+      title: "Updated API lifecycle banner",
+      priority: 40,
+    });
+
+    const auditUpdated = await pool.query(
+      `SELECT action, "oldValues", "newValues"
+       FROM audit_logs WHERE entity = 'PromotionBanner' AND "entityId" = $1
+         AND "staffAccountId" = $2 ORDER BY "createdAt" ASC`,
+      [bannerId, authorizedStaffId],
+    );
+    expect(auditUpdated.rows.map((row) => row.action)).toEqual([
+      "PROMOTION_BANNER_CREATED",
+      "PROMOTION_BANNER_UPDATED",
+    ]);
+    expect(auditUpdated.rows[1].oldValues.title).toBe("API lifecycle banner");
+    expect(auditUpdated.rows[1].newValues.title).toBe("Updated API lifecycle banner");
+
+    const removed = await request(app)
+      .delete(`${basePath}/${bannerId}`)
+      .set("Authorization", authorization);
+    expect(removed.status).toBe(200);
+    expect(removed.body).toMatchObject({ id: bannerId, deleted: true, cloudinaryCleanupQueued: true });
+
+    const deletedBanner = await pool.query(
+      `SELECT id FROM promotion_banners WHERE id = $1`,
+      [bannerId],
+    );
+    expect(deletedBanner.rows).toHaveLength(0);
+
+    const cleanup = await pool.query(
+      `SELECT status FROM cloudinary_cleanup_tasks WHERE "publicId" = $1`,
+      [created.body.banner.publicId],
+    );
+    expect(cleanup.rows).toHaveLength(1);
+    expect(cleanup.rows[0].status).toBe("PENDING");
+
+    const auditDeleted = await pool.query(
+      `SELECT action FROM audit_logs WHERE entity = 'PromotionBanner' AND "entityId" = $1
+       AND "staffAccountId" = $2 ORDER BY "createdAt" ASC`,
+      [bannerId, authorizedStaffId],
+    );
+    expect(auditDeleted.rows.map((row) => row.action)).toEqual([
+      "PROMOTION_BANNER_CREATED",
+      "PROMOTION_BANNER_UPDATED",
+      "PROMOTION_BANNER_DELETED",
+    ]);
+  });
+
+  it("creates, replaces, and deletes a default banner with audit and cleanup records", async () => {
+    const authorization = `Bearer ${authorizedToken}`;
+    const image = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const first = await request(app)
+      .put(`${basePath}/defaults/TOP`)
+      .set("Authorization", authorization)
+      .field("targetUrl", "/collections/default-one")
+      .field("altText", "Default banner one")
+      .attach("image", image, { filename: "default-one.png", contentType: "image/png" });
+
+    expect(first.status).toBe(200);
+    expect(first.body.banner).toMatchObject({
+      position: "TOP",
+      targetUrl: "/collections/default-one",
+      altText: "Default banner one",
+    });
+    const firstPublicId = first.body.banner.publicId as string;
+    const defaultId = first.body.banner.id as string;
+
+    const replaced = await request(app)
+      .put(`${basePath}/defaults/TOP`)
+      .set("Authorization", authorization)
+      .field("targetUrl", "/collections/default-two")
+      .field("altText", "Default banner two")
+      .attach("image", image, { filename: "default-two.png", contentType: "image/png" });
+
+    expect(replaced.status).toBe(200);
+    expect(replaced.body.banner).toMatchObject({
+      id: defaultId,
+      targetUrl: "/collections/default-two",
+      altText: "Default banner two",
+    });
+    expect(replaced.body.banner.publicId).not.toBe(firstPublicId);
+
+    const defaultAudits = await pool.query(
+      `SELECT action, "oldValues", "newValues" FROM audit_logs
+       WHERE entity = 'PromotionBannerDefault' AND "entityId" = $1
+         AND "staffAccountId" = $2 ORDER BY "createdAt" ASC`,
+      [defaultId, authorizedStaffId],
+    );
+    expect(defaultAudits.rows.map((row) => row.action)).toEqual([
+      "PROMOTION_BANNER_DEFAULT_CREATED",
+      "PROMOTION_BANNER_DEFAULT_UPDATED",
+    ]);
+    expect(defaultAudits.rows[1].oldValues.targetUrl).toBe("/collections/default-one");
+    expect(defaultAudits.rows[1].newValues.targetUrl).toBe("/collections/default-two");
+
+    const removed = await request(app)
+      .delete(`${basePath}/defaults/TOP`)
+      .set("Authorization", authorization);
+    expect(removed.status).toBe(200);
+    expect(removed.body).toMatchObject({
+      position: "TOP",
+      deleted: true,
+      cloudinaryCleanupQueued: true,
+    });
+
+    const remainingDefault = await pool.query(
+      `SELECT id FROM promotion_banner_defaults WHERE position = 'TOP'`,
+    );
+    expect(remainingDefault.rows).toHaveLength(0);
+
+    const queuedAssets = await pool.query(
+      `SELECT "publicId", status FROM cloudinary_cleanup_tasks
+       WHERE "publicId" = ANY($1::text[]) ORDER BY "publicId"`,
+      [[firstPublicId, replaced.body.banner.publicId]],
+    );
+    expect(queuedAssets.rows).toHaveLength(2);
+    expect(queuedAssets.rows.every((row) => row.status === "PENDING")).toBe(true);
+
+    const defaultAuditActions = await pool.query(
+      `SELECT action FROM audit_logs WHERE entity = 'PromotionBannerDefault'
+       AND "entityId" = $1 AND "staffAccountId" = $2 ORDER BY "createdAt" ASC`,
+      [defaultId, authorizedStaffId],
+    );
+    expect(defaultAuditActions.rows.map((row) => row.action)).toEqual([
+      "PROMOTION_BANNER_DEFAULT_CREATED",
+      "PROMOTION_BANNER_DEFAULT_UPDATED",
+      "PROMOTION_BANNER_DEFAULT_DELETED",
+    ]);
   });
 
   it("rejects unauthenticated default-banner mutations", async () => {
