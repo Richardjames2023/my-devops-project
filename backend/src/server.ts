@@ -12,32 +12,49 @@ import { startCustomerAccountDeletionJob } from "./infrastructure/jobs/customer-
 async function startServer(): Promise<void> {
   try {
     await connectToDatabase();
-    startInventoryReservationExpirationJob();
-    startPaymentInitializationReconciliationJob();
-    startNotificationOutboxJob();
-    startNotificationEmailJob();
-    startCloudinaryCleanupJob();
-    startCustomerAccountDeletionJob();
+
+    const stopJobs = [
+      startInventoryReservationExpirationJob(),
+      startPaymentInitializationReconciliationJob(),
+      startNotificationOutboxJob(),
+      startNotificationEmailJob(),
+      startCloudinaryCleanupJob(),
+      startCustomerAccountDeletionJob(),
+    ];
 
     const server = app.listen(env.PORT, () => {
       logger.info("Server started", { port: env.PORT });
     });
 
+    let shuttingDown = false;
     const shutdown = async (): Promise<void> => {
+      if (shuttingDown) return;
+      shuttingDown = true;
       logger.info("Server shutdown requested");
-      server.close(async () => {
-        try {
-          await disconnectDatabase();
-          logger.info("Server shutdown complete");
-          process.exit(0);
-        } catch (error) {
-          logger.error("Database disconnect failed during shutdown", error);
-          process.exit(1);
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          server.close((error) => error ? reject(error) : resolve());
+        });
+
+        const results = await Promise.allSettled(stopJobs.map((stop) => stop()));
+        for (const result of results) {
+          if (result.status === "rejected") {
+            logger.error("Background job did not stop cleanly", result.reason);
+          }
         }
-      });
+
+        await disconnectDatabase();
+        logger.info("Server shutdown complete");
+        process.exit(0);
+      } catch (error) {
+        logger.error("Server shutdown failed", error);
+        process.exit(1);
+      }
     };
-    process.on("SIGINT", shutdown);
-    process.on("SIGTERM", shutdown);
+
+    process.once("SIGINT", () => { void shutdown(); });
+    process.once("SIGTERM", () => { void shutdown(); });
   } catch (error) {
     logger.error("Server startup failed", error);
     process.exit(1);
