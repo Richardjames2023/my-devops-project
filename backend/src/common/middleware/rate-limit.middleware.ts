@@ -87,3 +87,21 @@ export const guestPaymentVerificationLimiter = rateLimit({
   legacyHeaders: false,
   message: rateLimitMessage("Too many payment verification attempts. Please try again later."),
 });
+
+
+// Customer wishlist access
+export const wishlistReadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many wishlist requests. Please try again later."),
+});
+
+export const wishlistMutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many wishlist changes. Please try again later."),
+});
