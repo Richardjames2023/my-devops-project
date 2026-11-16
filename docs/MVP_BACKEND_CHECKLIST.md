@@ -145,7 +145,7 @@ This checklist is an implementation tracker, not a claim that every item has alr
 - [x] Prisma migrations and generated client workflow.
 - [~] Verify actual production secrets, webhook secrets, courier credentials, and coupon HMAC secret are configured securely in deployment environments. Repository code cannot prove deployment secret values.
 - [~] Complete a rate-limit and abuse-protection audit across authentication, guest order access, checkout, wishlist, reviews, and public endpoints.
-- [x] Wishlist reads and mutations have dedicated IP-based rate limits (60 reads and 30 mutations per 15 minutes); broader abuse-protection audit remains in progress.
+- [x] Wishlist reads and mutations have dedicated per-customer rate limits (60 reads and 30 mutations per 15 minutes); broader abuse-protection audit remains in progress.
 - [~] Structured JSON logging, development TTY color output, request correlation IDs, HTTP request timing/status logs, centralized error logging, and structured logs across inventory reservation, Paystack payment reconciliation/webhooks/recovery, notification outbox/email, Cloudinary cleanup/product-image operations, and customer account deletion workers are implemented on `feat/structured-logging-observability`; focused and full local verification are required before merge.
 - [ ] Verify backup/restore procedure and production migration/rollback runbook.
 - [x] Run full build and test suite against the dedicated test database before the latest merge: TypeScript build passed; full Vitest suite passed (69 files, 423 tests). Prisma migration status was up to date on `shop_db_test`.
