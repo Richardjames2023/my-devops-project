@@ -439,7 +439,8 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
 
       await pool.query(
         `UPDATE order_items
-        SET "warrantyExpiresAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute'
+        SET "warrantyStartedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '13 months',
+          "warrantyExpiresAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute'
         WHERE id = $1`,
         [orderItemId],
       );
@@ -454,8 +455,8 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
 
       await pool.query(
         `UPDATE order_items
-         SET "warrantyStartedAt" = NOW() - INTERVAL '13 months',
-             "warrantyExpiresAt" = NOW() - INTERVAL '1 minute'
+         SET "warrantyStartedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '13 months',
+          "warrantyExpiresAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute'
          WHERE id = $1`,
         [incompleteWarrantyItemId],
       );
