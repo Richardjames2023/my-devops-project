@@ -137,7 +137,7 @@ Customer deletion and retention behavior must be explicitly integrated with the 
 Public/customer endpoints:
 
 - `POST /api/v1/chat/conversations` — create a guest or authenticated conversation.
-- `GET /api/v1/chat/conversations/:conversationId/messages` — retrieve history after ownership/session-token verification.
+- `GET /api/v1/chat/conversations` — list the caller’s conversations.\n- `GET /api/v1/chat/conversations/:conversationId` — retrieve conversation details after ownership verification.\n- `GET /api/v1/chat/conversations/:conversationId/messages` — retrieve paginated history after ownership/session verification.
 - `POST /api/v1/chat/conversations/:conversationId/messages` — persist a customer message and route according to conversation state.
 - `POST /api/v1/chat/conversations/:conversationId/handoff` — request human support idempotently.
 
@@ -204,10 +204,12 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - Select an AI provider after quality, pricing and data-use evaluation.
 
 ### Phase 1 — Durable chat foundation
-- Add Prisma models and SQL migration.
-- Add public conversation/session creation, history and message persistence.
-- Add state-transition service and authorization tests.
-- No AI provider or WebSocket dependency required for this phase.
+- [x] Add Prisma models and SQL migration.
+- [x] Add customer/guest conversation creation, listing, ownership-protected details and paginated message history.
+- [x] Add idempotent customer message persistence and atomic customer handoff transition.
+- [x] Add PostgreSQL integration coverage for ownership, pagination, idempotency and concurrent handoff.
+- [ ] Add staff inbox, assignment and agent reply endpoints in the next implementation slice.
+- No AI provider or WebSocket dependency is required for this phase. AI responses currently report `NOT_CONFIGURED`.
 
 ### Phase 2 — AI responses and controlled knowledge
 - Add provider interface and one configured adapter.
