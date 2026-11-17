@@ -56,6 +56,7 @@ model User {
   wishlistItems                            WishlistItem[]
   notifications                           Notification[]
   notificationPreferences                 NotificationPreference[]
+  chatConversations                        ChatConversation[]
 
   @@index([email])
   @@index([phone])
@@ -147,6 +148,9 @@ model StaffAccount {
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("StaffPaymentInventoryReconciliationResolver")
   notifications                           Notification[]
   notificationPreferences                 NotificationPreference[]
+  assignedChatConversations                ChatConversation[] @relation("ChatConversationAssignedAgent")
+  chatMessages                             ChatMessage[]      @relation("ChatMessageAgent")
+  chatEvents                               ChatEvent[]        @relation("ChatEventActor")
 
   @@index([status])
   @@map("staff_accounts")
@@ -260,6 +264,7 @@ model GuestSession {
   updatedAt DateTime  @updatedAt
 
   cart Cart?
+  chatConversations ChatConversation[]
 
   @@index([expiresAt])
   @@map("guest_sessions")
@@ -1131,6 +1136,65 @@ model NotificationPreference {
   @@map("notification_preferences")
 }
 
+
+model ChatConversation {
+  id                    String             @id @default(uuid()) @db.Uuid
+  customerUserId        String?            @db.Uuid
+  guestSessionId        String?            @db.Uuid
+  status                ChatConversationStatus @default(BOT_ACTIVE)
+  assignedAgentId       String?            @db.Uuid
+  lastMessageAt         DateTime            @default(now())
+  closedAt              DateTime?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  customer              User?               @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
+  guestSession          GuestSession?       @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
+  assignedAgent         StaffAccount?       @relation("ChatConversationAssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  messages              ChatMessage[]
+  events                ChatEvent[]
+
+  @@index([status, lastMessageAt])
+  @@index([customerUserId, lastMessageAt])
+  @@index([guestSessionId, lastMessageAt])
+  @@index([assignedAgentId, status, lastMessageAt])
+  @@map("chat_conversations")
+}
+
+model ChatMessage {
+  id              String          @id @default(uuid()) @db.Uuid
+  conversationId  String          @db.Uuid
+  senderType      ChatSenderType
+  senderAgentId   String?         @db.Uuid
+  content         String          @db.Text
+  clientMessageId String?
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderAgent    StaffAccount?    @relation("ChatMessageAgent", fields: [senderAgentId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, senderType, clientMessageId])
+  @@index([conversationId, createdAt])
+  @@index([senderAgentId, createdAt])
+  @@map("chat_messages")
+}
+
+model ChatEvent {
+  id              String          @id @default(uuid()) @db.Uuid
+  conversationId  String          @db.Uuid
+  eventType       ChatEventType
+  previousStatus  ChatConversationStatus?
+  newStatus       ChatConversationStatus?
+  actorAgentId    String?         @db.Uuid
+  metadata        Json?
+  createdAt       DateTime        @default(now())
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  actorAgent     StaffAccount?    @relation("ChatEventActor", fields: [actorAgentId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([actorAgentId, createdAt])
+  @@map("chat_events")
+}
+
 enum PromotionBannerPosition {
   HERO
   TOP
@@ -1358,4 +1422,25 @@ enum CustomerAccountDeletionStatus {
   REQUESTED
   CANCELLED
   COMPLETED
+}
+
+enum ChatConversationStatus {
+  BOT_ACTIVE
+  WAITING_FOR_AGENT
+  HUMAN_ACTIVE
+  CLOSED
+}
+
+enum ChatSenderType {
+  CUSTOMER
+  BOT
+  AGENT
+  SYSTEM
+}
+
+enum ChatEventType {
+  HANDOFF_REQUESTED
+  AGENT_ASSIGNED
+  AGENT_ACCEPTED
+  CONVERSATION_CLOSED
 }
