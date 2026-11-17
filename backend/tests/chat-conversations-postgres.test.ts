@@ -8,6 +8,9 @@ if (new URL(databaseUrl).pathname !== "/shop_db_test") {
   throw new Error("Chat tests may only use shop_db_test");
 }
 process.env.DATABASE_URL = databaseUrl;
+process.env.JWT_ACCESS_SECRET ??= "chat-conversations-test-secret-at-least-32-characters";
+process.env.CORS_ORIGIN ??= "http://localhost:3000";
+process.env.EMAIL_DELIVERY_ENABLED = "false";
 process.env.NODE_ENV = "test";
 
 const pool = new Pool({ connectionString: databaseUrl, max: 3 });
@@ -122,6 +125,11 @@ describe("Chat conversation foundation (PostgreSQL)", () => {
       content: "It has not arrived yet.",
       clientMessageId: randomUUID(),
     });
+    await pool.query(
+      `UPDATE chat_messages SET "createdAt" = NOW() - INTERVAL '2 seconds'
+       WHERE "conversation_id" = $1 AND "sender_type" = 'SYSTEM'`,
+      [conversation.id],
+    );
 
     const firstPage = await listConversationMessages(owner, conversation.id, 2);
     expect(firstPage.items).toHaveLength(2);
