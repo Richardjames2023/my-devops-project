@@ -10,6 +10,8 @@ import { enqueueCloudinaryCleanup } from "../../infrastructure/cloudinary/cloudi
 const DELETION_GRACE_PERIOD_DAYS = 30;
 const DELETION_DEFERRAL_DAYS = 7;
 const DELETION_BATCH_SIZE = 25;
+// Keep unknown-email cancellation attempts on the same Argon2 work path as known accounts.
+const DUMMY_CANCELLATION_PASSWORD_HASH = hashPassword(randomBytes(32).toString("base64url"));
 
 export interface UpdateCustomerProfileInput {
   firstName?: string;
@@ -131,7 +133,9 @@ export async function cancelCustomerAccountDeletion(email: string, password: str
     where: { email: normalizedEmail },
     select: { id: true, passwordHash: true, isActive: true },
   });
-  if (!user || user.isActive || !(await verifyPassword(password, user.passwordHash))) {
+  const passwordHash = user?.passwordHash ?? await DUMMY_CANCELLATION_PASSWORD_HASH;
+  const passwordMatches = await verifyPassword(password, passwordHash);
+  if (!user || user.isActive || !passwordMatches) {
     throw new AppError("Unable to cancel this account deletion request", 400);
   }
 
@@ -209,8 +213,10 @@ async function getCustomerDeletionDeferral(
       where: {
         order: { userId },
         hasWarranty: true,
-        warrantyStartedAt: { not: null },
-        warrantyExpiresAt: null,
+        OR: [
+          { warrantyStartedAt: null },
+          { warrantyExpiresAt: null },
+        ],
       },
       select: { id: true },
     }),
@@ -401,6 +407,24 @@ export async function processCustomerAccountDeletionBatch() {
           await tx.customerAccountDeletion.update({ where: { id: candidate.id }, data: { status: "COMPLETED", completedAt: new Date(), failureCount: 0, lastError: null } });
           return "COMPLETED";
         }
+
+        // Serialize against operational workflows that lock the order or purchased
+        // order-item row before changing fulfillment, delivery or warranty state.
+        // Use the same parent-before-child order as delivery completion.
+        await tx.$queryRaw`
+          SELECT id FROM orders
+          WHERE "userId" = ${user.id}::uuid
+          ORDER BY id
+          FOR UPDATE
+        `;
+        await tx.$queryRaw`
+          SELECT oi.id
+          FROM order_items oi
+          INNER JOIN orders o ON o.id = oi."orderId"
+          WHERE o."userId" = ${user.id}::uuid
+          ORDER BY oi.id
+          FOR UPDATE OF oi
+        `;
 
         const deferral = await getCustomerDeletionDeferral(tx, user.id);
         if (deferral.required) {
