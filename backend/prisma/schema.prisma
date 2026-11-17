@@ -1138,20 +1138,20 @@ model NotificationPreference {
 
 
 model ChatConversation {
-  id                    String             @id @default(uuid()) @db.Uuid
-  customerUserId        String?            @db.Uuid
-  guestSessionId        String?            @db.Uuid
-  status                ChatConversationStatus @default(BOT_ACTIVE)
-  assignedAgentId       String?            @db.Uuid
-  lastMessageAt         DateTime            @default(now())
-  closedAt              DateTime?
-  createdAt             DateTime            @default(now())
-  updatedAt             DateTime            @updatedAt
-  customer              User?               @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
-  guestSession          GuestSession?       @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
-  assignedAgent         StaffAccount?       @relation("ChatConversationAssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
-  messages              ChatMessage[]
-  events                ChatEvent[]
+  id              String                 @id @default(uuid()) @db.Uuid
+  customerUserId  String?                @map("customer_user_id") @db.Uuid
+  guestSessionId  String?                @map("guest_session_id") @db.Uuid
+  status          ChatConversationStatus @default(BOT_ACTIVE)
+  assignedAgentId String?                @map("assigned_agent_id") @db.Uuid
+  lastMessageAt   DateTime               @default(now()) @map("last_message_at")
+  closedAt        DateTime?              @map("closed_at")
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+  customer        User?                  @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
+  guestSession    GuestSession?          @relation(fields: [guestSessionId], references: [id], onDelete: SetNull)
+  assignedAgent   StaffAccount?          @relation("ChatConversationAssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  messages        ChatMessage[]
+  events          ChatEvent[]
 
   @@index([status, lastMessageAt])
   @@index([customerUserId, lastMessageAt])
@@ -1161,16 +1161,16 @@ model ChatConversation {
 }
 
 model ChatMessage {
-  id              String          @id @default(uuid()) @db.Uuid
-  conversationId  String          @db.Uuid
-  senderType      ChatSenderType
-  senderAgentId   String?         @db.Uuid
-  content         String          @db.Text
-  clientMessageId String?
+  id              String           @id @default(uuid()) @db.Uuid
+  conversationId  String           @map("conversation_id") @db.Uuid
+  senderType      ChatSenderType    @map("sender_type")
+  senderAgentId   String?           @map("sender_agent_id") @db.Uuid
+  content         String            @db.Text
+  clientMessageId String?           @map("client_message_id")
   metadata        Json?
-  createdAt       DateTime        @default(now())
-  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderAgent    StaffAccount?    @relation("ChatMessageAgent", fields: [senderAgentId], references: [id], onDelete: SetNull)
+  createdAt       DateTime          @default(now()) @map("created_at")
+  conversation    ChatConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderAgent     StaffAccount?     @relation("ChatMessageAgent", fields: [senderAgentId], references: [id], onDelete: SetNull)
 
   @@unique([conversationId, senderType, clientMessageId])
   @@index([conversationId, createdAt])
@@ -1179,16 +1179,16 @@ model ChatMessage {
 }
 
 model ChatEvent {
-  id              String          @id @default(uuid()) @db.Uuid
-  conversationId  String          @db.Uuid
-  eventType       ChatEventType
-  previousStatus  ChatConversationStatus?
-  newStatus       ChatConversationStatus?
-  actorAgentId    String?         @db.Uuid
-  metadata        Json?
-  createdAt       DateTime        @default(now())
-  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  actorAgent     StaffAccount?    @relation("ChatEventActor", fields: [actorAgentId], references: [id], onDelete: SetNull)
+  id             String                 @id @default(uuid()) @db.Uuid
+  conversationId String                 @map("conversation_id") @db.Uuid
+  eventType      ChatEventType          @map("event_type")
+  previousStatus ChatConversationStatus? @map("previous_status")
+  newStatus      ChatConversationStatus? @map("new_status")
+  actorAgentId   String?                @map("actor_agent_id") @db.Uuid
+  metadata       Json?
+  createdAt      DateTime               @default(now()) @map("created_at")
+  conversation   ChatConversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  actorAgent     StaffAccount?          @relation("ChatEventActor", fields: [actorAgentId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, createdAt])
   @@index([actorAgentId, createdAt])
