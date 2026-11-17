@@ -25,6 +25,28 @@ export const loginLimiter = rateLimit({
   message: rateLimitMessage("Too many login attempts. Please try again later."),
 });
 
+export const accountDeletionCancellationIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many cancellation attempts. Please try again later."),
+});
+
+export const accountDeletionCancellationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  keyGenerator: (req: Request) => {
+    const email = typeof req.body?.email === "string"
+      ? req.body.email.trim().toLowerCase()
+      : "";
+    return `${ipKeyGenerator(req.ip ?? "")}:${email}`;
+  },
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many cancellation attempts. Please try again later."),
+});
+
 export const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
