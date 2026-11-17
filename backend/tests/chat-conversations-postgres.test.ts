@@ -126,7 +126,7 @@ describe("Chat conversation foundation (PostgreSQL)", () => {
       clientMessageId: randomUUID(),
     });
     await pool.query(
-      `UPDATE chat_messages SET "createdAt" = NOW() - INTERVAL '2 seconds'
+      `UPDATE chat_messages SET created_at = NOW() - INTERVAL '2 seconds'
        WHERE "conversation_id" = $1 AND "sender_type" = 'SYSTEM'`,
       [conversation.id],
     );
