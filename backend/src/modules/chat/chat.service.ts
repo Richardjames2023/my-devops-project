@@ -282,6 +282,7 @@ export async function requestHumanHandoff(
         conversationId,
         senderType: ChatSenderType.SYSTEM,
         content: "Your request has been sent to customer care. Please wait for an agent to join.",
+        createdAt: now,
       },
     });
 
