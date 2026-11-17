@@ -11,7 +11,6 @@ import type { ChatOwner } from "./chat.types";
 const conversationSelect = {
   id: true,
   status: true,
-  assignedAgentId: true,
   lastMessageAt: true,
   closedAt: true,
   createdAt: true,
@@ -281,7 +280,7 @@ export async function requestHumanHandoff(
       data: {
         conversationId,
         senderType: ChatSenderType.SYSTEM,
-        content: "Your request has been sent to customer care. Please wait for an agent to join.",
+        content: "Your request is in the customer-care queue. An agent will join as soon as one is available.",
         createdAt: now,
       },
     });
