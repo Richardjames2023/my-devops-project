@@ -1,6 +1,6 @@
 # AI Customer Chatbot and Human Handoff
 
-**Status:** Proposed implementation design  
+**Status:** Phase 1 implementation in progress  
 **Target repository:** `Richardjames2023/my-devops-project`  
 **Implementation branch:** `feat/ai-chatbot-human-handoff`  
 **Last updated:** 2026-11-17
@@ -107,7 +107,7 @@ Use separate records for conversations, messages and lifecycle events. Reuse exi
 
 - UUID primary key.
 - Optional `customerUserId` relation for authenticated customers.
-- Optional unique `guestSessionTokenHash` for guest access (store only a hash, never the raw bearer token).
+- Optional `guestSessionId` relation to the existing `GuestSession` record. Reuse the existing hashed-token, expiry and revocation lifecycle; never store the raw guest token in chat records.
 - Conversation status enum.
 - Optional `assignedAgentId` relation to `StaffAccount`.
 - `lastMessageAt`, `closedAt`, `createdAt`, `updatedAt`.
