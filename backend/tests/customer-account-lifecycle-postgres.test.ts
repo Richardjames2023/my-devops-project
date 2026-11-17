@@ -107,6 +107,25 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
     }
   });
 
+  it("uses the same cancellation failure response for unknown, active and invalid-password accounts", async () => {
+    const customer = await createCustomer("deletion-cancel-generic");
+    try {
+      await expect(cancelCustomerAccountDeletion(
+        `missing-${randomUUID()}@test.local`,
+        "Customer-Lifecycle-Password-2026!",
+      )).rejects.toMatchObject({ statusCode: 400, message: "Unable to cancel this account deletion request" });
+      await expect(cancelCustomerAccountDeletion(
+        customer.email,
+        "incorrect-password",
+      )).rejects.toMatchObject({ statusCode: 400, message: "Unable to cancel this account deletion request" });
+      await expect(cancelCustomerAccountDeletion(
+        customer.email,
+        "Customer-Lifecycle-Password-2026!",
+      )).rejects.toMatchObject({ statusCode: 400, message: "Unable to cancel this account deletion request" });
+    } finally {
+      await pool.query("DELETE FROM users WHERE id = $1", [customer.id]);
+    }
+  });
   it("defers deletion while an order remains operational, then anonymizes personal data and preserves the order", async () => {
     const customer = await createCustomer("deletion-retention");
     const returnRequestId = randomUUID();
@@ -359,6 +378,13 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
          VALUES ($1, $2, $3, 'Warranty Test Product', 'Standard', $4, 1, 100, 0, 100, TRUE, 12, NOW() - INTERVAL '30 days', NOW() + INTERVAL '30 days', NOW())`,
         [orderItemId, orderId, variantId, `SKU-${variantId}`],
       );
+      const incompleteWarrantyItemId = randomUUID();
+      await pool.query(
+        `INSERT INTO order_items
+          (id, "orderId", "productVariantId", "productName", "variantName", sku, quantity, "unitPrice", "discountAmount", "totalPrice", "hasWarranty", "warrantyDuration", "warrantyStartedAt", "warrantyExpiresAt", "createdAt")
+         VALUES ($1, $2, $3, 'Legacy Warranty Product', 'Standard', $4, 1, 100, 0, 100, TRUE, 12, NULL, NULL, NOW())`,
+        [incompleteWarrantyItemId, orderId, variantId, `SKU-${incompleteWarrantyItemId}`],
+      );
       await pool.query(
         `INSERT INTO warranty_claims
           (id, "orderItemId", quantity, "userId", status, "claimNumber", issue, description, "resolutionNotes", "submittedAt", "createdAt", "updatedAt")
@@ -416,6 +442,22 @@ describe("PostgreSQL customer profile and account deletion lifecycle", () => {
         SET "warrantyExpiresAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - INTERVAL '1 minute'
         WHERE id = $1`,
         [orderItemId],
+      );
+      await pool.query(
+        'UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1',
+        [customer.id],
+      );
+      // Expiring the known warranty must not bypass a legacy warranty row
+      // whose start and expiry metadata are both missing.
+      const incompleteWarrantyDeferred = await processCustomerAccountDeletionBatch();
+      expect(incompleteWarrantyDeferred.deferred).toBe(1);
+
+      await pool.query(
+        `UPDATE order_items
+         SET "warrantyStartedAt" = NOW() - INTERVAL '13 months',
+             "warrantyExpiresAt" = NOW() - INTERVAL '1 minute'
+         WHERE id = $1`,
+        [incompleteWarrantyItemId],
       );
       await pool.query(
         'UPDATE customer_account_deletions SET "scheduledFor" = (CURRENT_TIMESTAMP AT TIME ZONE \'UTC\') - INTERVAL \'1 minute\' WHERE "userId" = $1',
