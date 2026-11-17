@@ -21,7 +21,7 @@ Track the design decisions, implementation stages, verification and release read
 | Deletion confirmation | The customer must provide their current password. |
 | Immediate effect | Deactivate the account, increment the session version, revoke refresh tokens and consume outstanding verification/reset tokens. |
 | Cancellation | Allow restoration only within 30 days of the original request. A fresh login is required after restoration. |
-| Operational deferral | Defer processing while dependent orders, payments, refunds, reservations, deliveries, returns, warranty claims or payment-inventory reconciliations remain unresolved. Also defer until every purchased product's active warranty coverage has expired. Recheck at the earlier of the normal seven-day retry interval or the latest active warranty expiry. Deferral must not extend the original 30-day cancellation deadline. |
+| Operational deferral | Defer processing while dependent orders, payments, refunds, reservations, deliveries, returns, warranty claims or payment-inventory reconciliations remain unresolved. Also defer until every purchased product's active warranty coverage has expired. If a warranty-bearing item has missing start or expiry metadata, conservatively defer for manual/data repair rather than assume coverage has ended. Recheck at the earlier of the normal seven-day retry interval or the latest active warranty expiry. Deferral must not extend the original 30-day cancellation deadline. |
 | Historical records | Retain completed orders, payments, refunds, returns, warranties, reviews and necessary audit actions. |
 | Identity and PII | Replace customer identity with “Deleted Customer”; anonymize order contact details and shipping information. |
 | Personal data cleanup | Remove carts, wishlists, notification inbox/preferences/deliveries, direct customer verification/reset email deliveries and their provider payloads, refresh tokens and verification/reset tokens. Replace the retained user password hash with a hash of an undisclosed random secret. |
@@ -34,6 +34,9 @@ Track the design decisions, implementation stages, verification and release read
 - [x] `POST /api/v1/customer/account/deletion-request/cancel` — public, rate-limited restoration using account email and password.
 - [x] Invalidate active sessions and refresh tokens when deletion is requested.
 - [x] Protect profile, request, cancellation and processing operations against concurrent updates with PostgreSQL advisory locks.
+- [x] Give the public cancellation endpoint a dedicated IP-and-email rate limit; perform Argon2 verification for unknown email addresses using a dummy hash to reduce account-state timing differences.
+- [x] Serialize deletion against order and order-item operations by locking customer-owned parent and child rows before the final eligibility check.
+- [x] Conservatively defer deletion when a warranty-bearing order item has either warranty timestamp missing.
 - [x] Serialize relevant login/refresh-token operations against account lifecycle changes.
 - [x] Serialize email verification with account deletion using the same user advisory lock; re-read and validate the token after acquiring the lock.
 
@@ -51,7 +54,8 @@ Track the design decisions, implementation stages, verification and release read
 - [x] Add coverage for password confirmation, immediate deactivation and session invalidation.
 - [x] Add coverage for cancellation and the original 30-day deadline.
 - [x] Add coverage for operational deferral, anonymization and retained order history.
-- [x] Add coverage for active warranty and unresolved payment-inventory reconciliation deferrals.
+- [x] Add coverage for active warranty, incomplete warranty metadata and unresolved payment-inventory reconciliation deferrals.
+- [x] Add coverage for generic cancellation failures across unknown, active and incorrect-password cases.
 - [x] Add coverage for concurrent duplicate requests and idempotent worker processing.
 - [x] Add coverage for email verification racing with account deletion.
 - [x] Add coverage for direct verification/reset email cleanup while preserving staff mail to a shared address.
@@ -135,3 +139,13 @@ git diff --check origin/dev...HEAD
 - Customer-authored free text is redacted during anonymization; return evidence URLs and Cloudinary public IDs are also cleared, with asset deletion queued through the existing Cloudinary cleanup worker. Staff-authored warranty resolution and return inspection notes remain available. Focused tests cover return/evidence redaction, warranty/review text redaction and retention of staff warranty resolution notes.
 - CI workflow changes are intentionally out of scope for this follow-up and have not been changed.
 - Keep this work on the feature branch until all release gates pass. Do not merge to `dev` before review and verification.
+
+
+## Hardening follow-up (2026-11-17)
+
+- Added a dedicated cancellation limiter (5 attempts per 15 minutes per IP + normalized email), independent of login traffic.
+- Cancellation now performs an Argon2 verification even when the submitted email does not identify an account, using a process-local dummy hash. Public failures for unknown, active and incorrect-password accounts share the same response.
+- Deletion processing now locks the customer's orders and order items in deterministic parent-before-child order before checking dependencies and anonymizing. This coordinates with the existing delivery-completion order locks and warranty-claim order-item locks.
+- Warranty-bearing order items with either missing `warrantyStartedAt` or `warrantyExpiresAt` are treated as unresolved and defer deletion. The regression test covers the legacy case where both values are null.
+- No Prisma schema or migration change is required.
+- Local PostgreSQL tests, TypeScript build and full regression suite remain required before merge.
