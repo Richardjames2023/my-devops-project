@@ -151,10 +151,11 @@ export async function listConversationMessages(
   });
   const hasMore = rows.length > limit;
   const page = rows.slice(0, limit);
+  const nextCursor = hasMore ? page[page.length - 1]?.id ?? null : null;
 
   return {
     items: page.reverse(),
-    nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+    nextCursor,
   };
 }
 
