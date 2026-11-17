@@ -209,6 +209,7 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - [x] Add idempotent customer message persistence and atomic customer handoff transition.
 - [x] Add PostgreSQL integration coverage for ownership, pagination, idempotency and concurrent handoff.
 - [ ] Add staff inbox, assignment and agent reply endpoints in the next implementation slice.
+- [ ] Run Prisma validation, client generation, TypeScript build and PostgreSQL integration tests locally.
 - No AI provider or WebSocket dependency is required for this phase. AI responses currently report `NOT_CONFIGURED`.
 
 ### Phase 2 — AI responses and controlled knowledge
