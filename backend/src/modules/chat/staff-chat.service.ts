@@ -132,12 +132,12 @@ export async function getStaffChatConversation(conversationId: string) {
 
   const messages = await prisma.chatMessage.findMany({
     where: { conversationId },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: 200,
     select: transcriptMessageSelect,
   });
 
-  return { ...conversation, messages };
+  return { ...conversation, messages: messages.reverse() };
 }
 
 /**
