@@ -206,6 +206,75 @@ describe("Chat AI generation (PostgreSQL)", () => {
     expect(botMessages).toHaveLength(1);
   });
 
+  it("atomically hands off when AI recommends human support", async () => {
+    const owner = await createCustomerOwner();
+    const { conversation, message } = await createCustomerMessage(owner);
+    const handoffReply = {
+      reply: "A support agent will help you with this issue.",
+      handoff: {
+        recommended: true,
+        reason: "The issue requires a manual account review.",
+      },
+    };
+
+    mocks.generateReply.mockResolvedValueOnce(handoffReply);
+
+    const result = await generateChatAiReply({
+      owner,
+      conversationId: conversation.id,
+      customerMessageId: message.id,
+    });
+
+    expect(result.status).toBe("HANDOFF_RECOMMENDED");
+    expect(result.botMessage?.content).toBe(handoffReply.reply);
+
+    const updatedConversation = await prisma.chatConversation.findUniqueOrThrow({
+      where: { id: conversation.id },
+    });
+    expect(updatedConversation.status).toBe("WAITING_FOR_AGENT");
+
+    const events = await prisma.chatEvent.findMany({
+      where: {
+        conversationId: conversation.id,
+        eventType: "HANDOFF_REQUESTED",
+      },
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      previousStatus: "BOT_ACTIVE",
+      newStatus: "WAITING_FOR_AGENT",
+      metadata: {
+        source: "ai",
+        reason: handoffReply.handoff.reason,
+      },
+    });
+
+    const handoffMessages = await prisma.chatMessage.findMany({
+      where: {
+        conversationId: conversation.id,
+        senderType: "SYSTEM",
+        content: {
+          startsWith: "Your request has been referred to customer care.",
+        },
+      },
+    });
+    expect(handoffMessages).toHaveLength(1);
+
+    const botMessages = await prisma.chatMessage.findMany({
+      where: {
+        conversationId: conversation.id,
+        senderType: "BOT",
+        clientMessageId: message.id,
+      },
+    });
+    expect(botMessages).toHaveLength(1);
+
+    const generation = await prisma.chatAiGeneration.findUniqueOrThrow({
+      where: { customerMessageId: message.id },
+    });
+    expect(generation.status).toBe("COMPLETED");
+  });
+
   it("returns the existing bot reply for a duplicate completed request", async () => {
     const owner = await createCustomerOwner();
     const { conversation, message } = await createCustomerMessage(owner);
@@ -546,7 +615,7 @@ describe("Chat AI generation (PostgreSQL)", () => {
       customerMessageId: message.id,
     });
 
-    expect(result.status).toBe("NOT_CONFIGURED");
+    expect(result.status).toBe("SKIPPED");
     expect(mocks.generateReply).not.toHaveBeenCalled();
   });
 
