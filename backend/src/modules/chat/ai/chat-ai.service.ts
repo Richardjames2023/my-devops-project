@@ -464,6 +464,8 @@ async function persistGeneratedReply(input: {
       select: botMessageSelect,
     });
 
+    let lastMessageAt = botMessage.createdAt;
+
     if (input.handoffRecommended) {
       await tx.chatEvent.create({
         data: {
@@ -488,11 +490,12 @@ async function persistGeneratedReply(input: {
         select: { createdAt: true },
       });
 
+      lastMessageAt = handoffMessage.createdAt;
+
       await tx.chatConversation.update({
         where: { id: input.conversationId },
         data: {
           status: ChatConversationStatus.WAITING_FOR_AGENT,
-          lastMessageAt: handoffMessage.createdAt,
         },
       });
     }
@@ -518,7 +521,7 @@ async function persistGeneratedReply(input: {
     await tx.chatConversation.update({
       where: { id: input.conversationId },
       data: {
-        lastMessageAt: botMessage.createdAt,
+        lastMessageAt,
       },
     });
 
