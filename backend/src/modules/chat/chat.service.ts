@@ -158,6 +158,25 @@ export async function listConversationMessages(
   };
 }
 
+/**
+ * Keep conversation activity ordered by the newest persisted message.
+ *
+ * Concurrent message transactions can reach this update in a different order
+ * from their message timestamps, so the database must never move the activity
+ * timestamp backwards.
+ */
+export async function updateConversationLastMessageAt(
+  tx: Prisma.TransactionClient,
+  conversationId: string,
+  messageCreatedAt: Date,
+): Promise<void> {
+  await tx.$executeRaw`
+    UPDATE "chat_conversations"
+    SET "last_message_at" = GREATEST("last_message_at", ${messageCreatedAt})
+    WHERE "id" = ${conversationId}::uuid
+  `;
+}
+
 export async function sendCustomerMessage(
   owner: ChatOwner,
   conversationId: string,
@@ -201,10 +220,11 @@ export async function sendCustomerMessage(
         },
         select: messageSelect,
       });
-      await tx.chatConversation.update({
-        where: { id: conversationId },
-        data: { lastMessageAt: message.createdAt },
-      });
+      await updateConversationLastMessageAt(
+        tx,
+        conversationId,
+        message.createdAt,
+      );
       return message;
     });
   } catch (error) {
