@@ -46,7 +46,11 @@ export async function listStaffChatConversationsController(
     return;
   }
 
-  const result = await listStaffChatConversations(parsed.data);
+  const result = await listStaffChatConversations({
+    status: parsed.data.status,
+    limit: parsed.data.limit,
+    ...(parsed.data.cursor ? { cursor: parsed.data.cursor } : {}),
+  });
   res.status(200).json({
     message: "Staff chat inbox retrieved",
     data: result,
