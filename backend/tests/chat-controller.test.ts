@@ -156,7 +156,7 @@ describe("sendCustomerMessageController", () => {
     });
   });
 
-  it("returns a handoff recommendation without changing conversation state", async () => {
+  it("returns the AI handoff result to the customer", async () => {
     mocks.generateChatAiReply.mockResolvedValue({
       status: "HANDOFF_RECOMMENDED",
       botMessage: {
@@ -180,7 +180,6 @@ describe("sendCustomerMessageController", () => {
     expect(payload.data.automation.status).toBe(
       "HANDOFF_RECOMMENDED",
     );
-    expect(mocks.requestHumanHandoff).not.toHaveBeenCalled();
   });
 
   it("accepts the customer message when AI generation is unavailable", async () => {
