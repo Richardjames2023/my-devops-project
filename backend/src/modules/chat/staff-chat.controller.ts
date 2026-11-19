@@ -1,5 +1,4 @@
 import type { Response } from "express";
-import { ChatConversationStatus } from "@prisma/client";
 import { z } from "zod";
 import { AppError } from "../../common/errors/AppError";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
@@ -10,8 +9,8 @@ import {
 } from "./staff-chat.service";
 
 const inboxQuerySchema = z.object({
-  status: z.nativeEnum(ChatConversationStatus).default(
-    ChatConversationStatus.WAITING_FOR_AGENT,
+  status: z.enum(["WAITING_FOR_AGENT", "HUMAN_ACTIVE", "CLOSED"]).default(
+    "WAITING_FOR_AGENT",
   ),
   limit: z.coerce.number().int().min(1).max(50).default(20),
   cursor: z.uuid().optional(),
