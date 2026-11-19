@@ -97,8 +97,18 @@ export async function getStaffChatConversation(conversationId: string) {
   const conversation = await prisma.chatConversation.findUnique({
     where: { id: conversationId },
     select: {
-      ...inboxConversationSelect,
-      messages: undefined,
+      id: true,
+      status: true,
+      customerUserId: true,
+      guestSessionId: true,
+      assignedAgentId: true,
+      lastMessageAt: true,
+      closedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      assignedAgent: {
+        select: { id: true, firstName: true, lastName: true },
+      },
       events: {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         select: {
