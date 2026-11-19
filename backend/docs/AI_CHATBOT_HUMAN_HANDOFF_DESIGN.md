@@ -1,9 +1,9 @@
 # AI Customer Chatbot and Human Handoff
 
-**Status:** Phase 1 implementation in progress  
+**Status:** Chat foundation and AI-response backend implemented; staff workflow and real-time delivery remain planned  
 **Target repository:** `Richardjames2023/my-devops-project`  
 **Implementation branch:** `feat/ai-chatbot-human-handoff`  
-**Last updated:** 2026-11-17
+**Last updated:** 2026-11-20
 
 ## 1. Purpose
 
@@ -67,7 +67,7 @@ Use explicit backend-owned states:
 
 Allowed transitions:
 
-- `BOT_ACTIVE -> WAITING_FOR_AGENT`: explicit customer request, validated AI escalation recommendation, or policy rule.
+- `BOT_ACTIVE -> WAITING_FOR_AGENT`: explicit customer request, a validated AI escalation recommendation, or an enforced backend policy rule. The backend—not the model—performs the transition.
 - `WAITING_FOR_AGENT -> HUMAN_ACTIVE`: authorized agent claims/accepts the conversation.
 - `HUMAN_ACTIVE -> CLOSED`: authorized agent resolves the conversation.
 - `HUMAN_ACTIVE -> WAITING_FOR_AGENT`: optional future reassignment/requeue flow; only if explicitly implemented.
@@ -137,7 +137,9 @@ Customer deletion and retention behavior must be explicitly integrated with the 
 Public/customer endpoints:
 
 - `POST /api/v1/chat/conversations` — create a guest or authenticated conversation.
-- `GET /api/v1/chat/conversations` — list the caller’s conversations.\n- `GET /api/v1/chat/conversations/:conversationId` — retrieve conversation details after ownership verification.\n- `GET /api/v1/chat/conversations/:conversationId/messages` — retrieve paginated history after ownership/session verification.
+- `GET /api/v1/chat/conversations` — list the caller’s conversations.
+- `GET /api/v1/chat/conversations/:conversationId` — retrieve conversation details after ownership verification.
+- `GET /api/v1/chat/conversations/:conversationId/messages` — retrieve paginated history after ownership/session verification.
 - `POST /api/v1/chat/conversations/:conversationId/messages` — persist a customer message and route according to conversation state.
 - `POST /api/v1/chat/conversations/:conversationId/handoff` — request human support idempotently.
 
@@ -174,7 +176,7 @@ Every socket join and send must verify conversation access. Do not trust room na
 3. Persist the customer message with an idempotency key to prevent duplicate submissions.
 4. If `BOT_ACTIVE`, call the configured AI adapter with bounded, approved context.
 5. Validate the AI response against a strict schema. The AI may recommend handoff and provide a reason, but cannot mutate state or execute arbitrary actions.
-6. If handoff is required, atomically transition to `WAITING_FOR_AGENT`, persist a system message/event and enqueue an agent notification.
+6. If handoff is recommended, the backend transaction that persists the bot reply also transitions the conversation to `WAITING_FOR_AGENT` and persists one `HANDOFF_REQUESTED` event plus a system message. An explicit customer handoff uses the same target state and remains idempotent. Durable agent notification delivery is not implemented in this slice.
 7. If `WAITING_FOR_AGENT` or `HUMAN_ACTIVE`, do not invoke AI.
 8. For human replies, verify agent permissions and assignment/claim rules, persist the reply, then emit it to the authorized conversation room.
 9. On closure, persist the state/event and stop further replies.
@@ -209,16 +211,18 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - [x] Add idempotent customer message persistence and atomic customer handoff transition.
 - [x] Add PostgreSQL integration coverage for ownership, pagination, idempotency and concurrent handoff.
 - [ ] Add staff inbox, assignment and agent reply endpoints in the next implementation slice.
-- [ ] Run Prisma validation, client generation, TypeScript build and PostgreSQL integration tests locally.
-- No AI provider or WebSocket dependency is required for this phase. AI responses currently report `NOT_CONFIGURED`.
+- [x] Run Prisma validation, client generation, TypeScript build and PostgreSQL integration tests locally.
+- Staff inbox, assignment and agent-reply endpoints are not part of this phase and remain outstanding.
 
 ### Phase 2 — AI responses and controlled knowledge
-- Add provider interface and one configured adapter.
-- Add FAQ/policy context retrieval.
-- Add validated handoff recommendation and usage/cost telemetry.
-- Add timeouts, provider failure behavior and AI-disabled behavior.
+- [x] Add provider interface and the Gemini adapter.
+- [x] Load the customer-support knowledge base and require explicit approval before sending it to the provider.
+- [x] Validate structured replies and handoff recommendations.
+- [x] Add bounded history, request timeout, output-token limit, disabled mode and provider-failure handling.
+- [x] Add PostgreSQL-backed generation leases, bounded retries, idempotent persistence and stale-worker protection.
+- [ ] Add usage and cost telemetry.
 
-### Phase 3 — Human handoff and real-time transport
+### Phase 3 — Staff operations and real-time transport
 - Attach Socket.IO to the existing HTTP server and graceful shutdown.
 - Add staff inbox, claim/assignment, agent replies and closure APIs.
 - Add durable handoff notifications through the existing outbox.
@@ -237,7 +241,7 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - Customer messages are persisted before they are broadcast or sent to AI.
 - Duplicate submissions do not create duplicate messages.
 - AI is called only in `BOT_ACTIVE`.
-- Explicit handoff reliably moves a conversation to `WAITING_FOR_AGENT`.
+- Explicit customer handoff and validated AI handoff recommendations reliably move a conversation to `WAITING_FOR_AGENT` with one event and system message.
 - A permitted agent can claim a waiting conversation; concurrent claims cannot both succeed.
 - In `HUMAN_ACTIVE`, customer messages reach the assigned agent and never trigger AI.
 - Unauthorized staff cannot view, assign or reply to conversations.
@@ -256,4 +260,4 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 
 ## 14. Initial implementation boundary
 
-Start with Phase 1 on this feature branch. Keep the first database/API change independent of AI vendor and Socket.IO. This creates a tested, durable conversation foundation before adding external-provider costs and real-time complexity.
+The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints, durable handoff notifications, Socket.IO delivery, frontend integration, and usage/cost telemetry remain separate follow-up work.
