@@ -44,6 +44,7 @@ import couponRoutes from "./modules/coupons/coupon.routes";
 import customerProfileRoutes from "./modules/customer-profile/customer-profile.routes";
 import analyticsRoutes from "./modules/analytics/analytics.routes";
 import promotionBannerRoutes from "./modules/promotions/promotion-banner.routes";
+import chatRoutes from "./modules/chat/chat.routes";
 
 const app = express();
 const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
@@ -121,6 +122,7 @@ app.use("/api/v1/refunds", refundRoutes);
 app.use("/api/v1/guest-session", guestSessionRoutes);
 app.use("/api/v1/inventory-reconciliation", inventoryReconciliationRoutes);
 app.use("/api/v1/guest-cart", guestCartRoutes);
+app.use("/api/v1/chat", chatRoutes);
 
 app.use(errorHandler);
 

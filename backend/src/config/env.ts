@@ -27,6 +27,48 @@ const envSchema = z.object({
     z.string().min(1, "PAYSTACK_SECRET_KEY cannot be empty").optional(),
   ),
 
+  CHAT_AI_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+
+  CHAT_AI_KNOWLEDGE_BASE_APPROVED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
+
+  CHAT_AI_PROVIDER: z
+    .enum(["gemini"])
+    .default("gemini"),
+
+  GEMINI_API_KEY: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1, "GEMINI_API_KEY cannot be empty").optional(),
+  ),
+
+  GEMINI_MODEL: z.string().min(1).default("gemini-3.8-flash"),
+
+  CHAT_AI_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(1_000)
+    .max(60_000)
+    .default(15_000),
+
+  CHAT_AI_MAX_HISTORY_MESSAGES: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(30)
+    .default(12),
+
+  CHAT_AI_MAX_OUTPUT_TOKENS: z.coerce
+    .number()
+    .int()
+    .min(64)
+    .max(2_048)
+    .default(512),
+
   CLOUDINARY_CLOUD_NAME: z.string().min(1).optional(),
   CLOUDINARY_API_KEY: z.string().min(1).optional(),
   CLOUDINARY_API_SECRET: z.string().min(1).optional(),
@@ -188,6 +230,13 @@ const envSchema = z.object({
       code: "custom",
       path: ["APP_BASE_URL"],
       message: "APP_BASE_URL must use HTTPS when email delivery is enabled in production",
+    });
+  }
+  if(value.CHAT_AI_ENABLED && !value.GEMINI_API_KEY) {
+    context.addIssue({
+      code: "custom",
+      path: ["GEMINI_API_KEY"],
+      message: "GEMINI_API_KEY is required when CHAT_AI_ENABLED is true",
     });
   }
 });

@@ -135,3 +135,52 @@ export const wishlistMutationLimiter = rateLimit({
   legacyHeaders: false,
   message: rateLimitMessage("Too many wishlist changes. Please try again later."),
 });
+
+
+type ChatRateLimitRequest = Request & {
+  chatOwner?: { type: "CUSTOMER" | "GUEST"; id: string };
+};
+
+function chatRateLimitKey(req: Request): string {
+  const owner = (req as ChatRateLimitRequest).chatOwner;
+  return owner
+    ? `chat:${owner.type}:${owner.id}`
+    : ipKeyGenerator(req.ip ?? "");
+}
+
+// Chat endpoints are mounted after chat identity resolution.
+export const chatConversationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  keyGenerator: chatRateLimitKey,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many chat conversations created. Please try again later."),
+});
+
+export const chatReadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 90,
+  keyGenerator: chatRateLimitKey,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many chat history requests. Please try again later."),
+});
+
+export const chatMessageLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  keyGenerator: chatRateLimitKey,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many chat messages. Please try again later."),
+});
+
+export const chatHandoffLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  keyGenerator: chatRateLimitKey,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: rateLimitMessage("Too many human support requests. Please try again later."),
+});
