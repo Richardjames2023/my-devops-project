@@ -32,8 +32,9 @@ const [
     listConversations,
     requestHumanHandoff,
     sendCustomerMessage,
+    updateConversationLastMessageAt,
   },
-  { disconnectDatabase },
+  { default: prisma, disconnectDatabase },
 ] = await Promise.all([
   import("../src/modules/chat/chat.service"),
   import("../src/infrastructure/prisma/client"),
@@ -229,6 +230,88 @@ describe("Chat conversation foundation (PostgreSQL)", () => {
     );
 
     expect(count.rows[0].count).toBe(2);
+  });
+
+  it("never moves conversation activity backwards when an older message updates last", async () => {
+    const owner = await createCustomerOwner();
+    const conversation = await createConversation(owner);
+    conversationIds.push(conversation.id);
+
+    const now = Date.now();
+    const olderMessageAt = new Date(now - 2_000);
+    const newerMessageAt = new Date(now - 1_000);
+
+    await prisma.chatConversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: new Date(now - 10_000) },
+    });
+
+    let releaseOlderUpdate!: () => void;
+    let signalOlderInsert!: () => void;
+    const olderMayUpdate = new Promise<void>((resolve) => {
+      releaseOlderUpdate = resolve;
+    });
+    const olderInserted = new Promise<void>((resolve) => {
+      signalOlderInsert = resolve;
+    });
+
+    // Deliberately hold the older transaction after inserting its message.
+    const olderTransaction = prisma.$transaction(async (tx) => {
+      await tx.chatMessage.create({
+        data: {
+          conversationId: conversation.id,
+          senderType: "CUSTOMER",
+          content: "Older message",
+          clientMessageId: randomUUID(),
+          createdAt: olderMessageAt,
+        },
+      });
+      signalOlderInsert();
+      await olderMayUpdate;
+      await updateConversationLastMessageAt(
+        tx,
+        conversation.id,
+        olderMessageAt,
+      );
+    });
+
+    await olderInserted;
+
+    let newerTransactionError: unknown;
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.chatMessage.create({
+          data: {
+            conversationId: conversation.id,
+            senderType: "CUSTOMER",
+            content: "Newer message",
+            clientMessageId: randomUUID(),
+            createdAt: newerMessageAt,
+          },
+        });
+        await updateConversationLastMessageAt(
+          tx,
+          conversation.id,
+          newerMessageAt,
+        );
+      });
+    } catch (error) {
+      newerTransactionError = error;
+    } finally {
+      releaseOlderUpdate();
+    }
+
+    await olderTransaction;
+    if (newerTransactionError) {
+      throw newerTransactionError;
+    }
+
+    const updated = await prisma.chatConversation.findUniqueOrThrow({
+      where: { id: conversation.id },
+      select: { lastMessageAt: true },
+    });
+
+    expect(updated.lastMessageAt).toEqual(newerMessageAt);
   });
 
   it("transitions a bot conversation to handoff once under concurrent requests", async () => {
