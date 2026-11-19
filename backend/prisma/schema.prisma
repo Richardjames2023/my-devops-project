@@ -48,15 +48,15 @@ model User {
   warrantyClaims                          WarrantyClaim[]
   refreshTokens                           RefreshToken[]
   emailVerificationTokens                 CustomerEmailVerificationToken[]
-  passwordResetTokens                      CustomerPasswordResetToken[]
+  passwordResetTokens                     CustomerPasswordResetToken[]
   accountDeletion                         CustomerAccountDeletion?
   returnItemInspections                   ReturnItemInspection[]           @relation("ReturnItemInspections")
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("PaymentInventoryReconciliationResolver")
   productReviews                          ProductReview[]
-  wishlistItems                            WishlistItem[]
+  wishlistItems                           WishlistItem[]
   notifications                           Notification[]
   notificationPreferences                 NotificationPreference[]
-  chatConversations                        ChatConversation[]
+  chatConversations                       ChatConversation[]
 
   @@index([email])
   @@index([phone])
@@ -107,20 +107,20 @@ model CustomerPasswordResetToken {
 }
 
 model CustomerAccountDeletion {
-  id            String                         @id @default(uuid()) @db.Uuid
-  userId        String                         @unique @db.Uuid
-  status        CustomerAccountDeletionStatus  @default(REQUESTED)
-  requestedAt   DateTime                       @default(now())
-  scheduledFor  DateTime
-  cancelledAt   DateTime?
-  completedAt   DateTime?
+  id             String                        @id @default(uuid()) @db.Uuid
+  userId         String                        @unique @db.Uuid
+  status         CustomerAccountDeletionStatus @default(REQUESTED)
+  requestedAt    DateTime                      @default(now())
+  scheduledFor   DateTime
+  cancelledAt    DateTime?
+  completedAt    DateTime?
   lastDeferredAt DateTime?
-  deferralCount Int                            @default(0)
-  failureCount  Int                            @default(0)
-  lastError     String?
-  createdAt     DateTime                       @default(now())
-  updatedAt     DateTime                       @updatedAt
-  user          User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deferralCount  Int                           @default(0)
+  failureCount   Int                           @default(0)
+  lastError      String?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+  user           User                          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([status, scheduledFor])
   @@map("customer_account_deletions")
@@ -137,20 +137,20 @@ model StaffAccount {
   createdAt                               DateTime                         @default(now())
   updatedAt                               DateTime                         @updatedAt
   roles                                   StaffAccountRole[]
-  assignedDeliveries                      Delivery[]                        @relation("DeliveryAssignedStaff")
+  assignedDeliveries                      Delivery[]                       @relation("DeliveryAssignedStaff")
   refreshTokens                           StaffRefreshToken[]
   auditLogs                               AuditLog[]
-  createdPromotionBanners                 PromotionBanner[]        @relation("PromotionBannerCreator")
-  updatedPromotionDefaults                PromotionBannerDefault[] @relation("PromotionBannerDefaultUpdater")
+  createdPromotionBanners                 PromotionBanner[]                @relation("PromotionBannerCreator")
+  updatedPromotionDefaults                PromotionBannerDefault[]         @relation("PromotionBannerDefaultUpdater")
   createdInvitations                      StaffInvitation[]                @relation("StaffInvitationCreator")
   assignedRoleRecords                     StaffAccountRole[]               @relation("StaffRoleAssigner")
   inspectedReturnItems                    ReturnItemInspection[]           @relation("StaffReturnItemInspections")
   resolvedPaymentInventoryReconciliations PaymentInventoryReconciliation[] @relation("StaffPaymentInventoryReconciliationResolver")
   notifications                           Notification[]
   notificationPreferences                 NotificationPreference[]
-  assignedChatConversations                ChatConversation[] @relation("ChatConversationAssignedAgent")
-  chatMessages                             ChatMessage[]      @relation("ChatMessageAgent")
-  chatEvents                               ChatEvent[]        @relation("ChatEventActor")
+  assignedChatConversations               ChatConversation[]               @relation("ChatConversationAssignedAgent")
+  chatMessages                            ChatMessage[]                    @relation("ChatMessageAgent")
+  chatEvents                              ChatEvent[]                      @relation("ChatEventActor")
 
   @@index([status])
   @@map("staff_accounts")
@@ -174,17 +174,17 @@ model StaffAccountRole {
 }
 
 model StaffInvitation {
-  id                      String                @id @default(uuid()) @db.Uuid
+  id                      String                             @id @default(uuid()) @db.Uuid
   email                   String
-  tokenHash               String                @unique
-  status                  StaffInvitationStatus @default(PENDING)
+  tokenHash               String                             @unique
+  status                  StaffInvitationStatus              @default(PENDING)
   expiresAt               DateTime
   acceptedAt              DateTime?
   revokedAt               DateTime?
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  createdByStaffAccountId String?               @db.Uuid
-  createdBy               StaffAccount?         @relation("StaffInvitationCreator", fields: [createdByStaffAccountId], references: [id], onDelete: SetNull)
+  createdAt               DateTime                           @default(now())
+  updatedAt               DateTime                           @updatedAt
+  createdByStaffAccountId String?                            @db.Uuid
+  createdBy               StaffAccount?                      @relation("StaffInvitationCreator", fields: [createdByStaffAccountId], references: [id], onDelete: SetNull)
   roles                   StaffInvitationRole[]
   acceptanceSessions      StaffInvitationAcceptanceSession[]
 
@@ -193,7 +193,6 @@ model StaffInvitation {
   @@index([createdByStaffAccountId])
   @@map("staff_invitations")
 }
-
 
 model StaffInvitationAcceptanceSession {
   id           String          @id @default(uuid()) @db.Uuid
@@ -263,7 +262,7 @@ model GuestSession {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  cart Cart?
+  cart              Cart?
   chatConversations ChatConversation[]
 
   @@index([expiresAt])
@@ -369,20 +368,19 @@ model Product {
   @@map("products")
 }
 
-
 model CloudinaryCleanupTask {
   id           String    @id @default(uuid()) @db.Uuid
   publicId     String    @unique
   resourceType String    @default("image")
   deliveryType String    @default("upload")
   status       String    @default("PENDING")
-  attempts    Int       @default(0)
-  availableAt DateTime  @default(now())
-  lockedAt    DateTime?
-  lockToken   String?   @db.Uuid
-  lastError   String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  attempts     Int       @default(0)
+  availableAt  DateTime  @default(now())
+  lockedAt     DateTime?
+  lockToken    String?   @db.Uuid
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@index([status, availableAt])
   @@map("cloudinary_cleanup_tasks")
@@ -403,23 +401,23 @@ model WishlistItem {
 }
 
 model PromotionBanner {
-  id                      String                @id @default(uuid()) @db.Uuid
+  id                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title                   String
   imageUrl                String
-  publicId                String                @unique
+  publicId                String                  @unique
   mobileImageUrl          String?
-  mobilePublicId          String?               @unique
+  mobilePublicId          String?                 @unique
   position                PromotionBannerPosition
   targetUrl               String?
   altText                 String?
   startAt                 DateTime
   endAt                   DateTime
-  status                  PromotionBannerStatus @default(DRAFT)
-  priority                Int                   @default(0)
-  createdByStaffAccountId String                @db.Uuid
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  createdBy               StaffAccount          @relation("PromotionBannerCreator", fields: [createdByStaffAccountId], references: [id], onDelete: Restrict)
+  status                  PromotionBannerStatus   @default(DRAFT)
+  priority                Int                     @default(0)
+  createdByStaffAccountId String                  @db.Uuid
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  createdBy               StaffAccount            @relation("PromotionBannerCreator", fields: [createdByStaffAccountId], references: [id], onDelete: Restrict)
 
   @@index([position, status, startAt, endAt, priority])
   @@index([createdByStaffAccountId, createdAt])
@@ -427,18 +425,18 @@ model PromotionBanner {
 }
 
 model PromotionBannerDefault {
-  id                      String                @id @default(uuid()) @db.Uuid
+  id                      String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   position                PromotionBannerPosition @unique
   imageUrl                String
-  publicId                String                @unique
+  publicId                String                  @unique
   mobileImageUrl          String?
-  mobilePublicId          String?               @unique
+  mobilePublicId          String?                 @unique
   targetUrl               String?
   altText                 String?
-  updatedByStaffAccountId String                @db.Uuid
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  updatedBy               StaffAccount          @relation("PromotionBannerDefaultUpdater", fields: [updatedByStaffAccountId], references: [id], onDelete: Restrict)
+  updatedByStaffAccountId String                  @db.Uuid
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  updatedBy               StaffAccount            @relation("PromotionBannerDefaultUpdater", fields: [updatedByStaffAccountId], references: [id], onDelete: Restrict)
 
   @@index([updatedByStaffAccountId, updatedAt])
   @@map("promotion_banner_defaults")
@@ -590,41 +588,41 @@ model CouponRedemption {
 }
 
 model Order {
-  id                       String                           @id @default(uuid()) @db.Uuid
-  userId                   String?                          @db.Uuid
-  customerName             String?
-  customerEmail            String?
-  customerPhone            String?
-  guestAccessTokenHash     String?                          @unique
+  id                        String                           @id @default(uuid()) @db.Uuid
+  userId                    String?                          @db.Uuid
+  customerName              String?
+  customerEmail             String?
+  customerPhone             String?
+  guestAccessTokenHash      String?                          @unique
   guestAccessTokenExpiresAt DateTime?
   guestAccessTokenRevokedAt DateTime?
-  orderNumber              String                           @unique
-  status                   OrderStatus                      @default(PENDING)
-  subtotal                 Decimal                          @db.Decimal(12, 2)
-  discountAmount           Decimal                          @default(0) @db.Decimal(12, 2)
-  couponId                 String?                          @db.Uuid
-  couponCode               String?
-  couponDiscountType       CouponDiscountType?
-  couponDiscountValue      Decimal?                         @db.Decimal(12, 2)
-  deliveryFee              Decimal                          @default(0) @db.Decimal(12, 2)
-  deliveryZoneId           String?                          @db.Uuid
-  deliveryZoneName         String?
-  totalAmount              Decimal                          @db.Decimal(12, 2)
-  currency                 String                           @default("NGN")
-  shippingAddress          Json
-  createdAt                DateTime                         @default(now())
-  updatedAt                DateTime                         @updatedAt
-  fulfillment              Fulfillment?
-  inventoryReservations    InventoryReservation[]
-  items                    OrderItem[]
-  user                     User?                            @relation(fields: [userId], references: [id])
-  inventoryReconciliations PaymentInventoryReconciliation[]
-  payments                 Payment[]
-  refunds                  Refund[]
-  returnRequests           ReturnRequest[]
-  deliveryZone             DeliveryZone?                     @relation(fields: [deliveryZoneId], references: [id], onDelete: SetNull)
-  coupon                   Coupon?                          @relation(fields: [couponId], references: [id], onDelete: SetNull)
-  couponRedemption         CouponRedemption?
+  orderNumber               String                           @unique
+  status                    OrderStatus                      @default(PENDING)
+  subtotal                  Decimal                          @db.Decimal(12, 2)
+  discountAmount            Decimal                          @default(0) @db.Decimal(12, 2)
+  couponId                  String?                          @db.Uuid
+  couponCode                String?
+  couponDiscountType        CouponDiscountType?
+  couponDiscountValue       Decimal?                         @db.Decimal(12, 2)
+  deliveryFee               Decimal                          @default(0) @db.Decimal(12, 2)
+  deliveryZoneId            String?                          @db.Uuid
+  deliveryZoneName          String?
+  totalAmount               Decimal                          @db.Decimal(12, 2)
+  currency                  String                           @default("NGN")
+  shippingAddress           Json
+  createdAt                 DateTime                         @default(now())
+  updatedAt                 DateTime                         @updatedAt
+  fulfillment               Fulfillment?
+  inventoryReservations     InventoryReservation[]
+  items                     OrderItem[]
+  user                      User?                            @relation(fields: [userId], references: [id])
+  inventoryReconciliations  PaymentInventoryReconciliation[]
+  payments                  Payment[]
+  refunds                   Refund[]
+  returnRequests            ReturnRequest[]
+  deliveryZone              DeliveryZone?                    @relation(fields: [deliveryZoneId], references: [id], onDelete: SetNull)
+  coupon                    Coupon?                          @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  couponRedemption          CouponRedemption?
 
   @@index([userId])
   @@index([status])
@@ -792,17 +790,17 @@ model PackageItem {
 }
 
 model Delivery {
-  id                String            @id @default(uuid()) @db.Uuid
-  packageId         String            @unique @db.Uuid
-  provider          String?
-  externalReference String?
-  status            DeliveryStatus    @default(PENDING)
-  shippedAt         DateTime?
-  deliveredAt       DateTime?
-  assignedStaffAccountId String?       @db.Uuid
-  package           Package           @relation(fields: [packageId], references: [id])
-  assignedStaff     StaffAccount?     @relation("DeliveryAssignedStaff", fields: [assignedStaffAccountId], references: [id], onDelete: SetNull)
-  attempts          DeliveryAttempt[]
+  id                     String            @id @default(uuid()) @db.Uuid
+  packageId              String            @unique @db.Uuid
+  provider               String?
+  externalReference      String?
+  status                 DeliveryStatus    @default(PENDING)
+  shippedAt              DateTime?
+  deliveredAt            DateTime?
+  assignedStaffAccountId String?           @db.Uuid
+  package                Package           @relation(fields: [packageId], references: [id])
+  assignedStaff          StaffAccount?     @relation("DeliveryAssignedStaff", fields: [assignedStaffAccountId], references: [id], onDelete: SetNull)
+  attempts               DeliveryAttempt[]
 
   @@index([status])
   @@index([provider])
@@ -1071,35 +1069,35 @@ model Notification {
 }
 
 model NotificationEmailDelivery {
-  id                String                          @id @default(uuid()) @db.Uuid
-  notificationId    String?                         @unique @db.Uuid
-  eventRecipientKey String?                         @unique
-  recipientEmail    String
-  templateKey       String
-  templateData      Json
-  status            NotificationEmailDeliveryStatus @default(QUEUED)
-  attemptCount      Int                             @default(0)
-  nextAttemptAt     DateTime                        @default(now())
-  lockedAt          DateTime?
-  lockedBy          String?
-  providerMessageId String?
-  acceptedAt        DateTime?
-  sentAt             DateTime?
-  deliveredAt       DateTime?
-  bouncedAt         DateTime?
-  complainedAt      DateTime?
-  failedAt          DateTime?
-  suppressedAt      DateTime?
+  id                    String                          @id @default(uuid()) @db.Uuid
+  notificationId        String?                         @unique @db.Uuid
+  eventRecipientKey     String?                         @unique
+  recipientEmail        String
+  templateKey           String
+  templateData          Json
+  status                NotificationEmailDeliveryStatus @default(QUEUED)
+  attemptCount          Int                             @default(0)
+  nextAttemptAt         DateTime                        @default(now())
+  lockedAt              DateTime?
+  lockedBy              String?
+  providerMessageId     String?
+  acceptedAt            DateTime?
+  sentAt                DateTime?
+  deliveredAt           DateTime?
+  bouncedAt             DateTime?
+  complainedAt          DateTime?
+  failedAt              DateTime?
+  suppressedAt          DateTime?
   lastProviderEventType String?
-  lastError         String?
-  createdAt         DateTime                        @default(now())
-  updatedAt         DateTime                        @updatedAt
-  notification      Notification?                   @relation(fields: [notificationId], references: [id], onDelete: SetNull)
-  providerEvents    NotificationEmailEvent[]
+  lastError             String?
+  createdAt             DateTime                        @default(now())
+  updatedAt             DateTime                        @updatedAt
+  notification          Notification?                   @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+  providerEvents        NotificationEmailEvent[]
 
+  @@unique([providerMessageId])
   @@index([status, nextAttemptAt, createdAt])
   @@index([status, lockedAt])
-  @@unique([providerMessageId])
   @@map("notification_email_deliveries")
 }
 
@@ -1136,7 +1134,6 @@ model NotificationPreference {
   @@map("notification_preferences")
 }
 
-
 model ChatConversation {
   id              String                 @id @default(uuid()) @db.Uuid
   customerUserId  String?                @map("customer_user_id") @db.Uuid
@@ -1161,16 +1158,17 @@ model ChatConversation {
 }
 
 model ChatMessage {
-  id              String           @id @default(uuid()) @db.Uuid
-  conversationId  String           @map("conversation_id") @db.Uuid
-  senderType      ChatSenderType    @map("sender_type")
-  senderAgentId   String?           @map("sender_agent_id") @db.Uuid
-  content         String            @db.Text
-  clientMessageId String?           @map("client_message_id")
-  metadata        Json?
-  createdAt       DateTime          @default(now()) @map("created_at")
-  conversation    ChatConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderAgent     StaffAccount?     @relation("ChatMessageAgent", fields: [senderAgentId], references: [id], onDelete: SetNull)
+  id               String            @id @default(uuid()) @db.Uuid
+  conversationId   String            @map("conversation_id") @db.Uuid
+  senderType       ChatSenderType    @map("sender_type")
+  senderAgentId    String?           @map("sender_agent_id") @db.Uuid
+  content          String            @db.Text
+  clientMessageId  String?           @map("client_message_id")
+  metadata         Json?
+  createdAt        DateTime          @default(now()) @map("created_at")
+  conversation     ChatConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderAgent      StaffAccount?     @relation("ChatMessageAgent", fields: [senderAgentId], references: [id], onDelete: SetNull)
+  chatAiGeneration ChatAiGeneration?
 
   @@unique([conversationId, senderType, clientMessageId])
   @@index([conversationId, createdAt])
@@ -1179,20 +1177,43 @@ model ChatMessage {
 }
 
 model ChatEvent {
-  id             String                 @id @default(uuid()) @db.Uuid
-  conversationId String                 @map("conversation_id") @db.Uuid
-  eventType      ChatEventType          @map("event_type")
+  id             String                  @id @default(uuid()) @db.Uuid
+  conversationId String                  @map("conversation_id") @db.Uuid
+  eventType      ChatEventType           @map("event_type")
   previousStatus ChatConversationStatus? @map("previous_status")
   newStatus      ChatConversationStatus? @map("new_status")
-  actorAgentId   String?                @map("actor_agent_id") @db.Uuid
+  actorAgentId   String?                 @map("actor_agent_id") @db.Uuid
   metadata       Json?
-  createdAt      DateTime               @default(now()) @map("created_at")
-  conversation   ChatConversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  actorAgent     StaffAccount?          @relation("ChatEventActor", fields: [actorAgentId], references: [id], onDelete: SetNull)
+  createdAt      DateTime                @default(now()) @map("created_at")
+  conversation   ChatConversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  actorAgent     StaffAccount?           @relation("ChatEventActor", fields: [actorAgentId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, createdAt])
   @@index([actorAgentId, createdAt])
   @@map("chat_events")
+}
+
+model ChatAiGeneration {
+  id                String                 @id @default(uuid()) @db.Uuid
+  customerMessageId String                 @unique @map("customer_message_id") @db.Uuid
+  status            ChatAiGenerationStatus @default(PROCESSING)
+  leaseToken        String?                @map("lease_token") @db.Uuid
+  leaseExpiresAt    DateTime?              @map("lease_expires_at") @db.Timestamptz(6)
+  attemptCount      Int                    @default(1) @map("attempt_count")
+  failureCode       String?                @map("failure_code") @db.VarChar(100)
+  createdAt         DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customerMessage ChatMessage @relation(fields: [customerMessageId], references: [id], onDelete: Cascade)
+
+  @@index([status, leaseExpiresAt])
+  @@map("chat_ai_generations")
+}
+
+enum ChatAiGenerationStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 enum PromotionBannerPosition {

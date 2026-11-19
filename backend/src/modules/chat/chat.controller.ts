@@ -1,7 +1,9 @@
 import type { Response } from "express";
 import { z } from "zod";
 import { AppError } from "../../common/errors/AppError";
+import { logger } from "../../config/logger";
 import type { ChatOwnerRequest } from "./chat.types";
+import { generateChatAiReply } from "./ai/chat-ai.service";
 import {
   createConversation,
   getConversation,
@@ -110,16 +112,42 @@ export async function sendCustomerMessageController(
     return;
   }
 
+  const owner = getOwner(req);
+  const conversationId = getConversationId(req.params.conversationId);
+
   const message = await sendCustomerMessage(
-    getOwner(req),
-    getConversationId(req.params.conversationId),
+    owner,
+    conversationId,
     parsed.data,
   );
+
+  let automation: Awaited<ReturnType<typeof generateChatAiReply>>;
+
+  try {
+    automation = await generateChatAiReply({
+      owner,
+      conversationId,
+      customerMessageId: message.id,
+    });
+  } catch (error) {
+    logger.error(
+      "Chat AI generation failed after customer message was accepted",
+      undefined,
+      {
+        conversationId,
+        customerMessageId: message.id,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      },
+    );
+
+    automation = { status: "UNAVAILABLE" };
+  }
+
   res.status(201).json({
     message: "Chat message accepted",
     data: {
       message,
-      automation: { status: "NOT_CONFIGURED" },
+      automation,
     },
   });
 }
