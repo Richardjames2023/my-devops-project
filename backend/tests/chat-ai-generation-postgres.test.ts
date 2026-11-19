@@ -259,6 +259,9 @@ describe("Chat AI generation (PostgreSQL)", () => {
       },
     });
     expect(handoffMessages).toHaveLength(1);
+    expect(updatedConversation.lastMessageAt).toEqual(
+      handoffMessages[0]?.createdAt,
+    );
 
     const botMessages = await prisma.chatMessage.findMany({
       where: {
