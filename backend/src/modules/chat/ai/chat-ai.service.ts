@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   ChatAiGenerationStatus,
   ChatConversationStatus,
+  ChatEventType,
   ChatSenderType,
   Prisma,
 } from "@prisma/client";
@@ -21,6 +22,7 @@ export type ChatAiAutomationStatus =
   | "PROCESSING"
   | "GENERATED"
   | "HANDOFF_RECOMMENDED"
+  | "SKIPPED"
   | "UNAVAILABLE";
 
 export interface ChatAiAutomationResult {
@@ -462,6 +464,39 @@ async function persistGeneratedReply(input: {
       select: botMessageSelect,
     });
 
+    if (input.handoffRecommended) {
+      await tx.chatEvent.create({
+        data: {
+          conversationId: input.conversationId,
+          eventType: ChatEventType.HANDOFF_REQUESTED,
+          previousStatus: ChatConversationStatus.BOT_ACTIVE,
+          newStatus: ChatConversationStatus.WAITING_FOR_AGENT,
+          metadata: {
+            source: "ai",
+            reason: input.handoffReason,
+          },
+        },
+      });
+
+      const handoffMessage = await tx.chatMessage.create({
+        data: {
+          conversationId: input.conversationId,
+          senderType: ChatSenderType.SYSTEM,
+          content:
+            "Your request has been referred to customer care. An agent will join as soon as one is available.",
+        },
+        select: { createdAt: true },
+      });
+
+      await tx.chatConversation.update({
+        where: { id: input.conversationId },
+        data: {
+          status: ChatConversationStatus.WAITING_FOR_AGENT,
+          lastMessageAt: handoffMessage.createdAt,
+        },
+      });
+    }
+
     const completed = await tx.chatAiGeneration.updateMany({
       where: {
         customerMessageId: input.customerMessageId,
@@ -530,7 +565,7 @@ export async function generateChatAiReply(
   if (
     conversation.status !== ChatConversationStatus.BOT_ACTIVE
   ) {
-    return { status: "NOT_CONFIGURED" };
+    return { status: "SKIPPED" };
   }
 
   /*
