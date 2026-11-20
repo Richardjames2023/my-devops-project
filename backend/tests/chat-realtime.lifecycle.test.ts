@@ -84,7 +84,7 @@ describe("Socket.IO conversation room lifecycle", () => {
       expiresAt: new Date(Date.now() + 60_000),
     });
     state.guestSessionFindFirst.mockResolvedValue({ id: GUEST_ID });
-    state.conversationFindFirst.mockImplementation(async ({ where }) => ({
+    state.conversationFindFirst.mockImplementation(async ({ where }: { where: { id: string } }) => ({
       id: where.id,
     }));
   });
@@ -116,6 +116,37 @@ describe("Socket.IO conversation room lifecycle", () => {
 
     expect(ack).toHaveBeenCalledWith({ ok: true, conversationId: conversationId(1) });
     expect(socket.rooms.has(`chat:conversation:${conversationId(1)}`)).toBe(true);
+    socket.disconnect();
+  });
+
+  it("does not count duplicate concurrent joins as separate rooms", async () => {
+    let resolveAuthorization!: (value: { id: string } | null) => void;
+    state.conversationFindFirst.mockImplementationOnce(() =>
+      new Promise((resolve) => { resolveAuthorization = resolve; }),
+    );
+    createChatRealtimeServer({} as any, []);
+    const socket = await connectSocket();
+    const joinHandler = socket.on.mock.calls.find(([event]: [string]) =>
+      event === "chat:conversation:join",
+    )?.[1];
+    const id = conversationId(77);
+    const firstAck = vi.fn();
+    const secondAck = vi.fn();
+
+    joinHandler({ conversationId: id }, firstAck);
+    await vi.waitFor(() => expect(resolveAuthorization).toBeTypeOf("function"));
+    joinHandler({ conversationId: id }, secondAck);
+    resolveAuthorization({ id });
+
+    await vi.waitFor(() => {
+      expect(firstAck).toHaveBeenCalled();
+      expect(secondAck).toHaveBeenCalled();
+    });
+    expect([...socket.rooms].filter((room: string) =>
+      room === `chat:conversation:${id}`,
+    )).toHaveLength(1);
+    expect(firstAck).toHaveBeenCalledWith({ ok: true, conversationId: id });
+    expect(secondAck).toHaveBeenCalledWith({ ok: true, conversationId: id });
     socket.disconnect();
   });
 
