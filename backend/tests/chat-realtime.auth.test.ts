@@ -239,6 +239,37 @@ describe("chat conversation room authorization", () => {
     }, CONVERSATION_ID)).resolves.toBe(false);
   });
 
+  it("allows a guest to join only a conversation linked to the validated guest session", async () => {
+    mocks.guestSessionFindFirst.mockResolvedValue({ id: GUEST_SESSION_ID });
+    mocks.conversationFindFirst.mockResolvedValue({ id: CONVERSATION_ID });
+
+    await expect(canJoinConversation({
+      type: "GUEST",
+      id: GUEST_SESSION_ID,
+      expiresAt: new Date(Date.now() + 60_000),
+    }, CONVERSATION_ID)).resolves.toBe(true);
+
+    expect(mocks.conversationFindFirst).toHaveBeenCalledWith({
+      where: { id: CONVERSATION_ID, guestSessionId: GUEST_SESSION_ID },
+      select: { id: true },
+    });
+  });
+
+  it("denies staff whose current database permissions no longer include chat.read", async () => {
+    mocks.staffFindUnique.mockResolvedValue({
+      status: "ACTIVE",
+      roles: [{ role: { permissions: [] } }],
+    });
+
+    await expect(canJoinConversation({
+      type: "STAFF",
+      id: STAFF_ID,
+      expiresAt: Math.floor(Date.now() / 1000) + 900,
+    }, CONVERSATION_ID)).resolves.toBe(false);
+
+    expect(mocks.conversationFindUnique).not.toHaveBeenCalled();
+  });
+
   it("requires current staff chat.read permission before joining a room", async () => {
     mocks.staffFindUnique.mockResolvedValue({
       status: "ACTIVE",
