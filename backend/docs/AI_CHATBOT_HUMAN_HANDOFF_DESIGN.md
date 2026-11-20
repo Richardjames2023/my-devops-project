@@ -1,6 +1,6 @@
 # AI Customer Chatbot and Human Handoff
 
-**Status:** Chat foundation, AI responses, staff inbox/replies/closure, and durable handoff notifications implemented; real-time delivery and frontend integration remain planned  
+**Status:** Chat foundation, AI responses, staff inbox/replies/closure, and durable handoff notifications implemented; real-time delivery and frontend integration remain planned
 **Target repository:** `Richardjames2023/my-devops-project`  
 **Implementation branch:** `feat/ai-chatbot-human-handoff`  
 **Last updated:** 2026-11-20
