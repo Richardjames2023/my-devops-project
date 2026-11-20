@@ -18,7 +18,7 @@ export async function listChatRealtimeEvents(
   const rows = await prisma.chatRealtimeEvent.findMany({
     where: {
       conversationId,
-      sequence: { gt: input.after },
+      sequence: { gt: input.after, lte: conversation.realtimeSequence },
     },
     orderBy: { sequence: "asc" },
     take: input.limit + 1,
@@ -44,6 +44,7 @@ export async function listChatRealtimeEvents(
       createdAt: event.createdAt,
     })),
     nextCursor: hasMore ? last?.sequence ?? input.after : null,
+    lastSequence: last?.sequence ?? input.after,
     currentSequence: conversation.realtimeSequence,
     hasMore,
   };
