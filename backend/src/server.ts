@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import app from "./app";
 import { env } from "./config/env";
 import { logger } from "./config/logger";
@@ -9,6 +10,7 @@ import { startNotificationEmailJob } from "./infrastructure/jobs/notification-em
 import { startCloudinaryCleanupJob } from "./infrastructure/jobs/cloudinary-cleanup.job";
 import { startCustomerAccountDeletionJob } from "./infrastructure/jobs/customer-account-deletion.job";
 import { runGracefulShutdown } from "./infrastructure/shutdown/graceful-shutdown";
+import { createChatRealtimeServer } from "./modules/chat/chat-realtime.server";
 
 async function startServer(): Promise<void> {
   try {
@@ -23,7 +25,11 @@ async function startServer(): Promise<void> {
       startCustomerAccountDeletionJob(),
     ];
 
-    const server = app.listen(env.PORT, () => {
+    const server = createServer(app);
+    const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
+    const io = createChatRealtimeServer(server, allowedOrigins);
+
+    server.listen(env.PORT, () => {
       logger.info("Server started", { port: env.PORT });
     });
 
@@ -39,6 +45,10 @@ async function startServer(): Promise<void> {
       logger.info("Server shutdown requested");
 
       await runGracefulShutdown({
+        stopRealtimeServer: () => {
+          io.disconnectSockets(true);
+          io.engine.close();
+        },
         closeServer: () => new Promise<void>((resolve, reject) => {
           server.close((error) => error ? reject(error) : resolve());
         }),
