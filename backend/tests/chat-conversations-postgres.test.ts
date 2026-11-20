@@ -251,17 +251,21 @@ describe("Chat conversation foundation (PostgreSQL)", () => {
       data: { lastMessageAt: new Date(now - 10_000) },
     });
 
-    let releaseOlderUpdate!: () => void;
-    let signalOlderInsert!: () => void;
-    const olderMayUpdate = new Promise<void>((resolve) => {
-      releaseOlderUpdate = resolve;
+    let releaseOlderInsert!: () => void;
+    let signalOlderTransactionReady!: () => void;
+    const olderMayInsert = new Promise<void>((resolve) => {
+      releaseOlderInsert = resolve;
     });
-    const olderInserted = new Promise<void>((resolve) => {
-      signalOlderInsert = resolve;
+    const olderTransactionReady = new Promise<void>((resolve) => {
+      signalOlderTransactionReady = resolve;
     });
 
-    // Deliberately hold the older transaction after inserting its message.
+    // Keep the older transaction open, but do not insert its message yet.
+    // The realtime-event trigger serializes inserts by locking the conversation
+    // row, so inserting here would intentionally block a newer message insert.
     const olderTransaction = prisma.$transaction(async (tx) => {
+      signalOlderTransactionReady();
+      await olderMayInsert;
       await tx.chatMessage.create({
         data: {
           conversationId: conversation.id,
@@ -271,8 +275,6 @@ describe("Chat conversation foundation (PostgreSQL)", () => {
           createdAt: olderMessageAt,
         },
       });
-      signalOlderInsert();
-      await olderMayUpdate;
       await updateConversationLastMessageAt(
         tx,
         conversation.id,
@@ -280,36 +282,27 @@ describe("Chat conversation foundation (PostgreSQL)", () => {
       );
     });
 
-    await olderInserted;
+    await olderTransactionReady;
 
-    let newerTransactionError: unknown;
-    try {
-      await prisma.$transaction(async (tx) => {
-        await tx.chatMessage.create({
-          data: {
-            conversationId: conversation.id,
-            senderType: "CUSTOMER",
-            content: "Newer message",
-            clientMessageId: randomUUID(),
-            createdAt: newerMessageAt,
-          },
-        });
-        await updateConversationLastMessageAt(
-          tx,
-          conversation.id,
-          newerMessageAt,
-        );
+    await prisma.$transaction(async (tx) => {
+      await tx.chatMessage.create({
+        data: {
+          conversationId: conversation.id,
+          senderType: "CUSTOMER",
+          content: "Newer message",
+          clientMessageId: randomUUID(),
+          createdAt: newerMessageAt,
+        },
       });
-    } catch (error) {
-      newerTransactionError = error;
-    } finally {
-      releaseOlderUpdate();
-    }
+      await updateConversationLastMessageAt(
+        tx,
+        conversation.id,
+        newerMessageAt,
+      );
+    });
 
+    releaseOlderInsert();
     await olderTransaction;
-    if (newerTransactionError) {
-      throw newerTransactionError;
-    }
 
     const updated = await prisma.chatConversation.findUniqueOrThrow({
       where: { id: conversation.id },
