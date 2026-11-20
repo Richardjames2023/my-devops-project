@@ -4,8 +4,10 @@ import { AppError } from "../../common/errors/AppError";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import {
   claimStaffChatConversation,
+  closeStaffChatConversation,
   getStaffChatConversation,
   listStaffChatConversations,
+  sendStaffChatMessage,
 } from "./staff-chat.service";
 
 const inboxQuerySchema = z.object({
@@ -20,6 +22,10 @@ const conversationIdSchema = z.object({ conversationId: z.uuid() });
 const transcriptQuerySchema = z.object({
   messageLimit: z.coerce.number().int().min(1).max(100).default(50),
   messageCursor: z.uuid().optional(),
+});
+const staffMessageSchema = z.object({
+  content: z.string().trim().min(1).max(4_000),
+  clientMessageId: z.uuid(),
 });
 
 function getStaffActor(req: AuthenticatedRequest): string {
@@ -96,6 +102,44 @@ export async function claimStaffChatConversationController(
   );
   res.status(200).json({
     message: "Chat conversation claimed",
+    data: { conversation },
+  });
+}
+
+export async function sendStaffChatMessageController(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = staffMessageSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: z.flattenError(parsed.error).fieldErrors,
+    });
+    return;
+  }
+
+  const message = await sendStaffChatMessage(
+    getConversationId(req),
+    getStaffActor(req),
+    parsed.data,
+  );
+  res.status(201).json({
+    message: "Staff chat reply accepted",
+    data: { message },
+  });
+}
+
+export async function closeStaffChatConversationController(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const conversation = await closeStaffChatConversation(
+    getConversationId(req),
+    getStaffActor(req),
+  );
+  res.status(200).json({
+    message: "Chat conversation closed",
     data: { conversation },
   });
 }
