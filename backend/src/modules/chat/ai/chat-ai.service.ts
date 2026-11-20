@@ -14,6 +14,7 @@ import { createChatAiProvider } from "./chat-ai.provider.factory";
 import { loadCustomerSupportKnowledgeBase } from "./customer-support-knowledge-base";
 import { publishNotificationEvent } from "../../notifications/notification-outbox.publisher";
 import type { ChatAiHistoryMessage } from "./chat-ai.types";
+import { emitChatConversationStatus, emitChatMessage } from "../chat-realtime.events";
 
 const LEASE_MS = 30_000;
 const MAX_ATTEMPTS = 3;
@@ -348,7 +349,16 @@ async function persistGeneratedReply(input: {
   handoffRecommended: boolean;
   handoffReason: string | null;
 }): Promise<ChatAiAutomationResult> {
-  return prisma.$transaction(async (tx) => {
+  let committedNewReply = false;
+  let handoffSystemMessage: BotMessage | null = null;
+  let handoffConversation: {
+    status: ChatConversationStatus;
+    assignedAgentId: string | null;
+    closedAt: Date | null;
+    updatedAt: Date;
+  } | null = null;
+
+  const result = await prisma.$transaction(async (tx) => {
     /*
      * Lock the conversation first.
      *
@@ -464,6 +474,7 @@ async function persistGeneratedReply(input: {
       },
       select: botMessageSelect,
     });
+    committedNewReply = true;
 
     let lastMessageAt = botMessage.createdAt;
 
@@ -481,22 +492,28 @@ async function persistGeneratedReply(input: {
         },
       });
 
-      const handoffMessage = await tx.chatMessage.create({
+      handoffSystemMessage = await tx.chatMessage.create({
         data: {
           conversationId: input.conversationId,
           senderType: ChatSenderType.SYSTEM,
           content:
             "Your request has been referred to customer care. An agent will join as soon as one is available.",
         },
-        select: { createdAt: true },
+        select: botMessageSelect,
       });
 
-      lastMessageAt = handoffMessage.createdAt;
+      lastMessageAt = handoffSystemMessage.createdAt;
 
-      await tx.chatConversation.update({
+      handoffConversation = await tx.chatConversation.update({
         where: { id: input.conversationId },
         data: {
           status: ChatConversationStatus.WAITING_FOR_AGENT,
+        },
+        select: {
+          status: true,
+          assignedAgentId: true,
+          closedAt: true,
+          updatedAt: true,
         },
       });
 
@@ -544,6 +561,30 @@ async function persistGeneratedReply(input: {
       botMessage: toBotMessage(botMessage),
     };
   });
+
+  if (committedNewReply && result.botMessage) {
+    emitChatMessage({
+      ...result.botMessage,
+      conversationId: input.conversationId,
+    });
+  }
+  if (handoffSystemMessage) {
+    emitChatMessage({
+      ...handoffSystemMessage,
+      conversationId: input.conversationId,
+    });
+  }
+  if (handoffConversation) {
+    emitChatConversationStatus({
+      conversationId: input.conversationId,
+      status: handoffConversation.status,
+      assignedAgentId: handoffConversation.assignedAgentId,
+      closedAt: handoffConversation.closedAt,
+      updatedAt: handoffConversation.updatedAt,
+    });
+  }
+
+  return result;
 }
 
 export async function generateChatAiReply(
