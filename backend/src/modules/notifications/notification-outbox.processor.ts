@@ -61,6 +61,8 @@ export function getNotificationEventPolicy(eventType: string): Policy {
       return { category: "REFUND", inAppMandatory: true, emailMode: "MANDATORY" };
     case "inventory.low_stock":
       return { category: "INVENTORY", inAppMandatory: false, emailMode: "DISABLED" };
+    case "chat.handoff_requested":
+      return { category: "STAFF", inAppMandatory: true, emailMode: "DISABLED" };
     default:
       throw new Error("Unsupported notification event type: " + eventType);
   }
@@ -583,6 +585,60 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
       };
     });
     return drafts;
+  }
+
+  if (event.eventType === "chat.handoff_requested") {
+    const conversationId = payloadString(event.payload, "conversationId") ?? event.aggregateId;
+    const conversation = await tx.chatConversation.findUnique({
+      where: { id: conversationId },
+      select: { id: true, status: true },
+    });
+    if (!conversation) {
+      throw new Error("Chat conversation not found for handoff notification: " + conversationId);
+    }
+    if (conversation.status !== "WAITING_FOR_AGENT") {
+      return [];
+    }
+
+    const staff = await tx.staffAccount.findMany({
+      where: { status: "ACTIVE" },
+      select: {
+        id: true,
+        email: true,
+        roles: {
+          select: {
+            role: {
+              select: {
+                permissions: {
+                  select: {
+                    permission: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const source = payloadString(event.payload, "source") ?? "customer";
+    const title = "Customer support handoff requested";
+    const body = "A customer conversation is waiting for an agent.";
+    const actionUrl = "/staff/chat/conversations/" + conversation.id;
+    return staff.filter((account) => account.roles.some(({ role }) =>
+      role.permissions.some(({ permission }) => permission.name === "chat.read"),
+    )).map((account) => ({
+      recipientType: "STAFF" as const,
+      customerUserId: null,
+      staffAccountId: account.id,
+      recipientEmail: account.email,
+      category: policy.category,
+      title,
+      body,
+      actionUrl,
+      metadata: { conversationId: conversation.id, source },
+      templateKey: "staff.chat-handoff-requested",
+      templateData: { title, body, actionUrl },
+    }));
   }
 
   if (event.eventType === "delivery.delivered") {
