@@ -1,6 +1,6 @@
 # AI Customer Chatbot and Human Handoff
 
-**Status:** Chat foundation, AI responses, staff inbox/replies/closure, durable handoff notifications, Socket.IO transport, socket authentication and authorized conversation rooms implemented; realtime event broadcasting and frontend integration remain planned
+**Status:** Chat foundation, AI responses, staff inbox/replies/closure, durable handoff notifications, Socket.IO transport, socket authentication, authorized conversation rooms and persisted realtime event broadcasting implemented; reconnect/history recovery and frontend integration remain planned
 **Target repository:** `Richardjames2023/my-devops-project`  
 **Implementation branch:** `feat/ai-chatbot-human-handoff`  
 **Last updated:** 2026-11-20
@@ -231,7 +231,12 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
   - Active staff with `chat.read` receive mandatory in-app alerts; email remains disabled for this event.
 - [x] Authenticate customer sockets against active/verified customer records and session versions; authenticate guests through the existing hashed guest-session cookie; authenticate staff against current active status and `chat.read` permission.
 - [x] Authorize conversation-room joins against current customer/guest ownership or current staff `chat.read` permission; periodically recheck identity validity and disconnect expired/revoked identities.
-- [ ] Broadcast committed customer, AI and staff messages and conversation lifecycle events.
+- [x] Broadcast committed customer, AI and staff messages and conversation lifecycle events to authorized conversation rooms after database transactions commit.
+  - `chat:message:new` carries the persisted message record for customer, AI, system handoff and staff messages.
+  - `chat:conversation:status` carries committed status, assignment and closure metadata.
+  - `chat:conversation:assigned` identifies the assigned staff agent.
+  - Idempotent retries do not rebroadcast already-persisted messages or repeated lifecycle transitions.
+  - Socket.IO remains delivery-only; REST continues to own writes and PostgreSQL remains the source of truth.
 - [ ] Add reconnect/history recovery using the existing paginated REST history endpoints.
 
 ### Phase 4 — Frontend integration and business context
@@ -266,4 +271,4 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 
 ## 14. Initial implementation boundary
 
-The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO is attached to the HTTP server with origin enforcement and graceful shutdown. Customer, guest and staff socket authentication plus ownership/permission-checked conversation rooms are implemented. Persisted event broadcasting, reconnect/history recovery, frontend integration, and usage/cost telemetry remain follow-up work.
+The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO is attached to the HTTP server with origin enforcement and graceful shutdown. Customer, guest and staff socket authentication plus ownership/permission-checked conversation rooms are implemented. Persisted customer, AI, system and staff messages plus handoff, assignment and closure transitions are broadcast after commit to authorized conversation rooms. Reconnect/history recovery, frontend integration, and usage/cost telemetry remain follow-up work.
