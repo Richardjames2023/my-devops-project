@@ -78,23 +78,3 @@ export function emitChatConversationAssigned(payload: {
   emitToConversation(payload.conversationId, "chat:conversation:assigned", payload);
 }
 
-export function emitPersistedChatRealtimeEvent(event: {
-  id: string;
-  conversationId: string;
-  sequence: number;
-  eventName: string;
-  payload: unknown;
-  createdAt: Date;
-}): void {
-  const payload =
-    typeof event.payload === "object" && event.payload !== null && !Array.isArray(event.payload)
-      ? event.payload as Record<string, unknown>
-      : { value: event.payload };
-
-  emitToConversation(event.conversationId, event.eventName, {
-    ...payload,
-    eventId: event.id,
-    sequence: event.sequence,
-    eventCreatedAt: event.createdAt,
-  });
-}
