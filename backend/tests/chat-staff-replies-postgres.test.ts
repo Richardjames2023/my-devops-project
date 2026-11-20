@@ -127,6 +127,12 @@ describe("Staff chat replies and closure (PostgreSQL)", () => {
       clientMessageId,
     });
     expect(retry.id).toBe(first.id);
+    await expect(
+      sendStaffChatMessage(activeConversationId, assignedAgentId, {
+        content: "Different content with the same idempotency key",
+        clientMessageId,
+      }),
+    ).rejects.toMatchObject({ statusCode: 409 });
 
     const count = await prisma.chatMessage.count({
       where: {
