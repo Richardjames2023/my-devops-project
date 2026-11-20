@@ -3,8 +3,10 @@ import { authenticate } from "../../common/middleware/authenticate";
 import { authorize } from "../../common/middleware/authorize";
 import {
   claimStaffChatConversationController,
+  closeStaffChatConversationController,
   getStaffChatConversationController,
   listStaffChatConversationsController,
+  sendStaffChatMessageController,
 } from "./staff-chat.controller";
 
 const router = Router();
@@ -25,6 +27,16 @@ router.post(
   "/conversations/:conversationId/assign",
   authorize("chat.assign"),
   claimStaffChatConversationController,
+);
+router.post(
+  "/conversations/:conversationId/messages",
+  authorize("chat.reply"),
+  sendStaffChatMessageController,
+);
+router.post(
+  "/conversations/:conversationId/close",
+  authorize("chat.close"),
+  closeStaffChatConversationController,
 );
 
 export default router;

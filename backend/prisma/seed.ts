@@ -45,6 +45,8 @@ const permissions = [
   "audit_logs.read",
   "chat.read",
   "chat.assign",
+  "chat.reply",
+  "chat.close",
 ];
 
 const roles = {
@@ -85,6 +87,8 @@ const roles = {
     "warranty.manage",
     "chat.read",
     "chat.assign",
+    "chat.reply",
+    "chat.close",
   ],
   DELIVERY_AGENT: [
     "deliveries.read",
