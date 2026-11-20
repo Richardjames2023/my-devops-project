@@ -361,6 +361,14 @@ describe("Chat AI generation (PostgreSQL)", () => {
     expect(second.status).toBe("GENERATED");
     expect(second.botMessage?.id).toBe(first.botMessage?.id);
     expect(mocks.generateReply).toHaveBeenCalledTimes(1);
+
+    const botBroadcasts = broadcasts.filter(
+      (item) =>
+        item.event === "chat:message:new" &&
+        item.payload.conversationId === conversation.id &&
+        item.payload.senderType === "BOT",
+    );
+    expect(botBroadcasts).toHaveLength(1);
   });
 
   it("allows only one provider call for concurrent generation requests", async () => {
