@@ -94,6 +94,11 @@ describe("Chat conversation foundation (PostgreSQL)", () => {
   afterAll(async () => {
     if (conversationIds.length > 0) {
       await pool.query(
+        `DELETE FROM notification_outbox
+         WHERE "aggregateType" = 'CHAT' AND "aggregateId" = ANY($1::text[])`,
+        [conversationIds],
+      );
+      await pool.query(
         "DELETE FROM chat_conversations WHERE id = ANY($1::uuid[])",
         [conversationIds],
       );
@@ -341,6 +346,21 @@ describe("Chat conversation foundation (PostgreSQL)", () => {
     );
 
     expect(events.rows[0].count).toBe(1);
+
+    const notificationEvents = await pool.query(
+      `SELECT "eventType", "aggregateType", "aggregateId", payload
+       FROM notification_outbox
+       WHERE "eventType" = 'chat.handoff_requested'
+         AND "aggregateId" = $1`,
+      [conversation.id],
+    );
+    expect(notificationEvents.rows).toHaveLength(1);
+    expect(notificationEvents.rows[0]).toMatchObject({
+      eventType: "chat.handoff_requested",
+      aggregateType: "CHAT",
+      aggregateId: conversation.id,
+      payload: { conversationId: conversation.id, source: "customer" },
+    });
 
     const systemMessages = await pool.query(
       `SELECT COUNT(*)::int AS count
