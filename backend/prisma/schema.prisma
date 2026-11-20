@@ -1169,7 +1169,6 @@ model ChatRealtimeEvent {
   conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, sequence])
-  @@index([conversationId, sequence])
   @@map("chat_realtime_events")
 }
 
