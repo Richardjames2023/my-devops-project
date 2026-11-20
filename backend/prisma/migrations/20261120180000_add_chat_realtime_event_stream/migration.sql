@@ -83,7 +83,8 @@ BEGIN
   WHERE "id" = NEW."conversation_id"
   RETURNING
     "realtime_sequence", "status", "assigned_agent_id", "closed_at", "updated_at"
-  INTO next_sequence, conversation_row;
+  INTO conversation_row;
+  next_sequence := conversation_row.realtime_sequence;
 
   event_payload := jsonb_build_object(
     'conversationId', NEW."conversation_id",
