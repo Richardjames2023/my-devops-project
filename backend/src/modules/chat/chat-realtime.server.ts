@@ -230,7 +230,7 @@ export async function resolveChatSocketIdentity(socket: Socket): Promise<ChatSoc
   return { type: "GUEST", id: session.id, expiresAt: session.expiresAt };
 }
 
-async function canJoinConversation(
+export async function canJoinConversation(
   identity: ChatSocketIdentity,
   conversationId: string,
 ): Promise<boolean> {
