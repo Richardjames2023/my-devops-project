@@ -62,6 +62,7 @@ describe("Staff chat replies and closure (PostgreSQL)", () => {
   let otherAgentId: string;
   let activeConversationId: string;
   let waitingConversationId: string;
+  let raceConversationId: string;
 
   beforeAll(async () => {
     const result = await pool.query("SELECT current_database() AS name");
@@ -83,6 +84,12 @@ describe("Staff chat replies and closure (PostgreSQL)", () => {
     waitingConversationId = waiting.id;
     conversationIds.push(waiting.id);
     await requestHumanHandoff(owner, waiting.id);
+
+    const race = await createConversation(owner);
+    raceConversationId = race.id;
+    conversationIds.push(race.id);
+    await requestHumanHandoff(owner, race.id);
+    await claimStaffChatConversation(race.id, assignedAgentId);
   });
 
   afterAll(async () => {
@@ -151,7 +158,7 @@ describe("Staff chat replies and closure (PostgreSQL)", () => {
     expect(conversation.lastMessageAt.getTime()).toBeGreaterThanOrEqual(first.createdAt.getTime());
   });
 
-  it("rejects replies until a conversation is claimed", async () => {
+  it("rejects replies to conversations that have not been assigned", async () => {
     await expect(
       sendStaffChatMessage(waitingConversationId, assignedAgentId, {
         content: "This should not be sent yet.",
@@ -186,6 +193,38 @@ describe("Staff chat replies and closure (PostgreSQL)", () => {
         newStatus: "CLOSED",
       }),
     ]);
+  });
+
+  it("serializes a concurrent reply and close so no reply is committed after closure", async () => {
+    const results = await Promise.allSettled([
+      sendStaffChatMessage(raceConversationId, assignedAgentId, {
+        content: "Concurrent reply",
+        clientMessageId: randomUUID(),
+      }),
+      closeStaffChatConversation(raceConversationId, assignedAgentId),
+    ]);
+
+    expect(results[1]?.status).toBe("fulfilled");
+    if (results[0]?.status === "rejected") {
+      expect(results[0].reason).toMatchObject({ statusCode: 409 });
+    }
+
+    const conversation = await prisma.chatConversation.findUniqueOrThrow({
+      where: { id: raceConversationId },
+      select: { status: true, closedAt: true },
+    });
+    expect(conversation.status).toBe("CLOSED");
+
+    const messages = await prisma.chatMessage.findMany({
+      where: { conversationId: raceConversationId, senderType: "AGENT" },
+      select: { createdAt: true },
+    });
+    expect(messages.length).toBeLessThanOrEqual(1);
+    if (messages[0]) {
+      expect(messages[0].createdAt.getTime()).toBeLessThanOrEqual(
+        conversation.closedAt!.getTime(),
+      );
+    }
   });
 
   it("rejects new replies after closure and prevents another agent from closing", async () => {
