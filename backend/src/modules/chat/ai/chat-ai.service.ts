@@ -349,16 +349,22 @@ async function persistGeneratedReply(input: {
   handoffRecommended: boolean;
   handoffReason: string | null;
 }): Promise<ChatAiAutomationResult> {
-  let committedNewReply = false;
-  let handoffSystemMessage: BotMessage | null = null;
-  let handoffConversation: {
-    status: ChatConversationStatus;
-    assignedAgentId: string | null;
-    closedAt: Date | null;
-    updatedAt: Date;
-  } | null = null;
+  type PersistedEvents = {
+    result: ChatAiAutomationResult;
+    botMessage: BotMessage | null;
+    handoffSystemMessage: BotMessage | null;
+    handoffConversation: {
+      status: ChatConversationStatus;
+      assignedAgentId: string | null;
+      closedAt: Date | null;
+      updatedAt: Date;
+    } | null;
+  };
 
-  const result: ChatAiAutomationResult = await prisma.$transaction(async (tx): Promise<ChatAiAutomationResult> => {
+  const transactionResult = await prisma.$transaction(
+    async (tx): Promise<PersistedEvents> => {
+      let handoffSystemMessage: BotMessage | null = null;
+      let handoffConversation: PersistedEvents["handoffConversation"] = null;
     /*
      * Lock the conversation first.
      *
@@ -377,7 +383,12 @@ async function persistGeneratedReply(input: {
     const conversation = conversations[0];
 
     if (!conversation) {
-      return { status: "UNAVAILABLE" };
+      return {
+        result: { status: "UNAVAILABLE" },
+        botMessage: null,
+        handoffSystemMessage: null,
+        handoffConversation: null,
+      };
     }
 
     /*
@@ -401,7 +412,12 @@ async function persistGeneratedReply(input: {
     const generation = generations[0];
 
     if (!generation) {
-      return { status: "UNAVAILABLE" };
+      return {
+        result: { status: "UNAVAILABLE" },
+        botMessage: null,
+        handoffSystemMessage: null,
+        handoffConversation: null,
+      };
     }
 
     if (
@@ -418,9 +434,14 @@ async function persistGeneratedReply(input: {
         select: botMessageSelect,
       });
 
-      return existing
-        ? toAutomationResult(existing)
-        : { status: "UNAVAILABLE" };
+      return {
+        result: existing
+          ? toAutomationResult(existing)
+          : { status: "UNAVAILABLE" },
+        botMessage: null,
+        handoffSystemMessage: null,
+        handoffConversation: null,
+      };
     }
 
     if (
@@ -428,7 +449,12 @@ async function persistGeneratedReply(input: {
       generation.leaseToken !== input.leaseToken ||
       !generation.leaseValid
     ) {
-      return { status: "UNAVAILABLE" };
+      return {
+        result: { status: "UNAVAILABLE" },
+        botMessage: null,
+        handoffSystemMessage: null,
+        handoffConversation: null,
+      };
     }
 
     /*
@@ -452,7 +478,12 @@ async function persistGeneratedReply(input: {
         },
       });
 
-      return { status: "UNAVAILABLE" };
+      return {
+        result: { status: "UNAVAILABLE" },
+        botMessage: null,
+        handoffSystemMessage: null,
+        handoffConversation: null,
+      };
     }
 
     /*
@@ -474,7 +505,6 @@ async function persistGeneratedReply(input: {
       },
       select: botMessageSelect,
     });
-    committedNewReply = true;
 
     let lastMessageAt = botMessage.createdAt;
 
@@ -555,36 +585,42 @@ async function persistGeneratedReply(input: {
     });
 
     return {
-      status: input.handoffRecommended
-        ? "HANDOFF_RECOMMENDED"
-        : "GENERATED",
-      botMessage: toBotMessage(botMessage),
+      result: {
+        status: input.handoffRecommended
+          ? "HANDOFF_RECOMMENDED"
+          : "GENERATED",
+        botMessage: toBotMessage(botMessage),
+      },
+      botMessage,
+      handoffSystemMessage,
+      handoffConversation,
     };
-  });
+  },
+  );
 
-  if (committedNewReply && result.botMessage) {
+  if (transactionResult.botMessage) {
     emitChatMessage({
-      ...result.botMessage,
+      ...transactionResult.botMessage,
       conversationId: input.conversationId,
     });
   }
-  if (handoffSystemMessage) {
+  if (transactionResult.handoffSystemMessage) {
     emitChatMessage({
-      ...handoffSystemMessage,
+      ...transactionResult.handoffSystemMessage,
       conversationId: input.conversationId,
     });
   }
-  if (handoffConversation) {
+  if (transactionResult.handoffConversation) {
     emitChatConversationStatus({
       conversationId: input.conversationId,
-      status: handoffConversation.status,
-      assignedAgentId: handoffConversation.assignedAgentId,
-      closedAt: handoffConversation.closedAt,
-      updatedAt: handoffConversation.updatedAt,
+      status: transactionResult.handoffConversation.status,
+      assignedAgentId: transactionResult.handoffConversation.assignedAgentId,
+      closedAt: transactionResult.handoffConversation.closedAt,
+      updatedAt: transactionResult.handoffConversation.updatedAt,
     });
   }
 
-  return result;
+  return transactionResult.result;
 }
 
 export async function generateChatAiReply(
