@@ -53,7 +53,7 @@ function readBearerToken(socket: Socket): string | null {
   if (header === undefined) return null;
   if (typeof header !== "string") throw new Error("Invalid authorization header");
 
-  const match = /^Bearer ([^\\s]+)$/.exec(header);
+  const match = /^Bearer ([^\s]+)$/.exec(header);
   if (!match?.[1]) throw new Error("Invalid authorization header");
   return match[1];
 }
