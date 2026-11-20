@@ -17,6 +17,10 @@ const inboxQuerySchema = z.object({
 });
 
 const conversationIdSchema = z.object({ conversationId: z.uuid() });
+const transcriptQuerySchema = z.object({
+  messageLimit: z.coerce.number().int().min(1).max(100).default(50),
+  messageCursor: z.uuid().optional(),
+});
 
 function getStaffActor(req: AuthenticatedRequest): string {
   if (!req.user || req.user.identityType !== "STAFF") {
@@ -61,7 +65,21 @@ export async function getStaffChatConversationController(
   req: AuthenticatedRequest,
   res: Response,
 ): Promise<void> {
-  const conversation = await getStaffChatConversation(getConversationId(req));
+  const parsed = transcriptQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: z.flattenError(parsed.error).fieldErrors,
+    });
+    return;
+  }
+
+  const conversation = await getStaffChatConversation(getConversationId(req), {
+    limit: parsed.data.messageLimit,
+    ...(parsed.data.messageCursor
+      ? { cursor: parsed.data.messageCursor }
+      : {}),
+  });
   res.status(200).json({
     message: "Staff chat conversation retrieved",
     data: { conversation },
