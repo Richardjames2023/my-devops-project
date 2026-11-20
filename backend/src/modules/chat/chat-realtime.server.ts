@@ -182,7 +182,7 @@ async function isIdentityCurrent(identity: ChatSocketIdentity): Promise<boolean>
   return staffHasChatReadPermission(identity.id);
 }
 
-async function resolveSocketIdentity(socket: Socket): Promise<ChatSocketIdentity> {
+export async function resolveChatSocketIdentity(socket: Socket): Promise<ChatSocketIdentity> {
   const token = readBearerToken(socket);
   if (token) {
     const claims = verifyAccessToken(token);
@@ -289,7 +289,7 @@ export function createChatRealtimeServer(
   });
 
   io.use((socket, next) => {
-    void resolveSocketIdentity(socket)
+    void resolveChatSocketIdentity(socket)
       .then((identity) => {
         (socket as ChatSocket).data.chatIdentity = identity;
         next();
