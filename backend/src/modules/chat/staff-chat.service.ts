@@ -93,7 +93,10 @@ export async function listStaffChatConversations(input: {
   };
 }
 
-export async function getStaffChatConversation(conversationId: string) {
+export async function getStaffChatConversation(
+  conversationId: string,
+  input: { limit: number; cursor?: string },
+) {
   const conversation = await prisma.chatConversation.findUnique({
     where: { id: conversationId },
     select: {
@@ -130,14 +133,44 @@ export async function getStaffChatConversation(conversationId: string) {
     throw new AppError("Conversation not found", 404);
   }
 
-  const messages = await prisma.chatMessage.findMany({
-    where: { conversationId },
+  const where: Prisma.ChatMessageWhereInput = { conversationId };
+  if (input.cursor) {
+    const cursorMessage = await prisma.chatMessage.findFirst({
+      where: { id: input.cursor, conversationId },
+      select: { id: true, createdAt: true },
+    });
+
+    if (!cursorMessage) {
+      throw new AppError("Invalid message cursor", 400);
+    }
+
+    where.OR = [
+      { createdAt: { lt: cursorMessage.createdAt } },
+      {
+        createdAt: cursorMessage.createdAt,
+        id: { lt: cursorMessage.id },
+      },
+    ];
+  }
+
+  const rows = await prisma.chatMessage.findMany({
+    where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: 200,
+    take: input.limit + 1,
     select: transcriptMessageSelect,
   });
 
-  return { ...conversation, messages: messages.reverse() };
+  const hasMore = rows.length > input.limit;
+  const messages = rows.slice(0, input.limit).reverse();
+
+  return {
+    ...conversation,
+    messages,
+    messagePagination: {
+      hasMore,
+      nextCursor: hasMore ? messages[0]?.id ?? null : null,
+    },
+  };
 }
 
 /**
