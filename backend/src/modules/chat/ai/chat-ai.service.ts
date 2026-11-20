@@ -12,6 +12,7 @@ import prisma from "../../../infrastructure/prisma/client";
 import type { ChatOwner } from "../chat.types";
 import { createChatAiProvider } from "./chat-ai.provider.factory";
 import { loadCustomerSupportKnowledgeBase } from "./customer-support-knowledge-base";
+import { publishNotificationEvent } from "../../notifications/notification-outbox.publisher";
 import type { ChatAiHistoryMessage } from "./chat-ai.types";
 
 const LEASE_MS = 30_000;
@@ -496,6 +497,17 @@ async function persistGeneratedReply(input: {
         where: { id: input.conversationId },
         data: {
           status: ChatConversationStatus.WAITING_FOR_AGENT,
+        },
+      });
+
+      await publishNotificationEvent(tx, {
+        eventType: "chat.handoff_requested",
+        aggregateType: "CHAT",
+        aggregateId: input.conversationId,
+        payload: {
+          conversationId: input.conversationId,
+          source: "ai",
+          reason: input.handoffReason,
         },
       });
     }

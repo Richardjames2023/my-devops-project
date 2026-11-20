@@ -1,6 +1,6 @@
 # AI Customer Chatbot and Human Handoff
 
-**Status:** Chat foundation and AI-response backend implemented; staff workflow and real-time delivery remain planned  
+**Status:** Chat foundation, AI responses, staff inbox/replies/closure, and durable handoff notifications implemented; real-time delivery and frontend integration remain planned
 **Target repository:** `Richardjames2023/my-devops-project`  
 **Implementation branch:** `feat/ai-chatbot-human-handoff`  
 **Last updated:** 2026-11-20
@@ -225,7 +225,9 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 ### Phase 3 — Staff operations and real-time transport
 - Attach Socket.IO to the existing HTTP server and graceful shutdown.
 - Add staff inbox, claim/assignment, agent replies and closure APIs.
-- Add durable handoff notifications through the existing outbox.
+- [x] Add durable handoff notifications through the existing outbox.
+  - Customer-requested and AI-recommended handoffs publish the outbox event in the same transaction as the state transition.
+  - Active staff with `chat.read` receive mandatory in-app alerts; email remains disabled for this event.
 - Add authenticated socket rooms and reconnect/history recovery.
 
 ### Phase 4 — Frontend integration and business context

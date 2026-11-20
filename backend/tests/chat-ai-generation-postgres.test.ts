@@ -144,6 +144,11 @@ describe("Chat AI generation (PostgreSQL)", () => {
   afterAll(async () => {
     if (conversationIds.length > 0) {
       await pool.query(
+        `DELETE FROM notification_outbox
+         WHERE "aggregateType" = 'CHAT' AND "aggregateId" = ANY($1::text[])`,
+        [conversationIds],
+      );
+      await pool.query(
         "DELETE FROM chat_conversations WHERE id = ANY($1::uuid[])",
         [conversationIds],
       );
@@ -259,6 +264,21 @@ describe("Chat AI generation (PostgreSQL)", () => {
       },
     });
     expect(handoffMessages).toHaveLength(1);
+
+    const notificationEvents = await prisma.notificationOutbox.findMany({
+      where: {
+        eventType: "chat.handoff_requested",
+        aggregateType: "CHAT",
+        aggregateId: conversation.id,
+      },
+    });
+    expect(notificationEvents).toHaveLength(1);
+    expect(notificationEvents[0]?.payload).toEqual({
+      conversationId: conversation.id,
+      source: "ai",
+      reason: handoffReply.handoff.reason,
+    });
+
     expect(updatedConversation.lastMessageAt).toEqual(
       handoffMessages[0]?.createdAt,
     );

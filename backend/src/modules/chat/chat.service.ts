@@ -7,6 +7,7 @@ import {
 import { AppError } from "../../common/errors/AppError";
 import prisma from "../../infrastructure/prisma/client";
 import type { ChatOwner } from "./chat.types";
+import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
 
 const conversationSelect = {
   id: true,
@@ -302,6 +303,16 @@ export async function requestHumanHandoff(
         senderType: ChatSenderType.SYSTEM,
         content: "Your request is in the customer-care queue. An agent will join as soon as one is available.",
         createdAt: now,
+      },
+    });
+
+    await publishNotificationEvent(tx, {
+      eventType: "chat.handoff_requested",
+      aggregateType: "CHAT",
+      aggregateId: conversationId,
+      payload: {
+        conversationId,
+        source: "customer",
       },
     });
 
