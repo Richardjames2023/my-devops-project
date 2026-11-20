@@ -210,9 +210,9 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - [x] Add customer/guest conversation creation, listing, ownership-protected details and paginated message history.
 - [x] Add idempotent customer message persistence and atomic customer handoff transition.
 - [x] Add PostgreSQL integration coverage for ownership, pagination, idempotency and concurrent handoff.
-- [ ] Add staff inbox, assignment and agent reply endpoints in the next implementation slice.
+- [x] Add staff inbox, assignment, agent reply and closure endpoints (implemented in the staff operations slice).
 - [x] Run Prisma validation, client generation, TypeScript build and PostgreSQL integration tests locally.
-- Staff inbox, assignment and agent-reply endpoints are not part of this phase and remain outstanding.
+- Staff inbox, assignment, agent-reply and closure endpoints are implemented and covered by PostgreSQL integration tests.
 
 ### Phase 2 — AI responses and controlled knowledge
 - [x] Add provider interface and the Gemini adapter.
@@ -223,12 +223,14 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - [ ] Add usage and cost telemetry.
 
 ### Phase 3 — Staff operations and real-time transport
-- Attach Socket.IO to the existing HTTP server and graceful shutdown.
-- Add staff inbox, claim/assignment, agent replies and closure APIs.
+- [x] Attach Socket.IO to the existing HTTP server with the configured CORS origin allowlist.
+- [x] Stop realtime connections before HTTP/job draining and Prisma disconnect during graceful shutdown.
+- [x] Add staff inbox, claim/assignment, agent replies and closure APIs.
 - [x] Add durable handoff notifications through the existing outbox.
   - Customer-requested and AI-recommended handoffs publish the outbox event in the same transaction as the state transition.
   - Active staff with `chat.read` receive mandatory in-app alerts; email remains disabled for this event.
-- Add authenticated socket rooms and reconnect/history recovery.
+- [ ] Add authenticated socket rooms and reconnect/history recovery.
+- [ ] Broadcast committed customer, AI and staff messages and conversation lifecycle events.
 
 ### Phase 4 — Frontend integration and business context
 - Add the customer widget to the storefront.
@@ -262,4 +264,4 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 
 ## 14. Initial implementation boundary
 
-The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints, durable handoff notifications, Socket.IO delivery, frontend integration, and usage/cost telemetry remain separate follow-up work.
+The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO infrastructure is now attached to the HTTP server; authenticated rooms, event delivery, frontend integration, and usage/cost telemetry remain follow-up work.
