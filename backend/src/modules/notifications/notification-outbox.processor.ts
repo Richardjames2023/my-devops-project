@@ -591,13 +591,10 @@ async function resolveDrafts(tx: Prisma.TransactionClient, event: OutboxEvent): 
     const conversationId = payloadString(event.payload, "conversationId") ?? event.aggregateId;
     const conversation = await tx.chatConversation.findUnique({
       where: { id: conversationId },
-      select: { id: true, status: true },
+      select: { id: true },
     });
     if (!conversation) {
       throw new Error("Chat conversation not found for handoff notification: " + conversationId);
-    }
-    if (conversation.status !== "WAITING_FOR_AGENT") {
-      return [];
     }
 
     const staff = await tx.staffAccount.findMany({
