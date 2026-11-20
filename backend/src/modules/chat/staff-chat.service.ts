@@ -332,8 +332,11 @@ export async function sendStaffChatMessage(
       select: staffMessageSelect,
     });
     if (existing) {
-      if (existing.senderAgentId !== staffAccountId) {
-        throw new AppError("Client message ID has already been used", 409);
+      if (
+        existing.senderAgentId !== staffAccountId ||
+        existing.content !== input.content
+      ) {
+        throw new AppError("Client message ID has already been used with a different request", 409);
       }
       return existing;
     }
