@@ -144,6 +144,11 @@ async function staffHasChatReadPermission(staffId: string): Promise<boolean> {
 }
 
 async function isIdentityCurrent(identity: ChatSocketIdentity): Promise<boolean> {
+  const expiresAt = identity.expiresAt instanceof Date
+    ? identity.expiresAt.getTime()
+    : identity.expiresAt * 1000;
+  if (expiresAt <= Date.now()) return false;
+
   if (identity.type === "CUSTOMER") {
     const user = await prisma.user.findUnique({
       where: { id: identity.id },
@@ -300,11 +305,6 @@ export function createChatRealtimeServer(
       return;
     }
 
-    const expiryDelay = identity.expiresAt instanceof Date
-      ? identity.expiresAt.getTime() - Date.now()
-      : identity.expiresAt * 1000 - Date.now();
-    const expiryTimer = setTimeout(() => socket.disconnect(true), Math.max(0, expiryDelay));
-
     let identityCheckRunning = false;
     const identityTimer = setInterval(() => {
       if (identityCheckRunning) return;
@@ -318,7 +318,6 @@ export function createChatRealtimeServer(
     }, IDENTITY_RECHECK_INTERVAL_MS);
 
     socket.on("disconnect", () => {
-      clearTimeout(expiryTimer);
       clearInterval(identityTimer);
     });
 
