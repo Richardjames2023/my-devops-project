@@ -271,7 +271,7 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 
 ## 14. Initial implementation boundary
 
-The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO is attached to the HTTP server with origin enforcement and graceful shutdown. Customer, guest and staff socket authentication plus ownership/permission-checked conversation rooms are implemented. Persisted customer, AI, system and staff messages plus handoff, assignment and closure transitions are broadcast after commit to authorized conversation rooms. Reconnect/history recovery, frontend integration, and usage/cost telemetry remain follow-up work.
+The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO is attached to the HTTP server with origin enforcement and graceful shutdown. Customer, guest and staff socket authentication plus ownership/permission-checked conversation rooms are implemented. Persisted customer, AI, system and staff messages plus handoff, assignment and closure transitions are broadcast after commit to authorized conversation rooms. Durable backend reconnect replay is implemented through the PostgreSQL event stream and customer/staff replay endpoints; frontend integration and usage/cost telemetry remain follow-up work.
 
 
 ## Reconnect recovery and missed-event synchronization
