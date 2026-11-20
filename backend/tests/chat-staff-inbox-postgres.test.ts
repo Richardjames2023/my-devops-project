@@ -96,26 +96,43 @@ describe("Staff chat inbox and assignment (PostgreSQL)", () => {
     conversationIds.push(conversation.id);
     await requestHumanHandoff(owner, conversation.id);
 
-    const result = await listStaffChatConversations({
-      status: "WAITING_FOR_AGENT",
-      limit: 20,
-    });
+    let cursor: string | undefined;
+    let matchingConversation:
+      | Awaited<ReturnType<typeof listStaffChatConversations>>["items"][number]
+      | undefined;
+    let pageCount = 0;
 
-    expect(result.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: conversation.id,
-          status: "WAITING_FOR_AGENT",
-          messages: [
-            expect.objectContaining({
-              senderType: "SYSTEM",
-              content: expect.stringContaining("customer-care queue"),
-            }),
-          ],
-        }),
-      ]),
+    do {
+      const page = await listStaffChatConversations({
+        status: "WAITING_FOR_AGENT",
+        limit: 20,
+        ...(cursor ? { cursor } : {}),
+      });
+
+      matchingConversation = page.items.find(
+        (item) => item.id === conversation.id,
+      );
+
+      if (page.nextCursor) {
+        expect(page.items.at(-1)?.id).toBe(page.nextCursor);
+      }
+
+      cursor = page.nextCursor ?? undefined;
+      pageCount += 1;
+    } while (!matchingConversation && cursor && pageCount < 1_000);
+
+    expect(matchingConversation).toEqual(
+      expect.objectContaining({
+        id: conversation.id,
+        status: "WAITING_FOR_AGENT",
+        messages: [
+          expect.objectContaining({
+            senderType: "SYSTEM",
+            content: expect.stringContaining("customer-care queue"),
+          }),
+        ],
+      }),
     );
-    expect(result.nextCursor).toBeNull();
   });
 
   it("returns the transcript and lifecycle audit events to staff services", async () => {
@@ -123,11 +140,43 @@ describe("Staff chat inbox and assignment (PostgreSQL)", () => {
     const conversation = await createConversation(owner);
     conversationIds.push(conversation.id);
     await requestHumanHandoff(owner, conversation.id);
+    await prisma.chatMessage.createMany({
+      data: Array.from({ length: 205 }, (_, index) => ({
+        conversationId: conversation.id,
+        senderType: "CUSTOMER",
+        content: `Historical customer message ${index + 1}`,
+      })),
+    });
 
-    const result = await getStaffChatConversation(conversation.id);
+    const firstPage = await getStaffChatConversation(conversation.id, {
+      limit: 50,
+    });
+    expect(firstPage.messages).toHaveLength(50);
+    expect(firstPage.messagePagination).toMatchObject({
+      hasMore: true,
+      nextCursor: firstPage.messages[0]?.id,
+    });
 
-    expect(result.messages.length).toBeGreaterThanOrEqual(2);
-    expect(result.events).toEqual([
+    const secondPage = await getStaffChatConversation(conversation.id, {
+      limit: 50,
+      cursor: firstPage.messagePagination.nextCursor!,
+    });
+    expect(secondPage.messages).toHaveLength(50);
+    expect(secondPage.messagePagination.hasMore).toBe(true);
+    expect(
+      secondPage.messages.some((message) =>
+        firstPage.messages.some((first) => first.id === message.id),
+      ),
+    ).toBe(false);
+
+    await expect(
+      getStaffChatConversation(conversation.id, {
+        limit: 50,
+        cursor: randomUUID(),
+      }),
+    ).rejects.toMatchObject({ statusCode: 400 });
+
+    expect(firstPage.events).toEqual([
       expect.objectContaining({
         eventType: "HANDOFF_REQUESTED",
         previousStatus: "BOT_ACTIVE",
