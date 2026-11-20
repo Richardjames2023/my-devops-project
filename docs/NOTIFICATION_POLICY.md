@@ -18,12 +18,14 @@ This document defines the notification channel policy enforced by the transactio
 | `inventory.low_stock` | Preference-controlled (enabled by default) | No | Inventory managers |
 | `refund.needs_attention` | Mandatory | Mandatory | Active staff with `refunds.manage` |
 | `staff.security_event` | Mandatory | Mandatory | Active staff with `staff.manage` or `audit_logs.read` |
+| `chat.handoff_requested` | Mandatory | No | Active staff with `chat.read`; preference cannot suppress a waiting-customer alert |
 
 ## Preference enforcement
 
 - Recipient preferences can disable routine in-app notifications.
 - Recipient preferences cannot enable email for routine categories.
 - Payment, security, and refund email notifications cannot be disabled.
+- Chat handoff alerts are mandatory in-app notifications but do not generate email; the staff inbox is the actionable destination.
 - Event-level mandatory policies take precedence over category preferences.
 - Legacy stored email preferences do not override the event policy.
 - Already-queued routine outbox email deliveries are marked `SUPPRESSED` before the email worker claims them; direct transactional emails without an outbox recipient key are unaffected.
