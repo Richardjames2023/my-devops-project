@@ -1,6 +1,6 @@
 # AI Customer Chatbot and Human Handoff
 
-**Status:** Chat foundation, AI responses, staff inbox/replies/closure, and durable handoff notifications implemented; real-time delivery and frontend integration remain planned
+**Status:** Chat foundation, AI responses, staff inbox/replies/closure, durable handoff notifications, Socket.IO transport, socket authentication and authorized conversation rooms implemented; realtime event broadcasting and frontend integration remain planned
 **Target repository:** `Richardjames2023/my-devops-project`  
 **Implementation branch:** `feat/ai-chatbot-human-handoff`  
 **Last updated:** 2026-11-20
@@ -264,4 +264,4 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 
 ## 14. Initial implementation boundary
 
-The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO infrastructure is now attached to the HTTP server; authenticated rooms, event delivery, frontend integration, and usage/cost telemetry remain follow-up work.
+The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO is attached to the HTTP server with origin enforcement and graceful shutdown. Customer, guest and staff socket authentication plus ownership/permission-checked conversation rooms are implemented. Persisted event broadcasting, reconnect/history recovery, frontend integration, and usage/cost telemetry remain follow-up work.
