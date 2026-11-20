@@ -10,6 +10,7 @@ import {
   createConversationController,
   getConversationController,
   listConversationMessagesController,
+  listConversationRealtimeEventsController,
   listConversationsController,
   requestHumanHandoffController,
   sendCustomerMessageController,
@@ -22,6 +23,11 @@ router.use(resolveChatOwner);
 router.post("/conversations", chatConversationLimiter, createConversationController);
 router.get("/conversations", chatReadLimiter, listConversationsController);
 router.get("/conversations/:conversationId", chatReadLimiter, getConversationController);
+router.get(
+  "/conversations/:conversationId/events",
+  chatReadLimiter,
+  listConversationRealtimeEventsController,
+);
 router.get(
   "/conversations/:conversationId/messages",
   chatReadLimiter,
