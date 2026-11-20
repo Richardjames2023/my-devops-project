@@ -24,6 +24,27 @@ describe("graceful server shutdown", () => {
     vi.restoreAllMocks();
   });
 
+  it("stops realtime sockets before draining HTTP requests and jobs", async () => {
+    const order: string[] = [];
+    const stopRealtimeServer = vi.fn(() => { order.push("realtime"); });
+    const closeServer = vi.fn(async () => { order.push("http"); });
+    const stopJob = vi.fn(async () => { order.push("jobs"); });
+    const disconnectDatabase = vi.fn(async () => { order.push("database"); });
+
+    await runGracefulShutdown({
+      stopRealtimeServer,
+      closeServer,
+      stopJobs: [stopJob],
+      disconnectDatabase,
+      timeoutMs: 10_000,
+      logger: createLogger(),
+      exit: vi.fn(),
+    });
+
+    expect(order).toEqual(["realtime", "http", "jobs", "database"]);
+    expect(stopRealtimeServer).toHaveBeenCalledOnce();
+  });
+
   it("waits for active HTTP requests and jobs before disconnecting the database", async () => {
     const httpDrain = deferred();
     const jobDrain = deferred();
