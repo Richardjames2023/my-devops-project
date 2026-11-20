@@ -305,6 +305,10 @@ export function createChatRealtimeServer(
       return;
     }
 
+    // Reserve room capacity before the first await. Without this set, many
+    // concurrent join requests can all observe a free slot and exceed the cap.
+    const pendingRoomJoins = new Set<string>();
+
     let identityCheckRunning = false;
     const identityTimer = setInterval(() => {
       if (identityCheckRunning) return;
@@ -337,21 +341,41 @@ export function createChatRealtimeServer(
         }
 
         const room = getChatConversationRoomName(conversationId);
+        const alreadyJoined = socket.rooms.has(room);
+        const alreadyPending = pendingRoomJoins.has(room);
         const joinedRoomCount = [...socket.rooms].filter((name) =>
           name.startsWith(CHAT_ROOM_PREFIX),
         ).length;
-        if (!socket.rooms.has(room) && joinedRoomCount >= MAX_ROOMS_PER_SOCKET) {
+        const reservesCapacity = !alreadyJoined && !alreadyPending;
+
+        if (
+          reservesCapacity &&
+          joinedRoomCount + pendingRoomJoins.size >= MAX_ROOMS_PER_SOCKET
+        ) {
           acknowledge(callback, { ok: false, error: "Too many active conversations" });
           return;
         }
 
-        if (!(await canJoinConversation(identity, conversationId))) {
-          acknowledge(callback, { ok: false, error: "Conversation access denied" });
-          return;
-        }
+        if (reservesCapacity) pendingRoomJoins.add(room);
 
-        await socket.join(room);
-        acknowledge(callback, { ok: true, conversationId });
+        try {
+          if (!(await canJoinConversation(identity, conversationId))) {
+            acknowledge(callback, { ok: false, error: "Conversation access denied" });
+            return;
+          }
+
+          // A disconnect can happen while the database authorization check is
+          // pending. Never add a disconnected socket to a room afterwards.
+          if (!socket.connected) {
+            acknowledge(callback, { ok: false, error: "Socket is disconnected" });
+            return;
+          }
+
+          await socket.join(room);
+          acknowledge(callback, { ok: true, conversationId });
+        } finally {
+          if (reservesCapacity) pendingRoomJoins.delete(room);
+        }
       })().catch(() => {
         acknowledge(callback, { ok: false, error: "Unable to join conversation" });
       });
