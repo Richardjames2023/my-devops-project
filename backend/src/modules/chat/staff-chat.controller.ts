@@ -9,6 +9,7 @@ import {
   listStaffChatConversations,
   sendStaffChatMessage,
 } from "./staff-chat.service";
+import { listChatRealtimeEvents } from "./chat-realtime.service";
 
 const inboxQuerySchema = z.object({
   status: z.enum(["WAITING_FOR_AGENT", "HUMAN_ACTIVE", "CLOSED"]).default(
@@ -22,6 +23,10 @@ const conversationIdSchema = z.object({ conversationId: z.uuid() });
 const transcriptQuerySchema = z.object({
   messageLimit: z.coerce.number().int().min(1).max(100).default(50),
   messageCursor: z.uuid().optional(),
+});
+const realtimeSyncQuerySchema = z.object({
+  after: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
 });
 const staffMessageSchema = z.object({
   content: z.string().trim().min(1).max(4_000),
@@ -89,6 +94,29 @@ export async function getStaffChatConversationController(
   res.status(200).json({
     message: "Staff chat conversation retrieved",
     data: { conversation },
+  });
+}
+
+export async function listStaffChatRealtimeEventsController(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = realtimeSyncQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: z.flattenError(parsed.error).fieldErrors,
+    });
+    return;
+  }
+
+  const result = await listChatRealtimeEvents(
+    getConversationId(req),
+    parsed.data,
+  );
+  res.status(200).json({
+    message: "Staff chat realtime events retrieved",
+    data: result,
   });
 }
 
