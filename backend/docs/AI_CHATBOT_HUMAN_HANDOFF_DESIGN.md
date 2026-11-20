@@ -229,8 +229,10 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - [x] Add durable handoff notifications through the existing outbox.
   - Customer-requested and AI-recommended handoffs publish the outbox event in the same transaction as the state transition.
   - Active staff with `chat.read` receive mandatory in-app alerts; email remains disabled for this event.
-- [ ] Add authenticated socket rooms and reconnect/history recovery.
+- [x] Authenticate customer sockets against active/verified customer records and session versions; authenticate guests through the existing hashed guest-session cookie; authenticate staff against current active status and `chat.read` permission.
+- [x] Authorize conversation-room joins against current customer/guest ownership or current staff `chat.read` permission; periodically recheck identity validity and disconnect expired/revoked identities.
 - [ ] Broadcast committed customer, AI and staff messages and conversation lifecycle events.
+- [ ] Add reconnect/history recovery using the existing paginated REST history endpoints.
 
 ### Phase 4 — Frontend integration and business context
 - Add the customer widget to the storefront.
