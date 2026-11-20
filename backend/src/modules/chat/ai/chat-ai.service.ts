@@ -492,7 +492,7 @@ async function persistGeneratedReply(input: {
         },
       });
 
-      handoffSystemMessage = await tx.chatMessage.create({
+      const handoffMessage = await tx.chatMessage.create({
         data: {
           conversationId: input.conversationId,
           senderType: ChatSenderType.SYSTEM,
@@ -501,8 +501,8 @@ async function persistGeneratedReply(input: {
         },
         select: botMessageSelect,
       });
-
-      lastMessageAt = handoffSystemMessage.createdAt;
+      handoffSystemMessage = handoffMessage;
+      lastMessageAt = handoffMessage.createdAt;
 
       handoffConversation = await tx.chatConversation.update({
         where: { id: input.conversationId },
