@@ -17,9 +17,6 @@ CREATE TABLE "chat_realtime_events" (
 CREATE UNIQUE INDEX "chat_realtime_events_conversation_id_sequence_key"
 ON "chat_realtime_events"("conversation_id", "sequence");
 
-CREATE INDEX "chat_realtime_events_conversation_id_sequence_idx"
-ON "chat_realtime_events"("conversation_id", "sequence");
-
 -- Keep the replay log in the same transaction as the source chat record.
 -- The conversation row update serializes sequence allocation per conversation.
 CREATE OR REPLACE FUNCTION "record_chat_message_realtime_event"()
@@ -91,7 +88,7 @@ BEGIN
     'status', NEW."new_status",
     'assignedAgentId', conversation_row.assigned_agent_id,
     'closedAt', conversation_row.closed_at,
-    'updatedAt', conversation_row.updated_at
+    'updatedAt', NEW."created_at"
   );
 
   INSERT INTO "chat_realtime_events" (
