@@ -56,6 +56,12 @@ describe("notification event policy", () => {
     });
   });
 
+  it("requires mandatory in-app delivery without email for customer-support handoffs", () => {
+    expect(getNotificationEventPolicy("chat.handoff_requested")).toEqual({
+      category: "STAFF", inAppMandatory: true, emailMode: "DISABLED",
+    });
+  });
+
   it("rejects event types without an explicit policy", () => {
     expect(() => getNotificationEventPolicy("unknown.event")).toThrow(
       "Unsupported notification event type: unknown.event",
