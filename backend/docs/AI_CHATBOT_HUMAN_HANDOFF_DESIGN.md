@@ -272,3 +272,18 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 ## 14. Initial implementation boundary
 
 The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO is attached to the HTTP server with origin enforcement and graceful shutdown. Customer, guest and staff socket authentication plus ownership/permission-checked conversation rooms are implemented. Persisted customer, AI, system and staff messages plus handoff, assignment and closure transitions are broadcast after commit to authorized conversation rooms. Reconnect/history recovery, frontend integration, and usage/cost telemetry remain follow-up work.
+
+
+## Reconnect recovery and missed-event synchronization
+
+The chat realtime event stream is persisted in PostgreSQL. Database triggers append an event in the same transaction whenever a chat message or lifecycle event is inserted, so a committed message or handoff cannot be absent from the replay log.
+
+- Each conversation has a monotonically increasing `realtimeSequence`.
+- Sequence allocation updates the conversation row, serializing event ordering for that conversation.
+- `chat_realtime_events` stores the event name, payload, creation time and sequence.
+- Customer/guest clients can replay with `GET /api/v1/chat/conversations/:conversationId/events?after=<sequence>&limit=50`.
+- Staff clients can replay with `GET /api/v1/staff/chat/conversations/:conversationId/events?after=<sequence>&limit=50`; the existing `chat.read` authorization remains required.
+- Responses include ordered events, `lastSequence`, `currentSequence`, `hasMore` and `nextCursor`. Clients should persist `lastSequence` only after applying the returned page, and request subsequent pages with `after=nextCursor` while `hasMore` is true.
+- Clients should join the authorized Socket.IO room and then replay from their last applied sequence. Replayed message IDs and event IDs should be deduplicated; status updates are safe to apply idempotently.
+
+The event log is additive and does not replace the paginated transcript endpoints. Existing conversations retain their full transcript through REST history; the replay stream starts recording new events when this migration is deployed. No socket-originated writes are introduced. Event retention/compaction is intentionally not part of this change.
