@@ -358,7 +358,7 @@ async function persistGeneratedReply(input: {
     updatedAt: Date;
   } | null = null;
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result: ChatAiAutomationResult = await prisma.$transaction(async (tx): Promise<ChatAiAutomationResult> => {
     /*
      * Lock the conversation first.
      *
