@@ -60,11 +60,16 @@ const [
   { createConversation, requestHumanHandoff, sendCustomerMessage },
   { generateChatAiReply },
   { default: prisma, disconnectDatabase },
+  realtimeEvents,
 ] = await Promise.all([
   import("../src/modules/chat/chat.service"),
   import("../src/modules/chat/ai/chat-ai.service"),
   import("../src/infrastructure/prisma/client"),
+  import("../src/modules/chat/chat-realtime.events"),
 ]);
+
+const { setChatRealtimeServer } = realtimeEvents;
+const broadcasts: Array<{ room: string; event: string; payload: any }> = [];
 
 const customerIds: string[] = [];
 const guestSessionIds: string[] = [];
@@ -129,6 +134,14 @@ describe("Chat AI generation (PostgreSQL)", () => {
         "Safety check failed: chat AI tests require shop_db_test",
       );
     }
+
+    setChatRealtimeServer({
+      to: (room: string) => ({
+        emit: (event: string, payload: unknown) => {
+          broadcasts.push({ room, event, payload });
+        },
+      }),
+    } as Parameters<typeof setChatRealtimeServer>[0]);
   });
 
   beforeEach(() => {
@@ -142,6 +155,7 @@ describe("Chat AI generation (PostgreSQL)", () => {
   });
 
   afterAll(async () => {
+    setChatRealtimeServer(null);
     if (conversationIds.length > 0) {
       await pool.query(
         `DELETE FROM notification_outbox
@@ -209,6 +223,18 @@ describe("Chat AI generation (PostgreSQL)", () => {
     });
 
     expect(botMessages).toHaveLength(1);
+
+    const botBroadcasts = broadcasts.filter(
+      (item) =>
+        item.event === "chat:message:new" &&
+        item.payload.conversationId === conversation.id &&
+        item.payload.senderType === "BOT",
+    );
+    expect(botBroadcasts).toHaveLength(1);
+    expect(botBroadcasts[0]?.payload).toMatchObject({
+      id: botMessages[0]?.id,
+      content: generatedReply.reply,
+    });
   });
 
   it("atomically hands off when AI recommends human support", async () => {
@@ -265,6 +291,23 @@ describe("Chat AI generation (PostgreSQL)", () => {
     });
     expect(handoffMessages).toHaveLength(1);
 
+    const conversationBroadcasts = broadcasts.filter(
+      (item) => item.payload.conversationId === conversation.id,
+    );
+    expect(
+      conversationBroadcasts.filter(
+        (item) => item.event === "chat:message:new" &&
+          ["BOT", "SYSTEM"].includes(item.payload.senderType),
+      ),
+    ).toHaveLength(2);
+    expect(
+      conversationBroadcasts.filter(
+        (item) =>
+          item.event === "chat:conversation:status" &&
+          item.payload.status === "WAITING_FOR_AGENT",
+      ),
+    ).toHaveLength(1);
+
     const notificationEvents = await prisma.notificationOutbox.findMany({
       where: {
         eventType: "chat.handoff_requested",
@@ -318,6 +361,14 @@ describe("Chat AI generation (PostgreSQL)", () => {
     expect(second.status).toBe("GENERATED");
     expect(second.botMessage?.id).toBe(first.botMessage?.id);
     expect(mocks.generateReply).toHaveBeenCalledTimes(1);
+
+    const botBroadcasts = broadcasts.filter(
+      (item) =>
+        item.event === "chat:message:new" &&
+        item.payload.conversationId === conversation.id &&
+        item.payload.senderType === "BOT",
+    );
+    expect(botBroadcasts).toHaveLength(1);
   });
 
   it("allows only one provider call for concurrent generation requests", async () => {

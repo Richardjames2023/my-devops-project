@@ -7,6 +7,7 @@ import {
 import { AppError } from "../../common/errors/AppError";
 import prisma from "../../infrastructure/prisma/client";
 import { updateConversationLastMessageAt } from "./chat.service";
+import { emitChatConversationAssigned, emitChatConversationStatus, emitChatMessage } from "./chat-realtime.events";
 
 const inboxConversationSelect = {
   id: true,
@@ -222,7 +223,7 @@ export async function claimStaffChatConversation(
   conversationId: string,
   staffAccountId: string,
 ) {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const current = await tx.chatConversation.findUnique({
       where: { id: conversationId },
       select: { id: true, status: true, assignedAgentId: true },
@@ -236,10 +237,13 @@ export async function claimStaffChatConversation(
       current.status === ChatConversationStatus.HUMAN_ACTIVE &&
       current.assignedAgentId === staffAccountId
     ) {
-      return tx.chatConversation.findUniqueOrThrow({
-        where: { id: conversationId },
-        select: inboxConversationSelect,
-      });
+      return {
+        conversation: await tx.chatConversation.findUniqueOrThrow({
+          where: { id: conversationId },
+          select: inboxConversationSelect,
+        }),
+        transitioned: false,
+      };
     }
 
     if (
@@ -271,10 +275,13 @@ export async function claimStaffChatConversation(
         latest?.status === ChatConversationStatus.HUMAN_ACTIVE &&
         latest.assignedAgentId === staffAccountId
       ) {
-        return tx.chatConversation.findUniqueOrThrow({
-          where: { id: conversationId },
-          select: inboxConversationSelect,
-        });
+        return {
+          conversation: await tx.chatConversation.findUniqueOrThrow({
+            where: { id: conversationId },
+            select: inboxConversationSelect,
+          }),
+          transitioned: false,
+        };
       }
 
       throw new AppError("Conversation is no longer available to claim", 409);
@@ -291,11 +298,34 @@ export async function claimStaffChatConversation(
       },
     });
 
-    return tx.chatConversation.findUniqueOrThrow({
-      where: { id: conversationId },
-      select: inboxConversationSelect,
-    });
+    return {
+      conversation: await tx.chatConversation.findUniqueOrThrow({
+        where: { id: conversationId },
+        select: inboxConversationSelect,
+      }),
+      transitioned: true,
+    };
   });
+
+  if (result.transitioned) {
+    const conversation = result.conversation;
+    emitChatConversationStatus({
+      conversationId,
+      status: conversation.status,
+      assignedAgentId: conversation.assignedAgentId,
+      assignedAgent: conversation.assignedAgent,
+      closedAt: conversation.closedAt,
+      updatedAt: conversation.updatedAt,
+    });
+    if (conversation.assignedAgent) {
+      emitChatConversationAssigned({
+        conversationId,
+        assignedAgent: conversation.assignedAgent,
+      });
+    }
+  }
+
+  return result.conversation;
 }
 
 /**
@@ -311,7 +341,7 @@ export async function sendStaffChatMessage(
   assertUuid(conversationId, "conversation ID");
   assertUuid(input.clientMessageId, "client message ID");
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const current = await lockStaffConversation(tx, conversationId);
     if (!current) {
       throw new AppError("Conversation not found", 404);
@@ -338,7 +368,7 @@ export async function sendStaffChatMessage(
       ) {
         throw new AppError("Client message ID has already been used with a different request", 409);
       }
-      return existing;
+      return { message: existing, created: false };
     }
 
     if (current.status === ChatConversationStatus.CLOSED) {
@@ -359,8 +389,13 @@ export async function sendStaffChatMessage(
       select: staffMessageSelect,
     });
     await updateConversationLastMessageAt(tx, conversationId, message.createdAt);
-    return message;
+    return { message, created: true };
   });
+
+  if (result.created) {
+    emitChatMessage(result.message);
+  }
+  return result.message;
 }
 
 /**
@@ -373,7 +408,7 @@ export async function closeStaffChatConversation(
 ) {
   assertUuid(conversationId, "conversation ID");
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const current = await lockStaffConversation(tx, conversationId);
     if (!current) {
       throw new AppError("Conversation not found", 404);
@@ -392,10 +427,13 @@ export async function closeStaffChatConversation(
         select: { id: true },
       });
       if (closeEvent) {
-        return tx.chatConversation.findUniqueOrThrow({
-          where: { id: conversationId },
-          select: inboxConversationSelect,
-        });
+        return {
+          conversation: await tx.chatConversation.findUniqueOrThrow({
+            where: { id: conversationId },
+            select: inboxConversationSelect,
+          }),
+          transitioned: false,
+        };
       }
       throw new AppError("Conversation has already been closed", 409);
     }
@@ -432,9 +470,26 @@ export async function closeStaffChatConversation(
       },
     });
 
-    return tx.chatConversation.findUniqueOrThrow({
-      where: { id: conversationId },
-      select: inboxConversationSelect,
-    });
+    return {
+      conversation: await tx.chatConversation.findUniqueOrThrow({
+        where: { id: conversationId },
+        select: inboxConversationSelect,
+      }),
+      transitioned: true,
+    };
   });
+
+  if (result.transitioned) {
+    const conversation = result.conversation;
+    emitChatConversationStatus({
+      conversationId,
+      status: conversation.status,
+      assignedAgentId: conversation.assignedAgentId,
+      assignedAgent: conversation.assignedAgent,
+      closedAt: conversation.closedAt,
+      updatedAt: conversation.updatedAt,
+    });
+  }
+
+  return result.conversation;
 }

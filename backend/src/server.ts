@@ -11,6 +11,7 @@ import { startCloudinaryCleanupJob } from "./infrastructure/jobs/cloudinary-clea
 import { startCustomerAccountDeletionJob } from "./infrastructure/jobs/customer-account-deletion.job";
 import { runGracefulShutdown } from "./infrastructure/shutdown/graceful-shutdown";
 import { createChatRealtimeServer } from "./modules/chat/chat-realtime.server";
+import { setChatRealtimeServer } from "./modules/chat/chat-realtime.events";
 
 async function startServer(): Promise<void> {
   try {
@@ -28,6 +29,7 @@ async function startServer(): Promise<void> {
     const server = createServer(app);
     const allowedOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim());
     const io = createChatRealtimeServer(server, allowedOrigins);
+    setChatRealtimeServer(io);
 
     server.listen(env.PORT, () => {
       logger.info("Server started", { port: env.PORT });
