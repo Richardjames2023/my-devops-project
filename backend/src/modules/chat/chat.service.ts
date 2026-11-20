@@ -8,6 +8,7 @@ import { AppError } from "../../common/errors/AppError";
 import prisma from "../../infrastructure/prisma/client";
 import type { ChatOwner } from "./chat.types";
 import { publishNotificationEvent } from "../notifications/notification-outbox.publisher";
+import { emitChatConversationStatus, emitChatMessage } from "./chat-realtime.events";
 
 const conversationSelect = {
   id: true,
@@ -194,7 +195,7 @@ export async function sendCustomerMessage(
   };
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const conversation = await tx.chatConversation.findFirst({
         where: { id: conversationId, ...ownerWhere(owner) },
         select: { status: true },
@@ -210,7 +211,7 @@ export async function sendCustomerMessage(
         where: uniqueKey,
         select: messageSelect,
       });
-      if (existing) return existing;
+      if (existing) return { message: existing, created: false };
 
       const message = await tx.chatMessage.create({
         data: {
@@ -226,8 +227,13 @@ export async function sendCustomerMessage(
         conversationId,
         message.createdAt,
       );
-      return message;
+      return { message, created: true };
     });
+
+    if (result.created) {
+      emitChatMessage({ ...result.message, conversationId });
+    }
+    return result.message;
   } catch (error) {
     // A concurrent retry can win the unique constraint after our initial
     // lookup. Return that persisted message instead of creating a duplicate.
@@ -248,7 +254,7 @@ export async function requestHumanHandoff(
 ) {
   assertUuid(conversationId);
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const conversation = await tx.chatConversation.findFirst({
       where: { id: conversationId, ...ownerWhere(owner) },
       select: { id: true, status: true },
@@ -258,10 +264,14 @@ export async function requestHumanHandoff(
     }
 
     if (conversation.status === ChatConversationStatus.WAITING_FOR_AGENT) {
-      return tx.chatConversation.findUniqueOrThrow({
-        where: { id: conversationId },
-        select: conversationSelect,
-      });
+      return {
+        conversation: await tx.chatConversation.findUniqueOrThrow({
+          where: { id: conversationId },
+          select: conversationSelect,
+        }),
+        transitioned: false,
+        systemMessage: null,
+      };
     }
     if (conversation.status !== ChatConversationStatus.BOT_ACTIVE) {
       throw new AppError("This conversation cannot be handed off in its current state", 409);
@@ -284,7 +294,9 @@ export async function requestHumanHandoff(
         where: { id: conversationId },
         select: conversationSelect,
       });
-      if (latest.status === ChatConversationStatus.WAITING_FOR_AGENT) return latest;
+      if (latest.status === ChatConversationStatus.WAITING_FOR_AGENT) {
+        return { conversation: latest, transitioned: false, systemMessage: null };
+      }
       throw new AppError("This conversation cannot be handed off in its current state", 409);
     }
 
@@ -297,13 +309,14 @@ export async function requestHumanHandoff(
         metadata: { source: "customer" },
       },
     });
-    await tx.chatMessage.create({
+    const systemMessage = await tx.chatMessage.create({
       data: {
         conversationId,
         senderType: ChatSenderType.SYSTEM,
         content: "Your request is in the customer-care queue. An agent will join as soon as one is available.",
         createdAt: now,
       },
+      select: messageSelect,
     });
 
     await publishNotificationEvent(tx, {
@@ -316,9 +329,28 @@ export async function requestHumanHandoff(
       },
     });
 
-    return tx.chatConversation.findUniqueOrThrow({
-      where: { id: conversationId },
-      select: conversationSelect,
-    });
+    return {
+      conversation: await tx.chatConversation.findUniqueOrThrow({
+        where: { id: conversationId },
+        select: conversationSelect,
+      }),
+      transitioned: true,
+      systemMessage,
+    };
   });
+
+  if (result.transitioned) {
+    emitChatConversationStatus({
+      conversationId,
+      status: result.conversation.status,
+      assignedAgentId: null,
+      closedAt: result.conversation.closedAt,
+      updatedAt: result.conversation.updatedAt,
+    });
+    if (result.systemMessage) {
+      emitChatMessage({ ...result.systemMessage, conversationId });
+    }
+  }
+
+  return result.conversation;
 }
