@@ -10,6 +10,8 @@ export interface GracefulShutdownLogger {
 }
 
 export interface GracefulShutdownOptions {
+  /** Stop accepting realtime connections and disconnect existing sockets. */
+  stopRealtimeServer?: () => void;
   closeServer: () => Promise<void>;
   closeAllConnections?: () => void;
   stopJobs: StopJob[];
@@ -20,10 +22,12 @@ export interface GracefulShutdownOptions {
 }
 
 /**
- * Stops accepting work, drains active HTTP/job work, and only then disconnects
- * Prisma. The deadline prevents a stuck server or worker from hanging shutdown.
+ * Stops realtime connections first, then drains active HTTP/job work, and
+ * only then disconnects Prisma. The deadline prevents a stuck server or
+ * worker from hanging shutdown.
  */
 export async function runGracefulShutdown({
+  stopRealtimeServer,
   closeServer,
   closeAllConnections,
   stopJobs,
@@ -49,6 +53,15 @@ export async function runGracefulShutdown({
 
   const drain = (async () => {
     try {
+      let realtimeError: unknown;
+      try {
+        // Prevent new socket work before the HTTP server begins draining.
+        stopRealtimeServer?.();
+      } catch (error) {
+        realtimeError = error;
+        logger.error("Realtime server did not stop cleanly", error);
+      }
+
       // Stop future job ticks and drain HTTP requests / active jobs concurrently.
       const results = await Promise.allSettled([
         closeServer(),
@@ -60,6 +73,7 @@ export async function runGracefulShutdown({
       const errors = results.flatMap((result) =>
         result.status === "rejected" ? [result.reason] : [],
       );
+      if (realtimeError !== undefined) errors.unshift(realtimeError);
       for (const error of errors) {
         logger.error("Server or background job did not stop cleanly", error);
       }
