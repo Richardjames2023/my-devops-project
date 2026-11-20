@@ -34,7 +34,7 @@ type ChatConversationStatusPayload = {
 let realtimeServer: ChatRealtimeTarget | null = null;
 
 /** Attach the live transport after Socket.IO authentication and room guards are configured. */
-export function setChatRealtimeServer(server: ChatRealtimeTarget): void {
+export function setChatRealtimeServer(server: ChatRealtimeTarget | null): void {
   realtimeServer = server;
 }
 
