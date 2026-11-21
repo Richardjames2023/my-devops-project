@@ -91,7 +91,7 @@ const Navbar = () => {
                 <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
               </button>
               <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-full z-50 mt-0 before:absolute before:-top-3 before:left-0 before:h-3 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
-                <div className="grid max-h-[min(560px,calc(100vh-180px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
+                <div className="grid max-h-[min(680px,calc(100vh-120px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
                   <div className="overflow-y-auto border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2">
                     <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
                     {shopCategories.map((category) => {
@@ -104,7 +104,7 @@ const Navbar = () => {
                       );
                     })}
                   </div>
-                  <div className="overflow-y-auto p-5">
+                  <div className="min-h-0 overflow-y-auto overscroll-contain p-5 pb-8">
                     <div className="mb-4 flex items-center justify-between border-b border-[var(--shop-peach)] pb-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wider text-[var(--shop-muted)]">Explore ShopSphere</p>
@@ -150,8 +150,8 @@ const Navbar = () => {
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "account" ? "rotate-180" : ""}`} />
               </button>
               <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-full z-50 mt-0 before:absolute before:-top-2 before:left-0 before:h-2 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
-                <div className="border-b border-[var(--shop-border)] bg-[var(--shop-navy)] p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+                <div className="border-b border-[var(--shop-peach)] bg-[var(--shop-peach-tint)] p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
                     Welcome to ShopSphere
                   </div>
