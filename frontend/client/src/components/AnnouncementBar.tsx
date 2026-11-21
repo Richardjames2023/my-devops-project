@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck, Sparkles } from "lucide-react";
+import { RotateCcw, ShieldCheck, Sparkles } from "lucide-react";
 
 const AnnouncementBar = () => {
   return (
@@ -9,6 +9,10 @@ const AnnouncementBar = () => {
           <span className="flex items-center gap-1.5">
             <Sparkles size={14} aria-hidden="true" />
             Discover new arrivals and everyday favourites
+          </span>
+          <span className="hidden items-center gap-1.5 sm:flex">
+            <RotateCcw size={14} aria-hidden="true" />
+            30-day easy returns
           </span>
           <span className="hidden items-center gap-1.5 md:flex">
             <ShieldCheck size={14} aria-hidden="true" />
