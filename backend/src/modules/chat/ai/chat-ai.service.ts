@@ -876,28 +876,36 @@ export async function generateChatAiReply(
         handoffReason: generated.handoff.reason,
       });
     } catch (error) {
+      try {
+        await prisma.chatAiUsage.updateMany({
+          where: {
+            generationId: claim.id,
+            attemptNumber: claim.attemptCount,
+          },
+          data: { persistenceStatus: "FAILED" },
+        });
+      } catch {
+        // Preserve the original persistence error; PENDING indicates unresolved accounting.
+      }
+      throw error;
+    }
+
+    try {
       await prisma.chatAiUsage.updateMany({
         where: {
           generationId: claim.id,
           attemptNumber: claim.attemptCount,
         },
-        data: { persistenceStatus: "FAILED" },
+        data: {
+          persistenceStatus:
+            result.botMessage?.content === generated.reply
+              ? "PERSISTED"
+              : "DISCARDED",
+        },
       });
-      throw error;
+    } catch {
+      // The provider usage row remains PENDING for operational reconciliation.
     }
-
-    await prisma.chatAiUsage.updateMany({
-      where: {
-        generationId: claim.id,
-        attemptNumber: claim.attemptCount,
-      },
-      data: {
-        persistenceStatus:
-          result.botMessage?.content === generated.reply
-            ? "PERSISTED"
-            : "DISCARDED",
-      },
-    });
 
     return result;
   } catch {
