@@ -22,6 +22,16 @@ export interface ChatAiTokenUsage {
   totalTokens: number | null;
 }
 
+export class ChatAiProviderResponseError extends Error {
+  constructor(
+    message: string,
+    readonly usage: ChatAiTokenUsage,
+  ) {
+    super(message);
+    this.name = "ChatAiProviderResponseError";
+  }
+}
+
 export interface ChatAiGenerateResult {
   reply: string;
   handoff: ChatAiHandoffRecommendation;
