@@ -20,24 +20,16 @@ const product: ProductType = {
   },
 };
 
-export const generateMetadata = async ({
-  params,
-}: {
-  params: { id: string };
-}) => {
-  // TODO:get the product from db
-  // TEMPORARY
+export const generateMetadata = async () => {
   return {
     title: product.name,
-    describe: product.description,
+    description: product.description,
   };
 };
 
 const ProductPage = async ({
-  params,
   searchParams,
 }: {
-  params: Promise<{ id: string }>;
   searchParams: Promise<{ color: string; size: string }>;
 }) => {
   const { size, color } = await searchParams;
