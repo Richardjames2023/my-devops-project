@@ -11,6 +11,9 @@ const script = `
     timeout: env.CHAT_AI_TIMEOUT_MS,
     maxHistory: env.CHAT_AI_MAX_HISTORY_MESSAGES,
     maxOutputTokens: env.CHAT_AI_MAX_OUTPUT_TOKENS,
+    inputRate: env.CHAT_AI_INPUT_USD_PER_MILLION_TOKENS ?? null,
+    outputRate: env.CHAT_AI_OUTPUT_USD_PER_MILLION_TOKENS ?? null,
+    pricingVersion: env.CHAT_AI_PRICING_VERSION ?? null,
   }));
 `;
 
@@ -58,6 +61,9 @@ describe("Chat AI environment configuration", () => {
       timeout: 15_000,
       maxHistory: 12,
       maxOutputTokens: 512,
+      inputRate: null,
+      outputRate: null,
+      pricingVersion: null,
     });
   });
 
@@ -95,6 +101,30 @@ describe("Chat AI environment configuration", () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("Invalid environment configuration");
+  });
+
+  it("accepts versioned input and output token pricing", () => {
+    const result = runEnvironment({
+      CHAT_AI_INPUT_USD_PER_MILLION_TOKENS: "0.25",
+      CHAT_AI_OUTPUT_USD_PER_MILLION_TOKENS: "1.50",
+      CHAT_AI_PRICING_VERSION: "gemini-pricing-2026-11",
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      inputRate: 0.25,
+      outputRate: 1.5,
+      pricingVersion: "gemini-pricing-2026-11",
+    });
+  });
+
+  it("rejects incomplete token pricing configuration", () => {
+    const result = runEnvironment({
+      CHAT_AI_INPUT_USD_PER_MILLION_TOKENS: "0.25",
+    });
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("CHAT_AI_PRICING_VERSION");
   });
 
   it("rejects a timeout outside the permitted range", () => {
