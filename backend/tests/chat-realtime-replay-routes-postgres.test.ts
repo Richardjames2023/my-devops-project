@@ -20,7 +20,7 @@ const [
   { default: app },
   { generateAccessToken },
   { createConversation, requestHumanHandoff },
-  { createGuestSession, hashGuestSessionToken },
+  { createGuestSession },
   { disconnectDatabase },
 ] = await Promise.all([
   import("../src/app"),
@@ -34,7 +34,6 @@ type Actor = { id: string; token: string };
 const customerIds: string[] = [];
 const conversationIds: string[] = [];
 const guestSessionIds: string[] = [];
-const guestTokenHashes: string[] = [];
 
 async function createCustomer(): Promise<Actor> {
   const id = randomUUID();
@@ -87,7 +86,6 @@ describe("Chat realtime replay customer and guest HTTP routes (PostgreSQL)", () 
 
     const guestSession = await createGuestSession();
     guestSessionIds.push(guestSession.session.id);
-    guestTokenHashes.push(hashGuestSessionToken(guestSession.token));
     guestCookie = `guest_session=${guestSession.token}`;
 
     const guestConversation = await createConversation({
@@ -114,12 +112,6 @@ describe("Chat realtime replay customer and guest HTTP routes (PostgreSQL)", () 
         await pool.query(
           "DELETE FROM guest_sessions WHERE id = ANY($1::uuid[])",
           [guestSessionIds],
-        );
-      }
-      if (guestTokenHashes.length) {
-        await pool.query(
-          "DELETE FROM guest_sessions WHERE token_hash = ANY($1::text[])",
-          [guestTokenHashes],
         );
       }
       if (customerIds.length) {
