@@ -1,7 +1,8 @@
 "use client";
 
 const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api/v1"
+  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  (process.env.NODE_ENV === "production" ? "" : "http://localhost:5000/api/v1")
 ).replace(/\/+$/, "");
 
 type ApiErrorPayload = {
@@ -52,7 +53,8 @@ export async function apiRequest<T>(
   } = options;
   const headers = new Headers(suppliedHeaders);
 
-  if (body !== undefined && !headers.has("Content-Type")) {
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !isFormData && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -63,11 +65,25 @@ export async function apiRequest<T>(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
+  if (!API_BASE_URL) {
+    throw new ApiError(
+      "The API base URL is not configured for this environment.",
+      500,
+    );
+  }
+
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  if (isFormData) {
+    headers.delete("Content-Type");
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...requestOptions,
     headers,
     credentials,
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(body === undefined
+      ? {}
+      : { body: isFormData ? body : JSON.stringify(body) }),
   });
 
   if (response.status === 204) {
