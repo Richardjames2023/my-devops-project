@@ -3,6 +3,7 @@ import type {
   ChatAiGenerateInput,
   ChatAiGenerateResult,
   ChatAiProvider,
+  ChatAiProviderResponseError,
 } from "./chat-ai.types";
 import { parseChatAiResponse } from "./chat-ai.response";
 
@@ -120,16 +121,23 @@ export class GeminiChatAiProvider implements ChatAiProvider {
       },
     });
 
-    const parsed = parseChatAiResponse(response.text);
-    const usage = response.usageMetadata;
-
-    return {
-      ...parsed,
-      usage: {
-        inputTokens: usage?.promptTokenCount ?? null,
-        outputTokens: usage?.candidatesTokenCount ?? null,
-        totalTokens: usage?.totalTokenCount ?? null,
-      },
+    const usageMetadata = response.usageMetadata;
+    const usage = {
+      inputTokens: usageMetadata?.promptTokenCount ?? null,
+      outputTokens: usageMetadata?.candidatesTokenCount ?? null,
+      totalTokens: usageMetadata?.totalTokenCount ?? null,
     };
+
+    try {
+      return {
+        ...parseChatAiResponse(response.text),
+        usage,
+      };
+    } catch (error) {
+      throw new ChatAiProviderResponseError(
+        error instanceof Error ? error.message : "AI provider returned an invalid response",
+        usage,
+      );
+    }
   }
 }
