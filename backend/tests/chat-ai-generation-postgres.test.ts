@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../src/modules/chat/ai/chat-ai.provider.factory", () => ({
   createChatAiProvider: () => ({
     name: "gemini",
+    model: "gemini-3.8-flash",
     generateReply: mocks.generateReply,
   }),
 }));
@@ -451,6 +452,19 @@ describe("Chat AI generation (PostgreSQL)", () => {
     expect(failed.status).toBe("FAILED");
     expect(failed.failureCode).toBe("AI_GENERATION_FAILED");
 
+    const failedUsage = await prisma.chatAiUsage.findMany({
+      where: { generationId: failed.id },
+    });
+    expect(failedUsage).toHaveLength(1);
+    expect(failedUsage[0]).toMatchObject({
+      attemptNumber: 1,
+      outcome: "FAILED",
+      persistenceStatus: "FAILED",
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+    });
+
     const second = await generateChatAiReply(input);
 
     expect(second.status).toBe("GENERATED");
@@ -462,6 +476,13 @@ describe("Chat AI generation (PostgreSQL)", () => {
     expect(completed.status).toBe("COMPLETED");
     expect(completed.attemptCount).toBe(2);
     expect(mocks.generateReply).toHaveBeenCalledTimes(2);
+
+    const attemptUsage = await prisma.chatAiUsage.findMany({
+      where: { generationId: completed.id },
+      orderBy: { attemptNumber: "asc" },
+    });
+    expect(attemptUsage.map((item) => item.outcome)).toEqual(["FAILED", "SUCCEEDED"]);
+    expect(attemptUsage.map((item) => item.attemptNumber)).toEqual([1, 2]);
   });
 
   it("reclaims an expired generation lease", async () => {
