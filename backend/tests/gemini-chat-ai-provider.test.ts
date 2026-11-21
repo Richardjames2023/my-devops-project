@@ -98,9 +98,14 @@ describe("GeminiChatAiProvider", () => {
     expect(request.config.responseMimeType).toBe("application/json");
   });
 
-  it("returns a validated provider response", async () => {
+  it("returns a validated provider response and normalized token usage", async () => {
     mocks.generateContent.mockResolvedValue({
       text: JSON.stringify(validResponse),
+      usageMetadata: {
+        promptTokenCount: 42,
+        candidatesTokenCount: 18,
+        totalTokenCount: 60,
+      },
     });
 
     const provider = new GeminiChatAiProvider(
@@ -114,7 +119,10 @@ describe("GeminiChatAiProvider", () => {
         knowledgeContext: "",
         history: [],
       }),
-    ).resolves.toEqual(validResponse);
+    ).resolves.toEqual({
+      ...validResponse,
+      usage: { inputTokens: 42, outputTokens: 18, totalTokens: 60 },
+    });
   });
 
   it("rejects invalid JSON returned by Gemini", async () => {
