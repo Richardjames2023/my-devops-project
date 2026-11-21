@@ -1220,9 +1220,36 @@ model ChatAiGeneration {
   updatedAt         DateTime               @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   customerMessage ChatMessage @relation(fields: [customerMessageId], references: [id], onDelete: Cascade)
+  usageRecords    ChatAiUsage[]
 
   @@index([status, leaseExpiresAt])
   @@map("chat_ai_generations")
+}
+
+
+model ChatAiUsage {
+  id                String          @id @default(uuid()) @db.Uuid
+  generationId      String          @map("generation_id") @db.Uuid
+  attemptNumber     Int             @map("attempt_number")
+  provider          String          @db.VarChar(50)
+  model             String          @db.VarChar(120)
+  outcome           String          @db.VarChar(30)
+  persistenceStatus String          @default("PENDING") @map("persistence_status") @db.VarChar(30)
+  inputTokens       Int?            @map("input_tokens")
+  outputTokens      Int?            @map("output_tokens")
+  totalTokens       Int?            @map("total_tokens")
+  inputCostUsd      Decimal?        @map("input_cost_usd") @db.Decimal(20, 12)
+  outputCostUsd     Decimal?        @map("output_cost_usd") @db.Decimal(20, 12)
+  totalCostUsd      Decimal?        @map("total_cost_usd") @db.Decimal(20, 12)
+  pricingVersion    String?         @map("pricing_version") @db.VarChar(100)
+  durationMs        Int             @map("duration_ms")
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  generation        ChatAiGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@unique([generationId, attemptNumber])
+  @@index([createdAt, provider, model])
+  @@index([outcome, createdAt])
+  @@map("chat_ai_usage")
 }
 
 enum ChatAiGenerationStatus {
