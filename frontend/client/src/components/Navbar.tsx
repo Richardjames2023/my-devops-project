@@ -78,13 +78,7 @@ const Navbar = () => {
           <div className="order-2 flex shrink-0 items-center justify-end gap-1 sm:gap-2 lg:order-3">
             <SearchBar />
 
-            <div className="relative z-10" onMouseEnter={() => setActiveMenu("account")} onMouseLeave={() => setActiveMenu(null)}> {
-                if (event.currentTarget.open && helpMenuRef.current) {
-                  helpMenuRef.current.open = false;
-                }
-              }}
-              className="group relative z-10 open:z-50"
-            >
+            <div className="relative z-10" onMouseEnter={() => setActiveMenu("account")} onMouseLeave={() => setActiveMenu(null)}>
               <button
                 type="button"
                 aria-label="Account menu"
@@ -118,15 +112,9 @@ const Navbar = () => {
                   </div>
                 </div>
               </div>
-            </details>
+            </div>
 
-            <div className="relative z-10" onMouseEnter={() => setActiveMenu("help")} onMouseLeave={() => setActiveMenu(null)}> {
-                if (event.currentTarget.open && accountMenuRef.current) {
-                  accountMenuRef.current.open = false;
-                }
-              }}
-              className="group relative z-10 open:z-50"
-            >
+            <div className="relative z-10" onMouseEnter={() => setActiveMenu("help")} onMouseLeave={() => setActiveMenu(null)}>
               <button
                 type="button"
                 aria-label="Help menu"
@@ -173,7 +161,7 @@ const Navbar = () => {
                   </div>
                 </div>
               </div>
-            </details>
+            </div>
 
             <ShoppingCartIcon />
           </div>
