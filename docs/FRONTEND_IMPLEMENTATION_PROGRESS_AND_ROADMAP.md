@@ -318,3 +318,37 @@ At the last confirmed local checkpoint, the developer was on branch `feat/storef
 
 **The next action is to inspect the root/client package configuration and the two component files with warnings, then make the minimal cleanup.** Preserve the untracked local workspace YAML and all backend/local backup files while doing so.
 
+
+
+---
+
+## 10. Storefront catalogue and ShopSphere implementation checkpoint — 21 November 2026
+
+Implemented on `feat/storefront-client-foundation` after the earlier API transport foundation:
+
+- Replaced the old storefront shell branding and visual treatment with the ShopSphere direction: `#FBF9F6` page surface, `#081C41` navy structure, `#1D52BD` primary blue and `#EC702E` orange accent.
+- Reworked the header/navigation, responsive search form, homepage hero, footer, product cards and catalogue layout.
+- Removed the hardcoded sample product list and placeholder product detail object.
+- Added typed public catalogue access for `GET /products`, `GET /products/:slug` and `GET /categories`.
+- Connected search, category, min/max price, pagination and the backend-supported sort values to the public product listing.
+- Connected product detail pages to the backend product slug and display of catalogue images, variants, stock and warranty fields.
+- Prices are formatted as NGN from backend values; no sample prices, stock levels, product ratings or shipping promises are fabricated.
+
+### Architectural note
+
+Public catalogue reads currently use Next.js server-side fetching with a 60-second revalidation interval. TanStack React Query has deliberately not been added yet: this first milestone is server-rendered public catalogue data, while React Query should be introduced with the subsequent client-interactive authenticated/cart workflows where cache invalidation is needed. The pnpm lockfile has therefore not been modified for a dependency that is not used.
+
+### Explicitly not complete
+
+- Cart mutations and guest/customer cart synchronization.
+- Secure persistent customer/staff sessions and the BFF/HttpOnly-cookie boundary.
+- Checkout and Paystack payment-return handling.
+- Full visual redesign of every remaining route (including cart and account flows).
+- Local lint, build, automated test and browser verification of this new checkpoint.
+
+### Current checkpoint
+
+- Latest implementation commit before this progress update: `be5b1bce3c847854900a9c7e642253887fef66c7`.
+- PR #55 remains open and stacked on PR #54; no retarget or merge was performed.
+- GitHub reported PR #55 mergeable after the latest update. No check runs were reported for the latest implementation commit.
+- Next action: pull the latest branch locally, run the client lint/tests/build, verify the API against a running local backend and review the ShopSphere pages at mobile/tablet/desktop widths. Fix any type/API/rendering issues before continuing with cart integration.
