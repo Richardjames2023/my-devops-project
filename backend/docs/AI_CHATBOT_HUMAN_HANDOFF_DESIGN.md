@@ -223,6 +223,7 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - [x] Add PostgreSQL-backed generation leases, bounded retries, idempotent persistence and stale-worker protection.
 - [x] Persist per-provider-attempt token usage, outcome, model and latency, including failed/retried calls and responses discarded after lease loss.
 - [x] Add optional estimated USD cost using explicitly configured input/output rates and a required pricing version; never assume or hard-code provider prices.
+- Cost estimates currently use provider-reported prompt and candidate token counts; cached, thinking and other separately priced token classes are not modeled independently, so estimates are operational approximations rather than billing reconciliation.
 - [x] Add a permission-protected staff usage summary at `GET /api/v1/staff/chat/usage`, with date filtering and provider/model aggregates. The report excludes customer and conversation identifiers.
 
 ### Phase 3 — Staff operations and real-time transport
