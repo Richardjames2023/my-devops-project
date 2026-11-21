@@ -16,13 +16,21 @@ export interface ChatAiHandoffRecommendation {
   reason: string | null;
 }
 
+export interface ChatAiTokenUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+}
+
 export interface ChatAiGenerateResult {
   reply: string;
   handoff: ChatAiHandoffRecommendation;
+  usage: ChatAiTokenUsage;
 }
 
 export interface ChatAiProvider {
   readonly name: string;
+  readonly model: string;
 
   generateReply(
     input: ChatAiGenerateInput,
