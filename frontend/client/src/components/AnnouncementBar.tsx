@@ -7,7 +7,7 @@ const AnnouncementBar = () => {
         <div className="flex min-w-0 items-center gap-4 overflow-hidden whitespace-nowrap">
           <span className="flex items-center gap-1.5">
             <Truck size={12} aria-hidden="true" />
-            Free shipping on orders over ₦50,000
+            Discover new arrivals and everyday favourites
           </span>
           <span className="hidden items-center gap-1.5 sm:flex">
             <RotateCcw size={12} aria-hidden="true" />
