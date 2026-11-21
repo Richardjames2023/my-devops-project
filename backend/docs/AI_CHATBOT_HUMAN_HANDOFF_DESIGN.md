@@ -1,9 +1,9 @@
 # AI Customer Chatbot and Human Handoff
 
-**Status:** Chat foundation, AI responses, staff inbox/replies/closure, durable handoff notifications, Socket.IO transport, socket authentication, authorized conversation rooms and persisted realtime event broadcasting and durable backend reconnect replay implemented; frontend integration remains planned
+**Status:** Chat foundation, AI responses, staff inbox/replies/closure, durable handoff notifications, Socket.IO transport, socket authentication, authorized conversation rooms, persisted realtime event broadcasting, durable backend reconnect replay and AI usage/cost telemetry implemented; frontend integration remains planned
 **Target repository:** `Richardjames2023/my-devops-project`  
 **Implementation branch:** `feat/ai-chatbot-human-handoff`  
-**Last updated:** 2026-11-20
+**Last updated:** 2026-11-21
 
 ## 1. Purpose
 
@@ -144,6 +144,7 @@ Public/customer endpoints:
 - `POST /api/v1/chat/conversations/:conversationId/handoff` — request human support idempotently.
 
 Staff endpoints (existing staff authentication and new chat permissions required):
+- `GET /api/v1/staff/chat/usage?from=...&to=...` — aggregate AI provider attempts, token usage, latency and configured estimated cost; requires `chat.read`. Defaults to the last 30 days.
 
 - `GET /api/v1/staff/chat/conversations?status=...` — inbox/queue.
 - `GET /api/v1/staff/chat/conversations/:conversationId` — transcript and conversation details.
@@ -220,7 +221,9 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - [x] Validate structured replies and handoff recommendations.
 - [x] Add bounded history, request timeout, output-token limit, disabled mode and provider-failure handling.
 - [x] Add PostgreSQL-backed generation leases, bounded retries, idempotent persistence and stale-worker protection.
-- [ ] Add usage and cost telemetry.
+- [x] Persist per-provider-attempt token usage, outcome, model and latency, including failed/retried calls and responses discarded after lease loss.
+- [x] Add optional estimated USD cost using explicitly configured input/output rates and a required pricing version; never assume or hard-code provider prices.
+- [x] Add a permission-protected staff usage summary at `GET /api/v1/staff/chat/usage`, with date filtering and provider/model aggregates. The report excludes customer and conversation identifiers.
 
 ### Phase 3 — Staff operations and real-time transport
 - [x] Attach Socket.IO to the existing HTTP server with the configured CORS origin allowlist.
@@ -257,6 +260,8 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 - In `HUMAN_ACTIVE`, customer messages reach the assigned agent and never trigger AI.
 - Unauthorized staff cannot view, assign or reply to conversations.
 - Reconnecting clients can recover missed persisted messages.
+- Each AI provider attempt is accounted for once, including failed calls and retries; token/cost reporting does not expose customer content or identifiers.
+- Cost estimates remain null until both token rates and a pricing-version identifier are explicitly configured.
 - AI outages do not lose customer messages and provide a safe fallback.
 - Tests cover state transitions, ownership, staff permissions, rate limits, concurrency, provider failures and retention behavior.
 
@@ -271,7 +276,7 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
 
 ## 14. Initial implementation boundary
 
-The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO is attached to the HTTP server with origin enforcement and graceful shutdown. Customer, guest and staff socket authentication plus ownership/permission-checked conversation rooms are implemented. Persisted customer, AI, system and staff messages plus handoff, assignment and closure transitions are broadcast after commit to authorized conversation rooms. Durable backend reconnect replay is implemented through the PostgreSQL event stream and customer/staff replay endpoints; frontend integration and usage/cost telemetry remain follow-up work.
+The initial implementation established the durable conversation foundation before adding AI-provider integration. The current branch contains that foundation and the AI-response backend. Staff inbox/assignment/reply endpoints and durable handoff notifications are implemented. Socket.IO is attached to the HTTP server with origin enforcement and graceful shutdown. Customer, guest and staff socket authentication plus ownership/permission-checked conversation rooms are implemented. Persisted customer, AI, system and staff messages plus handoff, assignment and closure transitions are broadcast after commit to authorized conversation rooms. Durable backend reconnect replay is implemented through the PostgreSQL event stream and customer/staff replay endpoints; frontend integration and frontend integration remains follow-up work; AI usage/cost telemetry now records per-attempt provider usage and exposes a permission-protected aggregate report.
 
 
 ## Reconnect recovery and missed-event synchronization
