@@ -16,6 +16,7 @@ import { publishNotificationEvent } from "../../notifications/notification-outbo
 import type {
   ChatAiGenerateResult,
   ChatAiHistoryMessage,
+  ChatAiProviderResponseError,
   ChatAiTokenUsage,
 } from "./chat-ai.types";
 import { emitChatConversationStatus, emitChatMessage } from "../chat-realtime.events";
@@ -839,7 +840,9 @@ export async function generateChatAiReply(
         provider: provider.name,
         model: provider.model,
         outcome: "FAILED",
-        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        usage: error instanceof ChatAiProviderResponseError
+          ? error.usage
+          : { inputTokens: null, outputTokens: null, totalTokens: null },
         durationMs: Date.now() - providerStartedAt,
       });
       throw error;
