@@ -1,9 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
+import { ChatAiProviderResponseError } from "./chat-ai.types";
 import type {
   ChatAiGenerateInput,
   ChatAiGenerateResult,
   ChatAiProvider,
-  ChatAiProviderResponseError,
 } from "./chat-ai.types";
 import { parseChatAiResponse } from "./chat-ai.response";
 
