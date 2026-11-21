@@ -5,6 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ChevronDown,
+  Footprints,
+  Glasses,
+  Briefcase,
+  Shirt,
+  ShoppingBasket,
+  Hand,
+  Venus,
   CircleHelp,
   CreditCard,
   Headphones,
@@ -23,9 +30,18 @@ import AnnouncementBar from "./AnnouncementBar";
 const navigation = [
   { label: "Home", href: "/" },
   { label: "Shop", href: "/products" },
-  { label: "Categories", href: "/products" },
-  { label: "Deals", href: "/products?sort=discount" },
   { label: "New Arrivals", href: "/products?sort=newest" },
+];
+
+const shopCategories = [
+  { name: "All", slug: "all", icon: ShoppingBasket, image: "/products/1g.png", items: ["All products", "New arrivals", "Popular picks"] },
+  { name: "T-shirts", slug: "t-shirts", icon: Shirt, image: "/products/1g.png", items: ["Basic T-shirts", "Graphic T-shirts", "Polo shirts", "Long-sleeve T-shirts"] },
+  { name: "Shoes", slug: "shoes", icon: Footprints, image: "/products/6g.png", items: ["Casual shoes", "Sneakers", "Running shoes", "Everyday footwear"] },
+  { name: "Accessories", slug: "accessories", icon: Glasses, image: "/products/8b.png", items: ["Everyday accessories", "Fashion accessories", "Style essentials"] },
+  { name: "Bags", slug: "bags", icon: Briefcase, image: "/products/8b.png", items: ["Backpacks", "Everyday bags", "Travel bags"] },
+  { name: "Dresses", slug: "dresses", icon: Venus, image: "/products/4w.png", items: ["Casual dresses", "Everyday dresses", "Occasion wear"] },
+  { name: "Jackets", slug: "jackets", icon: Shirt, image: "/products/2g.png", items: ["Hoodies", "Zip-up jackets", "Light jackets"] },
+  { name: "Gloves", slug: "gloves", icon: Hand, image: "/products/5bl.png", items: ["Everyday gloves", "Cold-weather gloves"] },
 ];
 
 const placeholderClass =
@@ -42,7 +58,7 @@ function ComingSoon({ children }: { children: React.ReactNode }) {
 }
 
 const Navbar = () => {
-  const [activeMenu, setActiveMenu] = useState<"account" | "help" | null>(null);
+  const [activeMenu, setActiveMenu] = useState<"account" | "help" | "categories" | null>(null);
 
   return (
     <header className="w-full">
@@ -64,12 +80,55 @@ const Navbar = () => {
           </Link>
 
           <nav aria-label="Main navigation" className="order-3 hidden items-center gap-5 text-[15px] font-semibold text-[var(--shop-navy)] lg:order-2 lg:flex xl:gap-6">
-            {navigation.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className="whitespace-nowrap transition-colors hover:text-[var(--shop-orange)]"
-              >
+            {navigation.slice(0, 2).map((item) => (
+              <Link key={item.label} href={item.href} className="whitespace-nowrap transition-colors hover:text-[var(--shop-orange)]">
+                {item.label}
+              </Link>
+            ))}
+            <div className="relative z-20" onMouseEnter={() => setActiveMenu("categories")} onMouseLeave={() => setActiveMenu((current) => current === "categories" ? null : current)}>
+              <button type="button" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="flex items-center gap-1 whitespace-nowrap transition-colors hover:text-[var(--shop-orange)]">
+                Categories
+                <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
+              </button>
+              <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-full z-50 mt-3 w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
+                <div className="grid max-h-[min(560px,calc(100vh-180px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
+                  <div className="overflow-y-auto border-r border-[var(--shop-border)] bg-[var(--shop-search)] p-2">
+                    <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-muted)]">Browse categories</p>
+                    {shopCategories.map((category) => {
+                      const Icon = category.icon;
+                      return (
+                        <Link key={category.slug} href={`/products?category=${category.slug}`} className="group flex items-center justify-between gap-2 rounded-lg px-3 py-3 text-sm font-medium text-[var(--shop-body)] transition-colors hover:bg-white hover:text-[var(--shop-orange)]">
+                          <span className="flex items-center gap-2"><Icon size={17} />{category.name}</span>
+                          <ChevronDown size={14} className="-rotate-90 text-[var(--shop-muted)]" />
+                        </Link>
+                      );
+                    })}
+                  </div>
+                  <div className="overflow-y-auto p-5">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--shop-muted)]">Explore ShopSphere</p>
+                        <h3 className="mt-1 text-lg font-bold text-[var(--shop-navy)]">Shop by category</h3>
+                      </div>
+                      <Link href="/products" className="text-sm font-semibold text-[var(--shop-orange)] hover:underline">View all</Link>
+                    </div>
+                    <div className="grid grid-cols-3 gap-x-4 gap-y-5">
+                      {shopCategories.filter((category) => category.slug !== "all").map((category) => (
+                        <Link key={category.slug} href={`/products?category=${category.slug}`} className="group flex min-w-0 flex-col items-center rounded-lg p-2 text-center transition-colors hover:bg-[var(--shop-search)]">
+                          <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-search)] ring-1 ring-[var(--shop-border)] transition-transform duration-200 group-hover:scale-105">
+                            <Image src={category.image} alt="" width={80} height={80} className="h-full w-full object-contain mix-blend-multiply" />
+                          </span>
+                          <span className="text-sm font-semibold text-[var(--shop-navy)] group-hover:text-[var(--shop-orange)]">{category.name}</span>
+                          <span className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--shop-muted)]">{category.items.slice(0, 2).join(" · ")}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {navigation.slice(2).map((item) => (
+              <Link key={item.label} href={item.href} className="whitespace-nowrap transition-colors hover:text-[var(--shop-orange)]">
                 {item.label}
               </Link>
             ))}
@@ -167,16 +226,22 @@ const Navbar = () => {
           </div>
 
           <nav aria-label="Mobile and tablet navigation" className="order-4 flex w-full items-center justify-around border-t border-[var(--shop-border)] pt-2 text-[15px] font-semibold text-[var(--shop-navy)] lg:hidden">
-            {navigation.map((item, index) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`whitespace-nowrap hover:text-[var(--shop-orange)] ${index > 2 ? "hidden md:inline-flex" : ""}`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {navigation.slice(0, 2).map((item) => <Link key={item.label} href={item.href} className="whitespace-nowrap hover:text-[var(--shop-orange)]">{item.label}</Link>)}
+            <button type="button" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="flex items-center gap-1 whitespace-nowrap hover:text-[var(--shop-orange)]">
+              Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
+            </button>
+            <Link href="/products?sort=newest" className="whitespace-nowrap hover:text-[var(--shop-orange)]">New Arrivals</Link>
           </nav>
+          <div className={`order-5 w-full overflow-hidden transition-all duration-300 ease-out lg:hidden ${activeMenu === "categories" ? "max-h-[70vh] translate-y-0 opacity-100" : "max-h-0 -translate-y-2 opacity-0"}`}>
+            <div className="grid grid-cols-2 gap-2 border-t border-[var(--shop-border)] py-3 sm:grid-cols-4">
+              {shopCategories.map((category) => (
+                <Link key={category.slug} href={`/products?category=${category.slug}`} className="flex items-center gap-2 rounded-lg bg-[var(--shop-search)] p-2 text-sm font-medium text-[var(--shop-navy)]">
+                  <Image src={category.image} alt="" width={40} height={40} className="h-10 w-10 rounded-full object-contain" />
+                  {category.name}
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </header>
