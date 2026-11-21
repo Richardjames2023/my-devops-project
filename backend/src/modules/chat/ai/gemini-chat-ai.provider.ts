@@ -64,7 +64,7 @@ export class GeminiChatAiProvider implements ChatAiProvider {
 
   constructor(
     apiKey: string,
-    private readonly model: string,
+    model: string,
     private readonly maxOutputTokens = 512,
     timeoutMs = 15_000,
     private readonly maxHistoryMessages = 12,
