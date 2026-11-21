@@ -18,7 +18,7 @@ const Navbar = () => {
     <header className="w-full">
       <AnnouncementBar />
       <div className="border-b border-[var(--shop-border)] bg-white">
-        <div className="mx-auto flex w-[min(100%-48px,1280px)] flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3 sm:flex-nowrap sm:py-3.5 max-sm:w-[min(100%-28px,1280px)]">
+        <div className="mx-auto flex header-inner flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3 sm:flex-nowrap sm:py-3.5 ">
           <Link href="/" aria-label="ShopSphere home" className="flex shrink-0 items-center gap-2">
             <Image
               src="/logo.png"
