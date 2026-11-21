@@ -21,11 +21,13 @@ const [
   staffChatService,
   prismaModule,
   realtimeEvents,
+  realtimeReplay,
 ] = await Promise.all([
   import("../src/modules/chat/chat.service"),
   import("../src/modules/chat/staff-chat.service"),
   import("../src/infrastructure/prisma/client"),
   import("../src/modules/chat/chat-realtime.events"),
+  import("../src/modules/chat/chat-realtime.service"),
 ]);
 
 const { default: prisma, disconnectDatabase } = prismaModule;
@@ -164,5 +166,45 @@ describe("Chat realtime event broadcasting (PostgreSQL)", () => {
       });
       expect(persisted).toEqual({ id: item.payload.id, conversationId });
     }
+
+    const replay = await realtimeReplay.listChatRealtimeEvents(conversationId, {
+      after: 0,
+      limit: 100,
+    });
+    expect(replay.items.map((item: { event: string }) => item.event)).toEqual([
+      "chat:message:new",
+      "chat:message:new",
+      "chat:conversation:status",
+      "chat:message:new",
+      "chat:conversation:status",
+      "chat:conversation:assigned",
+      "chat:message:new",
+      "chat:conversation:status",
+    ]);
+    expect(replay.items.map((item: { sequence: number }) => item.sequence)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8,
+    ]);
+    expect(replay.hasMore).toBe(false);
+    expect(replay.currentSequence).toBe(8);
+
+    const firstPage = await realtimeReplay.listChatRealtimeEvents(conversationId, {
+      after: 0,
+      limit: 3,
+    });
+    expect(firstPage.items).toHaveLength(3);
+    expect(firstPage.nextCursor).toBe(3);
+    const secondPage = await realtimeReplay.listChatRealtimeEvents(conversationId, {
+      after: firstPage.nextCursor!,
+      limit: 3,
+    });
+    expect(secondPage.items.map((item: { sequence: number }) => item.sequence)).toEqual([
+      4, 5, 6,
+    ]);
+    await expect(
+      realtimeReplay.listChatRealtimeEvents(conversationId, {
+        after: replay.currentSequence + 1,
+        limit: 10,
+      }),
+    ).rejects.toThrow("Invalid realtime event cursor");
   });
 });

@@ -6,6 +6,7 @@ import {
   closeStaffChatConversationController,
   getStaffChatConversationController,
   listStaffChatConversationsController,
+  listStaffChatRealtimeEventsController,
   sendStaffChatMessageController,
 } from "./staff-chat.controller";
 
@@ -22,6 +23,11 @@ router.get(
   "/conversations/:conversationId",
   authorize("chat.read"),
   getStaffChatConversationController,
+);
+router.get(
+  "/conversations/:conversationId/events",
+  authorize("chat.read"),
+  listStaffChatRealtimeEventsController,
 );
 router.post(
   "/conversations/:conversationId/assign",

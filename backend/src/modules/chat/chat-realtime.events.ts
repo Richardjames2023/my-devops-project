@@ -77,3 +77,4 @@ export function emitChatConversationAssigned(payload: {
 }): void {
   emitToConversation(payload.conversationId, "chat:conversation:assigned", payload);
 }
+

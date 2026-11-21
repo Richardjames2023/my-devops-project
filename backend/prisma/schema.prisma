@@ -1142,6 +1142,7 @@ model ChatConversation {
   assignedAgentId String?                @map("assigned_agent_id") @db.Uuid
   lastMessageAt   DateTime               @default(now()) @map("last_message_at")
   closedAt        DateTime?              @map("closed_at")
+  realtimeSequence Int                  @default(0) @map("realtime_sequence")
   createdAt       DateTime               @default(now()) @map("created_at")
   updatedAt       DateTime               @updatedAt @map("updated_at")
   customer        User?                  @relation(fields: [customerUserId], references: [id], onDelete: SetNull)
@@ -1149,12 +1150,26 @@ model ChatConversation {
   assignedAgent   StaffAccount?          @relation("ChatConversationAssignedAgent", fields: [assignedAgentId], references: [id], onDelete: SetNull)
   messages        ChatMessage[]
   events          ChatEvent[]
+  realtimeEvents  ChatRealtimeEvent[]
 
   @@index([status, lastMessageAt])
   @@index([customerUserId, lastMessageAt])
   @@index([guestSessionId, lastMessageAt])
   @@index([assignedAgentId, status, lastMessageAt])
   @@map("chat_conversations")
+}
+
+model ChatRealtimeEvent {
+  id             String           @id @default(uuid()) @db.Uuid
+  conversationId String           @map("conversation_id") @db.Uuid
+  sequence       Int
+  eventName      String           @map("event_name") @db.VarChar(100)
+  payload        Json
+  createdAt      DateTime         @default(now()) @map("created_at")
+  conversation   ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, sequence])
+  @@map("chat_realtime_events")
 }
 
 model ChatMessage {

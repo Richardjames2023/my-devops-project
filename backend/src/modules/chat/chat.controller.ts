@@ -4,6 +4,7 @@ import { AppError } from "../../common/errors/AppError";
 import { logger } from "../../config/logger";
 import type { ChatOwnerRequest } from "./chat.types";
 import { generateChatAiReply } from "./ai/chat-ai.service";
+import { listChatRealtimeEvents } from "./chat-realtime.service";
 import {
   createConversation,
   getConversation,
@@ -32,6 +33,11 @@ function getConversationId(value: unknown): string {
   }
   return parsed.data;
 }
+
+const realtimeSyncQuerySchema = z.object({
+  after: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
 
 function parsePagination(query: unknown) {
   const parsed = chatPaginationSchema.safeParse(query);
@@ -95,6 +101,25 @@ export async function listConversationMessagesController(
   );
   res.status(200).json({
     message: "Chat messages retrieved",
+    data: result,
+  });
+}
+
+export async function listConversationRealtimeEventsController(
+  req: ChatOwnerRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = realtimeSyncQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new AppError("Invalid realtime synchronization parameters", 400);
+  }
+
+  const conversationId = getConversationId(req.params.conversationId);
+  await getConversation(getOwner(req), conversationId);
+  const result = await listChatRealtimeEvents(conversationId, parsed.data);
+
+  res.status(200).json({
+    message: "Chat realtime events retrieved",
     data: result,
   });
 }

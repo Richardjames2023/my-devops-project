@@ -219,6 +219,58 @@ describe("Staff chat HTTP routes (PostgreSQL)", () => {
         }),
       ]),
     );
+
+    await request(app)
+      .get(`/api/v1/staff/chat/conversations/${conversationId}/events`)
+      .set("Authorization", `Bearer ${unauthorizedStaff.token}`)
+      .expect(403);
+
+    await request(app)
+      .get(`/api/v1/staff/chat/conversations/${conversationId}/events`)
+      .set("Authorization", `Bearer ${customer.token}`)
+      .expect(403);
+
+    const firstPage = await request(app)
+      .get(`/api/v1/staff/chat/conversations/${conversationId}/events?after=0&limit=1`)
+      .set("Authorization", `Bearer ${readOnlyStaff.token}`)
+      .expect(200);
+
+    expect(firstPage.body.data.items).toHaveLength(1);
+    expect(firstPage.body.data.items[0]).toMatchObject({
+      sequence: 1,
+      event: "chat:message:new",
+    });
+    expect(firstPage.body.data.hasMore).toBe(true);
+    expect(firstPage.body.data.nextCursor).toBe(1);
+
+    const secondPage = await request(app)
+      .get(`/api/v1/staff/chat/conversations/${conversationId}/events?after=1&limit=10`)
+      .set("Authorization", `Bearer ${readOnlyStaff.token}`)
+      .expect(200);
+
+    expect(secondPage.body.data.items.map((item: { sequence: number }) => item.sequence))
+      .toEqual([2, 3]);
+    expect(secondPage.body.data.items.map((item: { event: string }) => item.event)).toEqual([
+      "chat:conversation:status",
+      "chat:message:new",
+    ]);
+    expect(secondPage.body.data.hasMore).toBe(false);
+    expect(secondPage.body.data.nextCursor).toBeNull();
+
+    await request(app)
+      .get(`/api/v1/staff/chat/conversations/${conversationId}/events?after=999`)
+      .set("Authorization", `Bearer ${readOnlyStaff.token}`)
+      .expect(400);
+
+    await request(app)
+      .get(`/api/v1/staff/chat/conversations/${conversationId}/events?limit=101`)
+      .set("Authorization", `Bearer ${readOnlyStaff.token}`)
+      .expect(400);
+
+    await request(app)
+      .get("/api/v1/staff/chat/conversations/not-a-uuid/events")
+      .set("Authorization", `Bearer ${readOnlyStaff.token}`)
+      .expect(400);
   });
 
   it("protects transcript retrieval and validates route parameters and query limits", async () => {
