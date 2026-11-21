@@ -13,7 +13,11 @@ import type { ChatOwner } from "../chat.types";
 import { createChatAiProvider } from "./chat-ai.provider.factory";
 import { loadCustomerSupportKnowledgeBase } from "./customer-support-knowledge-base";
 import { publishNotificationEvent } from "../../notifications/notification-outbox.publisher";
-import type { ChatAiHistoryMessage, ChatAiTokenUsage } from "./chat-ai.types";
+import type {
+  ChatAiGenerateResult,
+  ChatAiHistoryMessage,
+  ChatAiTokenUsage,
+} from "./chat-ai.types";
 import { emitChatConversationStatus, emitChatMessage } from "../chat-realtime.events";
 
 const LEASE_MS = 30_000;
@@ -820,7 +824,7 @@ export async function generateChatAiReply(
      * Gemini runs outside database transactions.
      */
     const providerStartedAt = Date.now();
-    let generated;
+    let generated: ChatAiGenerateResult;
 
     try {
       generated = await provider.generateReply({
