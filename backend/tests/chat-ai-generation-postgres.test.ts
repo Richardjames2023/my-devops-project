@@ -615,6 +615,7 @@ describe("Chat AI generation (PostgreSQL)", () => {
     // Worker A finally receives its response after losing its lease.
     resolveFirstProviderCall({
       reply: "Worker A stale response must not be persisted.",
+      usage: { inputTokens: 29, outputTokens: 11, totalTokens: 40 },
       handoff: {
         recommended: false,
         reason: null,
@@ -651,6 +652,16 @@ describe("Chat AI generation (PostgreSQL)", () => {
 
     expect(botMessages).toHaveLength(1);
     expect(botMessages[0]?.content).toBe(workerBReply.reply);
+
+    const usageAttempts = await prisma.chatAiUsage.findMany({
+      where: { generationId: generation.id },
+      orderBy: { attemptNumber: "asc" },
+    });
+    expect(usageAttempts).toHaveLength(2);
+    expect(usageAttempts.map((item) => item.persistenceStatus)).toEqual([
+      "DISCARDED",
+      "PERSISTED",
+    ]);
   });
 
   it("does not generate from an unapproved knowledge base", async () => {
