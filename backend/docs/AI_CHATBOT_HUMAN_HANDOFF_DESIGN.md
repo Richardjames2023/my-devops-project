@@ -1,6 +1,6 @@
 # AI Customer Chatbot and Human Handoff
 
-**Status:** Chat foundation, AI responses, staff inbox/replies/closure, durable handoff notifications, Socket.IO transport, socket authentication, authorized conversation rooms and persisted realtime event broadcasting implemented; reconnect/history recovery and frontend integration remain planned
+**Status:** Chat foundation, AI responses, staff inbox/replies/closure, durable handoff notifications, Socket.IO transport, socket authentication, authorized conversation rooms and persisted realtime event broadcasting and durable backend reconnect replay implemented; frontend integration remains planned
 **Target repository:** `Richardjames2023/my-devops-project`  
 **Implementation branch:** `feat/ai-chatbot-human-handoff`  
 **Last updated:** 2026-11-20
@@ -237,7 +237,7 @@ Concurrent agent claims must be atomic so two agents cannot claim the same waiti
   - `chat:conversation:assigned` identifies the assigned staff agent.
   - Idempotent retries do not rebroadcast already-persisted messages or repeated lifecycle transitions.
   - Socket.IO remains delivery-only; REST continues to own writes and PostgreSQL remains the source of truth.
-- [ ] Add reconnect/history recovery using the existing paginated REST history endpoints.
+- [x] Add durable reconnect/history recovery through the PostgreSQL realtime event stream and customer/staff replay endpoints.
 
 ### Phase 4 — Frontend integration and business context
 - Add the customer widget to the storefront.
