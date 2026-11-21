@@ -54,7 +54,9 @@ export async function apiRequest<T>(
   const headers = new Headers(suppliedHeaders);
 
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
-  if (body !== undefined && !isFormData && !headers.has("Content-Type")) {
+  if (isFormData) {
+    headers.delete("Content-Type");
+  } else if (body !== undefined && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -70,11 +72,6 @@ export async function apiRequest<T>(
       "The API base URL is not configured for this environment.",
       500,
     );
-  }
-
-  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
-  if (isFormData) {
-    headers.delete("Content-Type");
   }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
