@@ -34,6 +34,7 @@ type Actor = { id: string; token: string };
 const customerIds: string[] = [];
 const conversationIds: string[] = [];
 const guestSessionIds: string[] = [];
+let customerRoleId: string;
 
 async function createCustomer(): Promise<Actor> {
   const id = randomUUID();
@@ -43,6 +44,13 @@ async function createCustomer(): Promise<Actor> {
       (id, email, "passwordHash", "firstName", "lastName", "createdAt", "updatedAt")
      VALUES ($1, $2, 'test-hash', 'Replay', 'Customer', NOW(), NOW())`,
     [id, `chat-replay-route-${id}@test.local`],
+  );
+  await pool.query('UPDATE users SET "emailVerified" = TRUE WHERE id = $1', [id]);
+  await pool.query(
+    `INSERT INTO user_roles (id, "userId", "roleId", "createdAt")
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT ("userId", "roleId") DO NOTHING`,
+    [randomUUID(), id, customerRoleId],
   );
   return {
     id,
@@ -67,6 +75,15 @@ describe("Chat realtime replay customer and guest HTTP routes (PostgreSQL)", () 
     if (database.rows[0]?.name !== "shop_db_test") {
       throw new Error("Safety check failed: chat replay route tests require shop_db_test");
     }
+
+    const customerRole = await pool.query(
+      `INSERT INTO roles (id, name, description, "createdAt", "updatedAt")
+       VALUES ($1, 'CUSTOMER', 'Customer role', NOW(), NOW())
+       ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+       RETURNING id`,
+      [randomUUID()],
+    );
+    customerRoleId = customerRole.rows[0].id;
 
     [customer, otherCustomer] = await Promise.all([
       createCustomer(),
