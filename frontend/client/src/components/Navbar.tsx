@@ -18,22 +18,22 @@ const Navbar = () => {
     <header className="w-full">
       <AnnouncementBar />
       <div className="border-b border-[var(--shop-border)] bg-white">
-        <div className="mx-auto flex header-inner flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3 sm:flex-nowrap sm:py-3.5 ">
+        <div className="mx-auto flex header-inner flex-wrap items-center justify-between gap-x-6 gap-y-3 py-3 sm:flex-nowrap sm:py-3.5">
           <Link href="/" aria-label="ShopSphere home" className="flex shrink-0 items-center gap-2">
             <Image
               src="/logo.png"
               alt=""
-              width={34}
-              height={34}
+              width={36}
+              height={36}
               priority
-              className="h-8 w-8 object-contain"
+              className="h-9 w-9 object-contain"
             />
-            <span className="text-[21px] font-bold tracking-[-0.8px] text-[var(--shop-navy)]">
+            <span className="text-[23px] font-bold tracking-[-0.8px] text-[var(--shop-navy)]">
               Shop<span className="text-[var(--shop-orange)]">Sphere</span>
             </span>
           </Link>
 
-          <nav aria-label="Main navigation" className="order-3 hidden items-center gap-5 text-[12px] font-semibold text-[var(--shop-navy)] lg:flex lg:order-2">
+          <nav aria-label="Main navigation" className="order-3 hidden items-center gap-5 text-sm font-semibold text-[var(--shop-navy)] lg:order-2 lg:flex">
             {navigation.map((item) => (
               <Link
                 key={item.label}
@@ -50,24 +50,24 @@ const Navbar = () => {
             <Link
               href="/login"
               aria-label="My account"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)]"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)]"
             >
-              <UserRound size={18} strokeWidth={1.8} />
+              <UserRound size={20} strokeWidth={1.8} />
             </Link>
             <Link
               href="/"
               aria-label="Wishlist"
-              className="hidden h-9 w-9 items-center justify-center rounded-full text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] sm:flex"
+              className="hidden h-10 w-10 items-center justify-center rounded-full text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] sm:flex"
             >
-              <Heart size={18} strokeWidth={1.8} />
+              <Heart size={20} strokeWidth={1.8} />
             </Link>
             <ShoppingCartIcon />
-            <Link href="/login" className="hidden text-xs font-semibold text-[var(--shop-navy)] hover:text-[var(--shop-orange)] md:inline">
+            <Link href="/login" className="hidden text-sm font-semibold text-[var(--shop-navy)] hover:text-[var(--shop-orange)] md:inline">
               Sign in
             </Link>
           </div>
 
-          <nav aria-label="Mobile navigation" className="order-4 flex w-full items-center justify-around border-t border-[var(--shop-border)] pt-2 text-xs font-semibold text-[var(--shop-navy)] lg:hidden">
+          <nav aria-label="Mobile navigation" className="order-4 flex w-full items-center justify-around border-t border-[var(--shop-border)] pt-2 text-sm font-semibold text-[var(--shop-navy)] lg:hidden">
             {navigation.slice(0, 3).map((item) => (
               <Link key={item.label} href={item.href} className="whitespace-nowrap hover:text-[var(--shop-orange)]">
                 {item.label}
