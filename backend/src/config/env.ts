@@ -71,7 +71,7 @@ const envSchema = z.object({
 
   CHAT_AI_INPUT_USD_PER_MILLION_TOKENS: z.preprocess(
     (value) => value === "" ? undefined : value,
-    z.coerce.number().positive().optional(),
+    z.coerce.number().finite().positive().optional(),
   ),
 
   CHAT_AI_OUTPUT_USD_PER_MILLION_TOKENS: z.preprocess(
