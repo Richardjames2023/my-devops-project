@@ -1,139 +1,26 @@
-import { ProductsType } from "@/types";
 import Categories from "./Categories";
 import ProductCard from "./ProductCard";
-import Link from "next/link";
 import Filter from "./Filter";
+import { CatalogQuery, getProducts } from "@/lib/catalog";
 
-// TEMPORARY
-const products: ProductsType = [
-  {
-    id: 1,
-    name: "Adidas CoreFit T-Shirt",
-    shortDescription:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    description:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    price: 39.9,
-    sizes: ["s", "m", "l", "xl", "xxl"],
-    colors: ["gray", "purple", "green"],
-    images: {
-      gray: "/products/1g.png",
-      purple: "/products/1p.png",
-      green: "/products/1gr.png",
-    },
-  },
-  {
-    id: 2,
-    name: "Puma Ultra Warm Zip",
-    shortDescription:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    description:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    price: 59.9,
-    sizes: ["s", "m", "l", "xl"],
-    colors: ["gray", "green"],
-    images: { gray: "/products/2g.png", green: "/products/2gr.png" },
-  },
-  {
-    id: 3,
-    name: "Nike Air Essentials Pullover",
-    shortDescription:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    description:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    price: 69.9,
-    sizes: ["s", "m", "l"],
-    colors: ["green", "blue", "black"],
-    images: {
-      green: "/products/3gr.png",
-      blue: "/products/3b.png",
-      black: "/products/3bl.png",
-    },
-  },
-  {
-    id: 4,
-    name: "Nike Dri Flex T-Shirt",
-    shortDescription:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    description:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    price: 29.9,
-    sizes: ["s", "m", "l"],
-    colors: ["white", "pink"],
-    images: { white: "/products/4w.png", pink: "/products/4p.png" },
-  },
-  {
-    id: 5,
-    name: "Under Armour StormFleece",
-    shortDescription:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    description:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    price: 49.9,
-    sizes: ["s", "m", "l"],
-    colors: ["red", "orange", "black"],
-    images: {
-      red: "/products/5r.png",
-      orange: "/products/5o.png",
-      black: "/products/5bl.png",
-    },
-  },
-  {
-    id: 6,
-    name: "Nike Air Max 270",
-    shortDescription:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    description:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    price: 59.9,
-    sizes: ["40", "42", "43", "44"],
-    colors: ["gray", "white"],
-    images: { gray: "/products/6g.png", white: "/products/6w.png" },
-  },
-  {
-    id: 7,
-    name: "Nike Ultraboost Pulse ",
-    shortDescription:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    description:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    price: 69.9,
-    sizes: ["40", "42", "43"],
-    colors: ["gray", "pink"],
-    images: { gray: "/products/7g.png", pink: "/products/7p.png" },
-  },
-  {
-    id: 8,
-    name: "Levi’s Classic Denim",
-    shortDescription:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    description:
-      "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-    price: 59.9,
-    sizes: ["s", "m", "l"],
-    colors: ["blue", "green"],
-    images: { blue: "/products/8b.png", green: "/products/8gr.png" },
-  },
-];
-
-const ProductList = ({ category,params }: { category: string, params:"homepage" | "products" }) => {
+type Props = { query: CatalogQuery; showFilter?: boolean };
+export default async function ProductList({ query, showFilter = false }: Props) {
+  let result;
+  try { result = await getProducts(query); }
+  catch (error) {
+    return <section className="rounded-2xl border border-[#F2D8C8] bg-[#FDF5ED] p-8 text-center"><h2 className="text-lg font-bold text-[#081C41]">We couldn’t load the catalogue</h2><p className="mt-2 text-sm text-[#6B7280]">{error instanceof Error ? error.message : "Please try again later."}</p></section>;
+  }
   return (
-    <div className="w-full">
-      <Categories />
-      {params === "products" && <Filter/>}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-12">
-        {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
+    <section>
+      <Categories selected={query.category} />
+      {showFilter && <Filter q={query.q} category={query.category} sort={query.sort} minPrice={query.minPrice} maxPrice={query.maxPrice} />}
+      <div className="mb-5 flex items-end justify-between gap-3">
+        <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#EC702E]">Curated for you</p><h2 className="mt-1 text-2xl font-bold tracking-tight text-[#081C41]">{query.category ? "Explore this category" : query.q ? `Results for “${query.q}”` : "Explore our collection"}</h2></div>
+        <p className="text-xs text-[#7B8493]">{result.pagination.total} products</p>
       </div>
-      <Link
-        href={category ? `/products/?category=${category}` : "/products"}
-        className="flex justify-end mt-4 underline text-sm text-gray-500"
-      >
-        View all products
-      </Link>
-    </div>
+      {result.items.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-4">{result.items.map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="rounded-2xl border border-dashed border-[#D9DDE5] bg-white px-6 py-14 text-center"><h3 className="font-semibold text-[#081C41]">No products found</h3><p className="mt-2 text-sm text-[#7B8493]">Try a different search or adjust your filters.</p></div>}
+      {result.pagination.totalPages > 1 && <nav aria-label="Product pages" className="mt-8 flex items-center justify-center gap-4 text-sm"><span className="text-[#7B8493]">Page {result.pagination.page} of {result.pagination.totalPages}</span>{result.pagination.hasPreviousPage && <a className="font-semibold text-[#1D52BD]" href={pageUrl(query, result.pagination.page - 1)}>Previous</a>}{result.pagination.hasNextPage && <a className="font-semibold text-[#1D52BD]" href={pageUrl(query, result.pagination.page + 1)}>Next</a>}</nav>}
+    </section>
   );
-};
-
-export default ProductList;
+}
+function pageUrl(query: CatalogQuery, page: number) { const params = new URLSearchParams(); for (const [key,value] of Object.entries({...query,page})) if (value !== undefined && value !== "") params.set(key,String(value)); return `/products?${params.toString()}`; }

@@ -1,120 +1,28 @@
 "use client";
 
-import useCartStore from "@/stores/cartStore";
-import { ProductType } from "@/types";
-import { ShoppingCart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
-import { toast } from "react-toastify";
+import { CatalogProduct, formatNaira } from "@/lib/catalog";
+import { ImageOff } from "lucide-react";
 
-const ProductCard = ({ product }: { product: ProductType }) => {
-  const [productTypes, setProductTypes] = useState({
-    size: product.sizes[0],
-    color: product.colors[0],
-  });
-
-  const { addToCart } = useCartStore();
-
-  const handleProductType = ({
-    type,
-    value,
-  }: {
-    type: "size" | "color";
-    value: string;
-  }) => {
-    setProductTypes((prev) => ({
-      ...prev,
-      [type]: value,
-    }));
-  };
-
-  const handleAddToCart = () => {
-    addToCart({
-      ...product,
-      quantity: 1,
-      selectedSize: productTypes.size,
-      selectedColor: productTypes.color,
-    });
-    toast.success("Product added to cart")
-  };
-
+export default function ProductCard({ product }: { product: CatalogProduct }) {
+  const image = product.images.find((item) => item.isPrimary) ?? product.images[0];
+  const price = product.priceFrom ?? product.basePrice;
   return (
-    <div className="shadow-lg rounded-lg overflow-hidden">
-      {/* IMAGE */}
-      <Link href={`/products/${product.id}`}>
-        <div className="relative aspect-[2/3]">
-          <Image
-            src={product.images[productTypes.color]}
-            alt={product.name}
-            fill
-            className="object-cover hover:scale-105 transition-all duration-300"
-          />
+    <article className="group overflow-hidden rounded-2xl border border-[#EEEAE4] bg-white transition duration-200 hover:-translate-y-1 hover:shadow-[0_14px_35px_rgba(8,28,65,0.09)]">
+      <Link href={`/products/${product.slug}`} className="block">
+        <div className="relative aspect-[4/4.5] overflow-hidden bg-[#F4F6FA]">
+          {image ? <Image src={image.url} alt={image.altText || product.name} fill unoptimized sizes="(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 25vw" className="object-cover transition duration-500 group-hover:scale-105" /> : <div className="flex h-full items-center justify-center text-[#9CA3AF]"><ImageOff size={32} /></div>}
+          {!product.inStock && <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[11px] font-bold text-[#6B7280]">Out of stock</span>}
+          {product.hasWarranty && <span className="absolute right-3 top-3 rounded-full bg-[#E9F1FE] px-3 py-1 text-[11px] font-bold text-[#1D52BD]">Warranty</span>}
+        </div>
+        <div className="p-4">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#7B8493]">{product.category.name}</p>
+          <h3 className="line-clamp-2 min-h-10 text-sm font-semibold text-[#081C41]">{product.name}</h3>
+          <p className="mt-3 text-base font-bold text-[#081C41]">{formatNaira(price)}</p>
+          {product.priceTo && product.priceFrom && product.priceTo !== product.priceFrom && <p className="mt-1 text-xs text-[#7B8493]">Price varies by option</p>}
         </div>
       </Link>
-      {/* PRODUCT DETAIL */}
-      <div className="flex flex-col gap-4 p-4">
-        <h1 className="font-medium">{product.name}</h1>
-        <p className="text-sm text-gray-500">{product.shortDescription}</p>
-        {/* PRODUCT TYPES */}
-        <div className="flex items-center gap-4 text-xs">
-          {/* SIZES */}
-          <div className="flex flex-col gap-1">
-            <span className="text-gray-500">Size</span>
-            <select
-              name="size"
-              id="size"
-              className="ring ring-gray-300 rounded-md px-2 py-1"
-              onChange={(e) =>
-                handleProductType({ type: "size", value: e.target.value })
-              }
-            >
-              {product.sizes.map((size) => (
-                <option key={size} value={size}>
-                  {size.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </div>
-          {/* COLORS */}
-          <div className="flex flex-col gap-1">
-            <span className="text-gray-500">Color</span>
-            <div className="flex items-center gap-2">
-              {product.colors.map((color) => (
-                <div
-                  className={`cursor-pointer border-1 ${
-                    productTypes.color === color
-                      ? "border-gray-400"
-                      : "border-gray-200"
-                  } rounded-full p-[1.2px]`}
-                  key={color}
-                  onClick={() =>
-                    handleProductType({ type: "color", value: color })
-                  }
-                >
-                  <div
-                    className="w-[14px] h-[14px] rounded-full"
-                    style={{ backgroundColor: color }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        {/* PRICE AND ADD TO CART BUTTON */}
-        <div className="flex items-center justify-between">
-          <p className="font-medium">${product.price.toFixed(2)}</p>
-          <button
-            onClick={handleAddToCart}
-            className="ring-1 ring-gray-200 shadow-lg rounded-md px-2 py-1 text-sm cursor-pointer hover:text-white hover:bg-black transition-all duration-300 flex items-center gap-2"
-          >
-            <ShoppingCart className="w-4 h-4" />
-            Add to Cart
-          </button>
-        </div>
-      </div>
-    </div>
+    </article>
   );
-};
-
-export default ProductCard;
+}
