@@ -122,6 +122,31 @@ describe("API client", () => {
     expect(options?.body).toBe(JSON.stringify(body));
   });
 
+
+  it("sends FormData without JSON serialization or a manual content type", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ id: "image-1" }), {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const formData = new FormData();
+    formData.append("image", new Blob(["image-bytes"]), "image.png");
+
+    await apiRequest("/products/images", {
+      method: "POST",
+      body: formData,
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const [, options] = fetchMock.mock.calls[0];
+    const headers = new Headers(options?.headers);
+
+    expect(options?.body).toBe(formData);
+    expect(headers.has("Content-Type")).toBe(false);
+  });
+
   it("returns parsed JSON responses", async () => {
     fetchMock.mockResolvedValue(
       new Response(JSON.stringify({ id: "product-1" }), {
