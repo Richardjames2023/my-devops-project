@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { RotateCcw, ShieldCheck, Truck } from "lucide-react";
+import { ShieldCheck, Sparkles } from "lucide-react";
 
 const AnnouncementBar = () => {
   return (
@@ -7,12 +7,8 @@ const AnnouncementBar = () => {
       <div className="mx-auto flex min-h-9 header-inner items-center justify-between gap-4 text-xs font-medium tracking-[0.01em]">
         <div className="flex min-w-0 items-center gap-4 overflow-hidden whitespace-nowrap">
           <span className="flex items-center gap-1.5">
-            <Truck size={14} aria-hidden="true" />
+            <Sparkles size={14} aria-hidden="true" />
             Discover new arrivals and everyday favourites
-          </span>
-          <span className="hidden items-center gap-1.5 sm:flex">
-            <RotateCcw size={14} aria-hidden="true" />
-            30-day easy returns
           </span>
           <span className="hidden items-center gap-1.5 md:flex">
             <ShieldCheck size={14} aria-hidden="true" />
