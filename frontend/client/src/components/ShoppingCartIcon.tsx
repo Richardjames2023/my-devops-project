@@ -1,19 +1,25 @@
 "use client";
 
 import useCartStore from "@/stores/cartStore";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingBag } from "lucide-react";
 import Link from "next/link";
 
 const ShoppingCartIcon = () => {
   const { cart, hasHydrated } = useCartStore();
+  const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
 
-  if (!hasHydrated) return null;
   return (
-    <Link href="/cart" className="relative">
-      <ShoppingCart className="w-4 h-4 text-gray-600" />
-      <span className="absolute -top-3 -right-3 bg-amber-400 text-gray-600 rounded-full w-4 h-4 flex items-center justify-center text-xs font-medium">
-        {cart.reduce((acc, item) => acc + item.quantity, 0)}
-      </span>
+    <Link
+      href="/cart"
+      aria-label={hasHydrated ? `Shopping bag, ${itemCount} items` : "Shopping bag"}
+      className="relative flex h-9 w-9 items-center justify-center rounded-full text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)]"
+    >
+      <ShoppingBag size={19} strokeWidth={1.8} />
+      {hasHydrated && itemCount > 0 ? (
+        <span className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[var(--shop-orange)] px-1 text-[10px] font-bold leading-none text-white">
+          {itemCount}
+        </span>
+      ) : null}
     </Link>
   );
 };
