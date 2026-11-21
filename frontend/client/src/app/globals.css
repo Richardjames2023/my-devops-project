@@ -73,6 +73,17 @@ input {
   -webkit-tap-highlight-color: transparent;
 }
 
+.header-inner {
+  width: min(1280px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+@media (max-width: 640px) {
+  .header-inner {
+    width: calc(100% - 28px);
+  }
+}
+
 .storefront-shell {
   width: 100%;
   min-height: 100vh;
