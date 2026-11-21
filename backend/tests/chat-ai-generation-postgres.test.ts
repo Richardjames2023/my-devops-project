@@ -119,6 +119,7 @@ async function createCustomerMessage(
 
 const generatedReply = {
   reply: "Please submit a return request with photos or a video of the defect.",
+  usage: { inputTokens: 24, outputTokens: 13, totalTokens: 37 },
   handoff: {
     recommended: false,
     reason: null,
@@ -214,6 +215,25 @@ describe("Chat AI generation (PostgreSQL)", () => {
       leaseExpiresAt: null,
     });
 
+    const usageRecords = await prisma.chatAiUsage.findMany({
+      where: { generationId: generation?.id },
+    });
+    expect(usageRecords).toHaveLength(1);
+    expect(usageRecords[0]).toMatchObject({
+      attemptNumber: 1,
+      provider: "gemini",
+      model: "gemini-3.8-flash",
+      outcome: "SUCCEEDED",
+      persistenceStatus: "PERSISTED",
+      inputTokens: 24,
+      outputTokens: 13,
+      totalTokens: 37,
+      inputCostUsd: null,
+      outputCostUsd: null,
+      totalCostUsd: null,
+      pricingVersion: null,
+    });
+
     const botMessages = await prisma.chatMessage.findMany({
       where: {
         conversationId: conversation.id,
@@ -242,6 +262,7 @@ describe("Chat AI generation (PostgreSQL)", () => {
     const { conversation, message } = await createCustomerMessage(owner);
     const handoffReply = {
       reply: "A support agent will help you with this issue.",
+      usage: { inputTokens: 28, outputTokens: 12, totalTokens: 40 },
       handoff: {
         recommended: true,
         reason: "The issue requires a manual account review.",
@@ -532,6 +553,7 @@ describe("Chat AI generation (PostgreSQL)", () => {
 
     const workerBReply = {
       reply: "Worker B completed the customer support response.",
+      usage: { inputTokens: 31, outputTokens: 16, totalTokens: 47 },
       handoff: {
         recommended: false,
         reason: null,
