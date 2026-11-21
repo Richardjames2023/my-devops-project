@@ -4,6 +4,7 @@ import { authorize } from "../../common/middleware/authorize";
 import {
   claimStaffChatConversationController,
   closeStaffChatConversationController,
+  getStaffChatAiUsageController,
   getStaffChatConversationController,
   listStaffChatConversationsController,
   listStaffChatRealtimeEventsController,
@@ -14,6 +15,11 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get(
+  "/usage",
+  authorize("chat.read"),
+  getStaffChatAiUsageController,
+);
 router.get(
   "/conversations",
   authorize("chat.read"),

@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../src/modules/chat/ai/chat-ai.provider.factory", () => ({
   createChatAiProvider: () => ({
     name: "gemini",
+    model: "gemini-3.8-flash",
     generateReply: mocks.generateReply,
   }),
 }));
@@ -48,6 +49,9 @@ process.env.CORS_ORIGIN ??= "http://localhost:3000";
 process.env.EMAIL_DELIVERY_ENABLED = "false";
 process.env.CHAT_AI_ENABLED = "true";
 process.env.CHAT_AI_KNOWLEDGE_BASE_APPROVED = "true";
+process.env.CHAT_AI_INPUT_USD_PER_MILLION_TOKENS = "0.25";
+process.env.CHAT_AI_OUTPUT_USD_PER_MILLION_TOKENS = "1.50";
+process.env.CHAT_AI_PRICING_VERSION = "gemini-test-pricing-v1";
 process.env.GEMINI_API_KEY ??= "test-gemini-key";
 process.env.NODE_ENV = "test";
 
@@ -119,6 +123,7 @@ async function createCustomerMessage(
 
 const generatedReply = {
   reply: "Please submit a return request with photos or a video of the defect.",
+  usage: { inputTokens: 24, outputTokens: 13, totalTokens: 37 },
   handoff: {
     recommended: false,
     reason: null,
@@ -214,6 +219,25 @@ describe("Chat AI generation (PostgreSQL)", () => {
       leaseExpiresAt: null,
     });
 
+    const usageRecords = await prisma.chatAiUsage.findMany({
+      where: { generationId: generation?.id },
+    });
+    expect(usageRecords).toHaveLength(1);
+    expect(usageRecords[0]).toMatchObject({
+      attemptNumber: 1,
+      provider: "gemini",
+      model: "gemini-3.8-flash",
+      outcome: "SUCCEEDED",
+      persistenceStatus: "PERSISTED",
+      inputTokens: 24,
+      outputTokens: 13,
+      totalTokens: 37,
+      pricingVersion: "gemini-test-pricing-v1",
+    });
+    expect(usageRecords[0]?.inputCostUsd?.toString()).toBe("0.000006");
+    expect(usageRecords[0]?.outputCostUsd?.toString()).toBe("0.0000195");
+    expect(usageRecords[0]?.totalCostUsd?.toString()).toBe("0.0000255");
+
     const botMessages = await prisma.chatMessage.findMany({
       where: {
         conversationId: conversation.id,
@@ -242,6 +266,7 @@ describe("Chat AI generation (PostgreSQL)", () => {
     const { conversation, message } = await createCustomerMessage(owner);
     const handoffReply = {
       reply: "A support agent will help you with this issue.",
+      usage: { inputTokens: 28, outputTokens: 12, totalTokens: 40 },
       handoff: {
         recommended: true,
         reason: "The issue requires a manual account review.",
@@ -430,6 +455,19 @@ describe("Chat AI generation (PostgreSQL)", () => {
     expect(failed.status).toBe("FAILED");
     expect(failed.failureCode).toBe("AI_GENERATION_FAILED");
 
+    const failedUsage = await prisma.chatAiUsage.findMany({
+      where: { generationId: failed.id },
+    });
+    expect(failedUsage).toHaveLength(1);
+    expect(failedUsage[0]).toMatchObject({
+      attemptNumber: 1,
+      outcome: "FAILED",
+      persistenceStatus: "FAILED",
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+    });
+
     const second = await generateChatAiReply(input);
 
     expect(second.status).toBe("GENERATED");
@@ -441,6 +479,13 @@ describe("Chat AI generation (PostgreSQL)", () => {
     expect(completed.status).toBe("COMPLETED");
     expect(completed.attemptCount).toBe(2);
     expect(mocks.generateReply).toHaveBeenCalledTimes(2);
+
+    const attemptUsage = await prisma.chatAiUsage.findMany({
+      where: { generationId: completed.id },
+      orderBy: { attemptNumber: "asc" },
+    });
+    expect(attemptUsage.map((item) => item.outcome)).toEqual(["FAILED", "SUCCEEDED"]);
+    expect(attemptUsage.map((item) => item.attemptNumber)).toEqual([1, 2]);
   });
 
   it("reclaims an expired generation lease", async () => {
@@ -532,6 +577,7 @@ describe("Chat AI generation (PostgreSQL)", () => {
 
     const workerBReply = {
       reply: "Worker B completed the customer support response.",
+      usage: { inputTokens: 31, outputTokens: 16, totalTokens: 47 },
       handoff: {
         recommended: false,
         reason: null,
@@ -572,6 +618,7 @@ describe("Chat AI generation (PostgreSQL)", () => {
     // Worker A finally receives its response after losing its lease.
     resolveFirstProviderCall({
       reply: "Worker A stale response must not be persisted.",
+      usage: { inputTokens: 29, outputTokens: 11, totalTokens: 40 },
       handoff: {
         recommended: false,
         reason: null,
@@ -608,6 +655,16 @@ describe("Chat AI generation (PostgreSQL)", () => {
 
     expect(botMessages).toHaveLength(1);
     expect(botMessages[0]?.content).toBe(workerBReply.reply);
+
+    const usageAttempts = await prisma.chatAiUsage.findMany({
+      where: { generationId: generation.id },
+      orderBy: { attemptNumber: "asc" },
+    });
+    expect(usageAttempts).toHaveLength(2);
+    expect(usageAttempts.map((item) => item.persistenceStatus)).toEqual([
+      "DISCARDED",
+      "PERSISTED",
+    ]);
   });
 
   it("does not generate from an unapproved knowledge base", async () => {

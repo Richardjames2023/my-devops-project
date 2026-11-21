@@ -98,9 +98,14 @@ describe("GeminiChatAiProvider", () => {
     expect(request.config.responseMimeType).toBe("application/json");
   });
 
-  it("returns a validated provider response", async () => {
+  it("returns a validated provider response and normalized token usage", async () => {
     mocks.generateContent.mockResolvedValue({
       text: JSON.stringify(validResponse),
+      usageMetadata: {
+        promptTokenCount: 42,
+        candidatesTokenCount: 18,
+        totalTokenCount: 60,
+      },
     });
 
     const provider = new GeminiChatAiProvider(
@@ -114,12 +119,20 @@ describe("GeminiChatAiProvider", () => {
         knowledgeContext: "",
         history: [],
       }),
-    ).resolves.toEqual(validResponse);
+    ).resolves.toEqual({
+      ...validResponse,
+      usage: { inputTokens: 42, outputTokens: 18, totalTokens: 60 },
+    });
   });
 
-  it("rejects invalid JSON returned by Gemini", async () => {
+  it("retains token usage when Gemini returns invalid JSON", async () => {
     mocks.generateContent.mockResolvedValue({
       text: "invalid JSON",
+      usageMetadata: {
+        promptTokenCount: 9,
+        candidatesTokenCount: 2,
+        totalTokenCount: 11,
+      },
     });
 
     const provider = new GeminiChatAiProvider(
@@ -133,7 +146,10 @@ describe("GeminiChatAiProvider", () => {
         knowledgeContext: "",
         history: [],
       }),
-    ).rejects.toThrow("AI provider returned invalid JSON");
+    ).rejects.toMatchObject({
+      message: "AI provider returned invalid JSON",
+      usage: { inputTokens: 9, outputTokens: 2, totalTokens: 11 },
+    });
   });
 
   it("propagates provider errors", async () => {

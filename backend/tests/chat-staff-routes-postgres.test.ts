@@ -206,6 +206,32 @@ describe("Staff chat HTTP routes (PostgreSQL)", () => {
       .set("Authorization", `Bearer ${unauthorizedStaff.token}`)
       .expect(403);
 
+    await request(app)
+      .get("/api/v1/staff/chat/usage")
+      .set("Authorization", `Bearer ${unauthorizedStaff.token}`)
+      .expect(403);
+
+    const usageReport = await request(app)
+      .get("/api/v1/staff/chat/usage")
+      .set("Authorization", `Bearer ${readOnlyStaff.token}`)
+      .expect(200);
+
+    expect(usageReport.body.data).toMatchObject({
+      currency: "USD",
+      totals: {
+        attempts: expect.any(Number),
+        succeededAttempts: expect.any(Number),
+        failedAttempts: expect.any(Number),
+      },
+      byProviderModel: expect.any(Array),
+    });
+    expect(usageReport.body.data).not.toHaveProperty("customerIds");
+
+    await request(app)
+      .get("/api/v1/staff/chat/usage?from=not-a-date")
+      .set("Authorization", `Bearer ${readOnlyStaff.token}`)
+      .expect(400);
+
     const response = await request(app)
       .get("/api/v1/staff/chat/conversations")
       .set("Authorization", `Bearer ${readOnlyStaff.token}`)

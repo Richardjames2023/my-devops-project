@@ -10,6 +10,7 @@ import {
   sendStaffChatMessage,
 } from "./staff-chat.service";
 import { listChatRealtimeEvents } from "./chat-realtime.service";
+import { getChatAiUsageReport } from "./ai/chat-ai-usage.service";
 
 const inboxQuerySchema = z.object({
   status: z.enum(["WAITING_FOR_AGENT", "HUMAN_ACTIVE", "CLOSED"]).default(
@@ -27,6 +28,10 @@ const transcriptQuerySchema = z.object({
 const realtimeSyncQuerySchema = z.object({
   after: z.coerce.number().int().min(0).default(0),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+const usageReportQuerySchema = z.object({
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
 });
 const staffMessageSchema = z.object({
   content: z.string().trim().min(1).max(4_000),
@@ -46,6 +51,34 @@ function getConversationId(req: AuthenticatedRequest): string {
     throw new AppError("Invalid conversation ID", 400);
   }
   return parsed.data.conversationId;
+}
+
+export async function getStaffChatAiUsageController(
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> {
+  const parsed = usageReportQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({
+      message: "Validation failed",
+      errors: z.flattenError(parsed.error).fieldErrors,
+    });
+    return;
+  }
+
+  const now = new Date();
+  const from = parsed.data.from ?? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const to = parsed.data.to ?? now;
+  if (from > to) {
+    res.status(400).json({ message: "The from date must be before the to date" });
+    return;
+  }
+
+  const report = await getChatAiUsageReport({ from, to });
+  res.status(200).json({
+    message: "Chat AI usage report retrieved",
+    data: report,
+  });
 }
 
 export async function listStaffChatConversationsController(

@@ -16,13 +16,31 @@ export interface ChatAiHandoffRecommendation {
   reason: string | null;
 }
 
+export interface ChatAiTokenUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+}
+
+export class ChatAiProviderResponseError extends Error {
+  constructor(
+    message: string,
+    readonly usage: ChatAiTokenUsage,
+  ) {
+    super(message);
+    this.name = "ChatAiProviderResponseError";
+  }
+}
+
 export interface ChatAiGenerateResult {
   reply: string;
   handoff: ChatAiHandoffRecommendation;
+  usage: ChatAiTokenUsage;
 }
 
 export interface ChatAiProvider {
   readonly name: string;
+  readonly model: string;
 
   generateReply(
     input: ChatAiGenerateInput,

@@ -69,6 +69,21 @@ const envSchema = z.object({
     .max(2_048)
     .default(512),
 
+  CHAT_AI_INPUT_USD_PER_MILLION_TOKENS: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.coerce.number().finite().positive().optional(),
+  ),
+
+  CHAT_AI_OUTPUT_USD_PER_MILLION_TOKENS: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.coerce.number().finite().positive().optional(),
+  ),
+
+  CHAT_AI_PRICING_VERSION: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().trim().min(1).max(100).optional(),
+  ),
+
   CLOUDINARY_CLOUD_NAME: z.string().min(1).optional(),
   CLOUDINARY_API_KEY: z.string().min(1).optional(),
   CLOUDINARY_API_SECRET: z.string().min(1).optional(),
@@ -106,6 +121,16 @@ const envSchema = z.object({
   STAFF_INVITATION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(48),
   STAFF_INVITATION_ACCEPTANCE_SESSION_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
 }).superRefine((value, context) => {
+  const hasInputRate = value.CHAT_AI_INPUT_USD_PER_MILLION_TOKENS !== undefined;
+  const hasOutputRate = value.CHAT_AI_OUTPUT_USD_PER_MILLION_TOKENS !== undefined;
+  if (hasInputRate !== hasOutputRate || ((hasInputRate || hasOutputRate) && !value.CHAT_AI_PRICING_VERSION)) {
+    context.addIssue({
+      code: "custom",
+      path: ["CHAT_AI_PRICING_VERSION"],
+      message: "Configure both chat AI token rates and a pricing version together",
+    });
+  }
+
   if (value.NODE_ENV === "production" && !value.EMAIL_DELIVERY_ENABLED) {
     context.addIssue({
       code: "custom",

@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { ChatAiProviderResponseError } from "./chat-ai.types";
 import type {
   ChatAiGenerateInput,
   ChatAiGenerateResult,
@@ -57,12 +58,13 @@ function serializeUntrustedData(value: unknown): string {
 
 export class GeminiChatAiProvider implements ChatAiProvider {
   readonly name = "gemini";
+  readonly model: string;
 
   private readonly client: GoogleGenAI;
 
   constructor(
     apiKey: string,
-    private readonly model: string,
+    model: string,
     private readonly maxOutputTokens = 512,
     timeoutMs = 15_000,
     private readonly maxHistoryMessages = 12,
@@ -75,6 +77,7 @@ export class GeminiChatAiProvider implements ChatAiProvider {
       throw new Error("Gemini model is required");
     }
 
+    this.model = model;
     this.client = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -118,6 +121,23 @@ export class GeminiChatAiProvider implements ChatAiProvider {
       },
     });
 
-    return parseChatAiResponse(response.text);
+    const usageMetadata = response.usageMetadata;
+    const usage = {
+      inputTokens: usageMetadata?.promptTokenCount ?? null,
+      outputTokens: usageMetadata?.candidatesTokenCount ?? null,
+      totalTokens: usageMetadata?.totalTokenCount ?? null,
+    };
+
+    try {
+      return {
+        ...parseChatAiResponse(response.text),
+        usage,
+      };
+    } catch (error) {
+      throw new ChatAiProviderResponseError(
+        error instanceof Error ? error.message : "AI provider returned an invalid response",
+        usage,
+      );
+    }
   }
 }
