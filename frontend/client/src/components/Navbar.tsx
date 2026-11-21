@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -42,8 +42,7 @@ function ComingSoon({ children }: { children: React.ReactNode }) {
 }
 
 const Navbar = () => {
-  const accountMenuRef = useRef<HTMLDetailsElement>(null);
-  const helpMenuRef = useRef<HTMLDetailsElement>(null);
+  const [activeMenu, setActiveMenu] = useState<"account" | "help" | null>(null);
 
   return (
     <header className="w-full">
@@ -79,24 +78,25 @@ const Navbar = () => {
           <div className="order-2 flex shrink-0 items-center justify-end gap-1 sm:gap-2 lg:order-3">
             <SearchBar />
 
-            <details
-              ref={accountMenuRef}
-              onToggle={(event) => {
+            <div className="relative z-10" onMouseEnter={() => setActiveMenu("account")} onMouseLeave={() => setActiveMenu(null)}> {
                 if (event.currentTarget.open && helpMenuRef.current) {
                   helpMenuRef.current.open = false;
                 }
               }}
               className="group relative z-10 open:z-50"
             >
-              <summary
-                aria-label="Open account menu"
-                className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] [&::-webkit-details-marker]:hidden sm:px-3"
+              <button
+                type="button"
+                aria-label="Account menu"
+                aria-expanded={activeMenu === "account"}
+                onClick={() => setActiveMenu(activeMenu === "account" ? null : "account")}
+                className="flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] sm:px-3"
               >
                 <UserRound size={22} strokeWidth={1.9} />
                 <span className="hidden text-sm font-semibold sm:inline">Account</span>
-                <ChevronDown size={16} className="hidden transition-transform group-open:rotate-180 sm:block" />
-              </summary>
-              <div className="absolute right-0 z-50 mt-2 w-[min(19rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl">
+                <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "account" ? "rotate-180" : ""}`} />
+              </button>
+              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-full z-50 mt-2 w-[min(19rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="border-b border-[var(--shop-border)] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
                     <UserRound size={18} />
@@ -120,24 +120,25 @@ const Navbar = () => {
               </div>
             </details>
 
-            <details
-              ref={helpMenuRef}
-              onToggle={(event) => {
+            <div className="relative z-10" onMouseEnter={() => setActiveMenu("help")} onMouseLeave={() => setActiveMenu(null)}> {
                 if (event.currentTarget.open && accountMenuRef.current) {
                   accountMenuRef.current.open = false;
                 }
               }}
               className="group relative z-10 open:z-50"
             >
-              <summary
-                aria-label="Open help menu"
-                className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] [&::-webkit-details-marker]:hidden sm:px-3"
+              <button
+                type="button"
+                aria-label="Help menu"
+                aria-expanded={activeMenu === "help"}
+                onClick={() => setActiveMenu(activeMenu === "help" ? null : "help")}
+                className="flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] sm:px-3"
               >
                 <CircleHelp size={22} strokeWidth={1.9} />
                 <span className="hidden text-sm font-semibold sm:inline">Help</span>
-                <ChevronDown size={16} className="hidden transition-transform group-open:rotate-180 sm:block" />
-              </summary>
-              <div className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl">
+                <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "help" ? "rotate-180" : ""}`} />
+              </button>
+              <div aria-hidden={activeMenu !== "help"} className={`absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "help" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="py-1">
                   <Link href="/help" className={activeClass}>
                     <CircleHelp size={19} /> Help Centre
