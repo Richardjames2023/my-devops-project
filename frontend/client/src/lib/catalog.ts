@@ -12,7 +12,7 @@ export type CatalogProduct = {
 export type CatalogCategory = { id: string; name: string; slug: string; description: string | null; productCount: number };
 export type ProductListResponse = { message: string; items: CatalogProduct[]; pagination: { page: number; limit: number; total: number; totalPages: number; hasNextPage: boolean; hasPreviousPage: boolean } };
 type CategoryListResponse = { message: string; categories: CatalogCategory[] };
-
+type ProductDetailResponse = { message: string; product: CatalogProduct };
 export type CatalogQuery = { q?: string; category?: string; minPrice?: string; maxPrice?: string; sort?: "newest" | "price_asc" | "price_desc" | "name_asc"; page?: number; limit?: number };
 
 async function getPublic<T>(path: string): Promise<T> {
@@ -24,20 +24,19 @@ async function getPublic<T>(path: string): Promise<T> {
     throw new Error("The shop catalogue is temporarily unavailable. Please try again shortly.");
   }
 }
-
 export async function getProducts(query: CatalogQuery = {}): Promise<ProductListResponse> {
   const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== "" && value !== "all") params.set(key, String(value));
-  }
+  for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== "" && value !== "all") params.set(key, String(value));
   return getPublic<ProductListResponse>(`/products${params.size ? `?${params.toString()}` : ""}`);
 }
-
+export async function getProductBySlug(slug: string): Promise<CatalogProduct> {
+  const response = await getPublic<ProductDetailResponse>(`/products/${encodeURIComponent(slug)}`);
+  return response.product;
+}
 export async function getCategories(): Promise<CatalogCategory[]> {
   const response = await getPublic<CategoryListResponse>("/categories");
   return response.categories;
 }
-
 export function formatNaira(value: string | number): string {
   const amount = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(amount)) return "Price unavailable";

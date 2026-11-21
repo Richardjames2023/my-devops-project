@@ -1,97 +1,36 @@
-import ProductInteraction from "@/components/ProductInteraction";
-import { ProductType } from "@/types";
 import Image from "next/image";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, CheckCircle2, ShieldCheck } from "lucide-react";
+import { formatNaira, getProductBySlug } from "@/lib/catalog";
+import type { Metadata } from "next";
 
-// TEMPORARY
-const product: ProductType = {
-  id: 1,
-  name: "Adidas CoreFit T-Shirt",
-  shortDescription:
-    "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-  description:
-    "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-  price: 59.9,
-  sizes: ["xs", "s", "m", "l", "xl"],
-  colors: ["gray", "purple", "green"],
-  images: {
-    gray: "/products/1g.png",
-    purple: "/products/1p.png",
-    green: "/products/1gr.png",
-  },
-};
-
-export const generateMetadata = async () => {
-  return {
-    title: product.name,
-    description: product.description,
-  };
-};
-
-const ProductPage = async ({
-  searchParams,
-}: {
-  searchParams: Promise<{ color: string; size: string }>;
-}) => {
-  const { size, color } = await searchParams;
-
-  const selectedSize = size || (product.sizes[0] as string);
-  const selectedColor = color || (product.colors[0] as string);
-  return (
-    <div className="flex flex-col gap-4 lg:flex-row md:gap-12 mt-12">
-      {/* IMAGE */}
-      <div className="w-full lg:w-5/12 relative aspect-[2/3]">
-        <Image
-          src={product.images[selectedColor]}
-          alt={product.name}
-          fill
-          className="object-contain rounded-md"
-        />
+type Props = { params: Promise<{ id: string }> };
+async function loadProduct(slug: string) { try { return await getProductBySlug(slug); } catch { return null; } }
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params; const product = await loadProduct(id);
+  return product ? { title: product.name, description: product.description ?? `Explore ${product.name} on ShopSphere.` } : { title: "Product not found" };
+}
+export default async function ProductPage({ params }: Props) {
+  const { id } = await params; const product = await loadProduct(id); if (!product) notFound();
+  const image = product.images.find((item) => item.isPrimary) ?? product.images[0];
+  const price = product.priceFrom ?? product.basePrice;
+  return <div className="mx-auto max-w-6xl">
+    <Link href="/products" className="mb-7 inline-flex items-center gap-2 text-sm font-semibold text-[#1D52BD]"><ArrowLeft size={16}/> Back to shop</Link>
+    <div className="grid gap-9 lg:grid-cols-2 lg:gap-14">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="relative aspect-square overflow-hidden rounded-3xl bg-[#F4F6FA] sm:col-span-2">{image ? <Image src={image.url} alt={image.altText || product.name} fill unoptimized sizes="(max-width: 1024px) 100vw, 50vw" className="object-contain"/> : <div className="flex h-full items-center justify-center text-sm text-[#7B8493]">No product image available</div>}</div>
+        {product.images.filter((item) => item.id !== image?.id).slice(0,2).map((item) => <div key={item.id} className="relative aspect-square overflow-hidden rounded-2xl bg-[#F4F6FA]"><Image src={item.url} alt={item.altText || product.name} fill unoptimized sizes="(max-width: 640px) 45vw, 25vw" className="object-cover"/></div>)}
       </div>
-      {/* DETAILS */}
-      <div className="w-full lg:w-7/12 flex flex-col gap-4">
-        <h1 className="text-2xl font-medium">{product.name}</h1>
-        <p className="text-gray-500">{product.description}</p>
-        <h2 className="text-2xl font-semibold">${product.price.toFixed(2)}</h2>
-        <ProductInteraction
-          product={product}
-          selectedSize={selectedSize}
-          selectedColor={selectedColor}
-        />
-        {/* CARD INFO */}
-        <div className="flex items-center gap-2 mt-4">
-          <Image
-            src="/klarna.png"
-            alt="klarna"
-            width={50}
-            height={25}
-            className="rounded-md"
-          />
-          <Image
-            src="/cards.png"
-            alt="cards"
-            width={50}
-            height={25}
-            className="rounded-md"
-          />
-          <Image
-            src="/stripe.png"
-            alt="stripe"
-            width={50}
-            height={25}
-            className="rounded-md"
-          />
-        </div>
-        <p className="text-gray-500 text-xs">
-          By clicking Pay Now, you agree to our{" "}
-          <span className="underline hover:text-black">Terms & Conditions</span>{" "}
-          and <span className="underline hover:text-black">Privacy Policy</span>
-          . You authorize us to charge your selected payment method for the
-          total amount shown. All sales are subject to our return and{" "}
-          <span className="underline hover:text-black">Refund Policies</span>.
-        </p>
+      <div className="py-2">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#EC702E]">{product.category.name}</p>
+        <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-[#081C41] sm:text-4xl">{product.name}</h1>
+        <p className="mt-5 text-2xl font-bold text-[#081C41]">{formatNaira(price)}{product.priceTo && product.priceFrom && product.priceTo !== product.priceFrom ? <span className="ml-2 text-sm font-normal text-[#7B8493]">– {formatNaira(product.priceTo)}</span> : null}</p>
+        <div className="mt-5 flex items-center gap-2 text-sm">{product.inStock ? <><CheckCircle2 size={17} className="text-[#337245]"/> <span className="font-semibold text-[#337245]">In stock</span></> : <span className="font-semibold text-[#7B8493]">Currently out of stock</span>}</div>
+        {product.description && <div className="mt-7 border-t border-[#EEEAE4] pt-6"><h2 className="font-bold text-[#081C41]">Product details</h2><p className="mt-3 whitespace-pre-line text-sm leading-7 text-[#626B79]">{product.description}</p></div>}
+        <div className="mt-7 border-t border-[#EEEAE4] pt-6"><h2 className="font-bold text-[#081C41]">Available options</h2>{product.variants.length ? <ul className="mt-3 divide-y divide-[#EEEAE4] rounded-xl border border-[#EEEAE4] bg-white">{product.variants.map((variant) => <li key={variant.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm"><span className="font-medium text-[#373E4B]">{variant.name}</span><span className="text-right"><span className="block font-semibold text-[#081C41]">{formatNaira(variant.price)}</span><span className={variant.inStock ? "text-xs text-[#337245]" : "text-xs text-[#7B8493]"}>{variant.inStock ? `${variant.availableQuantity} available` : "Unavailable"}</span></span></li>)}</ul> : <p className="mt-2 text-sm text-[#7B8493]">No options listed for this product.</p>}</div>
+        {product.hasWarranty && <div className="mt-6 flex gap-3 rounded-2xl bg-[#E9F1FE] p-4 text-sm text-[#081C41]"><ShieldCheck size={20} className="shrink-0 text-[#1D52BD]"/><div><p className="font-bold">Warranty information</p>{product.warrantyDuration !== null && <p className="mt-1">{product.warrantyDuration} months</p>}{product.warrantyTerms && <p className="mt-1 leading-6 text-[#46556E]">{product.warrantyTerms}</p>}</div></div>}
       </div>
     </div>
-  );
-};
-
-export default ProductPage;
+  </div>;
+}
