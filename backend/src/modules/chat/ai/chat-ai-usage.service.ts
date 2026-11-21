@@ -37,7 +37,7 @@ export async function getChatAiUsageReport(range: ChatAiUsageReportRange) {
       prisma.chatAiUsage.count({ where: { ...where, outcome: "SUCCEEDED" } }),
       prisma.chatAiUsage.count({ where: { ...where, outcome: "FAILED" } }),
       prisma.chatAiUsage.groupBy({
-        by: ["provider", "model"],
+        by: ["provider", "model", "pricingVersion"],
         where,
         _count: { _all: true },
         _sum: {
@@ -70,6 +70,7 @@ export async function getChatAiUsageReport(range: ChatAiUsageReportRange) {
     byProviderModel: byProviderModel.map((item) => ({
       provider: item.provider,
       model: item.model,
+      pricingVersion: item.pricingVersion,
       attempts: item._count._all,
       inputTokens: item._sum.inputTokens ?? 0,
       outputTokens: item._sum.outputTokens ?? 0,
