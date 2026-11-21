@@ -1,3 +1,6 @@
+"use client";
+
+import { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -39,6 +42,9 @@ function ComingSoon({ children }: { children: React.ReactNode }) {
 }
 
 const Navbar = () => {
+  const accountMenuRef = useRef<HTMLDetailsElement>(null);
+  const helpMenuRef = useRef<HTMLDetailsElement>(null);
+
   return (
     <header className="w-full">
       <AnnouncementBar />
@@ -73,7 +79,15 @@ const Navbar = () => {
           <div className="order-2 flex shrink-0 items-center justify-end gap-1 sm:gap-2 lg:order-3">
             <SearchBar />
 
-            <details className="group relative">
+            <details
+              ref={accountMenuRef}
+              onToggle={(event) => {
+                if (event.currentTarget.open && helpMenuRef.current) {
+                  helpMenuRef.current.open = false;
+                }
+              }}
+              className="group relative z-10 open:z-50"
+            >
               <summary
                 aria-label="Open account menu"
                 className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] [&::-webkit-details-marker]:hidden sm:px-3"
@@ -106,7 +120,15 @@ const Navbar = () => {
               </div>
             </details>
 
-            <details className="group relative">
+            <details
+              ref={helpMenuRef}
+              onToggle={(event) => {
+                if (event.currentTarget.open && accountMenuRef.current) {
+                  accountMenuRef.current.open = false;
+                }
+              }}
+              className="group relative z-10 open:z-50"
+            >
               <summary
                 aria-label="Open help menu"
                 className="flex h-10 cursor-pointer list-none items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] [&::-webkit-details-marker]:hidden sm:px-3"
