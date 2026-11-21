@@ -847,7 +847,7 @@ export async function generateChatAiReply(
       provider: provider.name,
       model: provider.model,
       outcome: "SUCCEEDED",
-      usage: generated.usage,
+      usage: generated.usage ?? { inputTokens: null, outputTokens: null, totalTokens: null },
       durationMs: Date.now() - providerStartedAt,
     });
 
@@ -857,15 +857,27 @@ export async function generateChatAiReply(
      * recorded first so a billed response is accounted for even if
      * this worker has lost its generation lease.
      */
-    const result = await persistGeneratedReply({
-      conversationId: input.conversationId,
-      customerMessageId: input.customerMessageId,
-      leaseToken,
-      reply: generated.reply,
-      providerName: provider.name,
-      handoffRecommended: generated.handoff.recommended,
-      handoffReason: generated.handoff.reason,
-    });
+    let result: ChatAiAutomationResult;
+    try {
+      result = await persistGeneratedReply({
+        conversationId: input.conversationId,
+        customerMessageId: input.customerMessageId,
+        leaseToken,
+        reply: generated.reply,
+        providerName: provider.name,
+        handoffRecommended: generated.handoff.recommended,
+        handoffReason: generated.handoff.reason,
+      });
+    } catch (error) {
+      await prisma.chatAiUsage.updateMany({
+        where: {
+          generationId: claim.id,
+          attemptNumber: claim.attemptCount,
+        },
+        data: { persistenceStatus: "FAILED" },
+      });
+      throw error;
+    }
 
     await prisma.chatAiUsage.updateMany({
       where: {
