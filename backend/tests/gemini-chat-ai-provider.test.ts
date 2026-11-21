@@ -125,9 +125,14 @@ describe("GeminiChatAiProvider", () => {
     });
   });
 
-  it("rejects invalid JSON returned by Gemini", async () => {
+  it("retains token usage when Gemini returns invalid JSON", async () => {
     mocks.generateContent.mockResolvedValue({
       text: "invalid JSON",
+      usageMetadata: {
+        promptTokenCount: 9,
+        candidatesTokenCount: 2,
+        totalTokenCount: 11,
+      },
     });
 
     const provider = new GeminiChatAiProvider(
@@ -141,7 +146,10 @@ describe("GeminiChatAiProvider", () => {
         knowledgeContext: "",
         history: [],
       }),
-    ).rejects.toThrow("AI provider returned invalid JSON");
+    ).rejects.toMatchObject({
+      message: "AI provider returned invalid JSON",
+      usage: { inputTokens: 9, outputTokens: 2, totalTokens: 11 },
+    });
   });
 
   it("propagates provider errors", async () => {
