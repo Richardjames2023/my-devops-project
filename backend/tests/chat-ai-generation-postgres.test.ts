@@ -49,6 +49,9 @@ process.env.CORS_ORIGIN ??= "http://localhost:3000";
 process.env.EMAIL_DELIVERY_ENABLED = "false";
 process.env.CHAT_AI_ENABLED = "true";
 process.env.CHAT_AI_KNOWLEDGE_BASE_APPROVED = "true";
+process.env.CHAT_AI_INPUT_USD_PER_MILLION_TOKENS = "0.25";
+process.env.CHAT_AI_OUTPUT_USD_PER_MILLION_TOKENS = "1.50";
+process.env.CHAT_AI_PRICING_VERSION = "gemini-test-pricing-v1";
 process.env.GEMINI_API_KEY ??= "test-gemini-key";
 process.env.NODE_ENV = "test";
 
@@ -229,11 +232,11 @@ describe("Chat AI generation (PostgreSQL)", () => {
       inputTokens: 24,
       outputTokens: 13,
       totalTokens: 37,
-      inputCostUsd: null,
-      outputCostUsd: null,
-      totalCostUsd: null,
-      pricingVersion: null,
+      pricingVersion: "gemini-test-pricing-v1",
     });
+    expect(usageRecords[0]?.inputCostUsd?.toString()).toBe("0.000006");
+    expect(usageRecords[0]?.outputCostUsd?.toString()).toBe("0.0000195");
+    expect(usageRecords[0]?.totalCostUsd?.toString()).toBe("0.0000255");
 
     const botMessages = await prisma.chatMessage.findMany({
       where: {
