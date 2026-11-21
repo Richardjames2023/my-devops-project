@@ -13,10 +13,10 @@ import type { ChatOwner } from "../chat.types";
 import { createChatAiProvider } from "./chat-ai.provider.factory";
 import { loadCustomerSupportKnowledgeBase } from "./customer-support-knowledge-base";
 import { publishNotificationEvent } from "../../notifications/notification-outbox.publisher";
+import { ChatAiProviderResponseError } from "./chat-ai.types";
 import type {
   ChatAiGenerateResult,
   ChatAiHistoryMessage,
-  ChatAiProviderResponseError,
   ChatAiTokenUsage,
 } from "./chat-ai.types";
 import { emitChatConversationStatus, emitChatMessage } from "../chat-realtime.events";
