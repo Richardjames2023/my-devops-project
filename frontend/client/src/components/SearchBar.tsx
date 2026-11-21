@@ -15,7 +15,7 @@ const SearchBar = () => {
         type="search"
         placeholder="Search products, brands..."
         aria-label="Search products and brands"
-        className="ml-2 hidden min-w-0 flex-1 bg-transparent text-xs text-[var(--shop-navy)] outline-none placeholder:text-[var(--shop-muted)] sm:block"
+        className="ml-2 hidden min-w-0 flex-1 bg-transparent text-[13px] text-[var(--shop-navy)] outline-none placeholder:text-[var(--shop-muted)] sm:block"
       />
     </form>
   );
