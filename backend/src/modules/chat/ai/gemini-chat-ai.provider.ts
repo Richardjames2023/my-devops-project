@@ -57,6 +57,7 @@ function serializeUntrustedData(value: unknown): string {
 
 export class GeminiChatAiProvider implements ChatAiProvider {
   readonly name = "gemini";
+  readonly model: string;
 
   private readonly client: GoogleGenAI;
 
@@ -75,6 +76,7 @@ export class GeminiChatAiProvider implements ChatAiProvider {
       throw new Error("Gemini model is required");
     }
 
+    this.model = model;
     this.client = new GoogleGenAI({
       apiKey,
       httpOptions: {
@@ -118,6 +120,16 @@ export class GeminiChatAiProvider implements ChatAiProvider {
       },
     });
 
-    return parseChatAiResponse(response.text);
+    const parsed = parseChatAiResponse(response.text);
+    const usage = response.usageMetadata;
+
+    return {
+      ...parsed,
+      usage: {
+        inputTokens: usage?.promptTokenCount ?? null,
+        outputTokens: usage?.candidatesTokenCount ?? null,
+        totalTokens: usage?.totalTokenCount ?? null,
+      },
+    };
   }
 }
