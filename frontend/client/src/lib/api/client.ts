@@ -1,3 +1,5 @@
+"use client";
+
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5000/api/v1"
 ).replace(/\/+$/, "");
@@ -19,9 +21,9 @@ export class ApiError extends Error {
   }
 }
 
-// Access tokens deliberately remain in memory. Do not persist bearer or refresh
-// tokens in localStorage/sessionStorage. A server-side session/BFF is the next
-// auth integration step for securely retaining refresh tokens across reloads.
+// Access tokens deliberately remain in browser memory. Do not persist bearer or
+// refresh tokens in localStorage/sessionStorage. A server-side session/BFF is
+// the next auth integration step for securely retaining refresh tokens.
 let accessToken: string | null = null;
 
 export function setAccessToken(token: string | null): void {
@@ -41,7 +43,13 @@ export async function apiRequest<T>(
   path: `/${string}`,
   options: ApiRequestOptions = {},
 ): Promise<T> {
-  const { body, authenticated = false, headers: suppliedHeaders, ...requestOptions } = options;
+  const {
+    body,
+    authenticated = false,
+    credentials = "same-origin",
+    headers: suppliedHeaders,
+    ...requestOptions
+  } = options;
   const headers = new Headers(suppliedHeaders);
 
   if (body !== undefined && !headers.has("Content-Type")) {
@@ -58,7 +66,7 @@ export async function apiRequest<T>(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...requestOptions,
     headers,
-    credentials: "include",
+    credentials,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 
@@ -67,9 +75,22 @@ export async function apiRequest<T>(
   }
 
   const contentType = response.headers.get("content-type") ?? "";
-  const payload: unknown = contentType.includes("application/json")
-    ? await response.json()
-    : await response.text();
+  const responseText = await response.text();
+  let payload: unknown = responseText;
+
+  if (contentType.includes("application/json") && responseText.length > 0) {
+    try {
+      payload = JSON.parse(responseText) as unknown;
+    } catch {
+      if (response.ok) {
+        throw new ApiError(
+          "The server returned an invalid JSON response.",
+          502,
+          responseText,
+        );
+      }
+    }
+  }
 
   if (!response.ok) {
     const errorPayload =
@@ -82,7 +103,7 @@ export async function apiRequest<T>(
         ? payload
         : "The request could not be completed.");
 
-    throw new ApiError(message, response.status, errorPayload?.errors);
+    throw new ApiError(message, response.status, errorPayload?.errors ?? payload);
   }
 
   return payload as T;
