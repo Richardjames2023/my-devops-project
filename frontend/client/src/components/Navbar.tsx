@@ -149,7 +149,7 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Account</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "account" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-full z-50 mt-0 before:absolute before:-top-2 before:left-0 before:h-2 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-full z-50 mt-0 before:absolute before:-top-2 before:left-0 before:h-2 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="border-b border-[var(--shop-border)] bg-[var(--shop-navy)] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
