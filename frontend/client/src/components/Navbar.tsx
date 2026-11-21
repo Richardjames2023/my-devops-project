@@ -34,7 +34,7 @@ const Navbar = () => {
           </Link>
 
           <nav aria-label="Main navigation" className="order-3 hidden items-center gap-5 text-[12px] font-semibold text-[var(--shop-navy)] lg:flex lg:order-2">
-            {navigation.slice(0, 3).map((item) => (
+            {navigation.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
@@ -68,7 +68,7 @@ const Navbar = () => {
           </div>
 
           <nav aria-label="Mobile navigation" className="order-4 flex w-full items-center justify-around border-t border-[var(--shop-border)] pt-2 text-xs font-semibold text-[var(--shop-navy)] lg:hidden">
-            {navigation.map((item) => (
+            {navigation.slice(0, 3).map((item) => (
               <Link key={item.label} href={item.href} className="whitespace-nowrap hover:text-[var(--shop-orange)]">
                 {item.label}
               </Link>
