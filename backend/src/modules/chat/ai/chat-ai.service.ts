@@ -13,7 +13,7 @@ import type { ChatOwner } from "../chat.types";
 import { createChatAiProvider } from "./chat-ai.provider.factory";
 import { loadCustomerSupportKnowledgeBase } from "./customer-support-knowledge-base";
 import { publishNotificationEvent } from "../../notifications/notification-outbox.publisher";
-import type { ChatAiHistoryMessage } from "./chat-ai.types";
+import type { ChatAiHistoryMessage, ChatAiTokenUsage } from "./chat-ai.types";
 import { emitChatConversationStatus, emitChatMessage } from "../chat-realtime.events";
 
 const LEASE_MS = 30_000;
@@ -338,6 +338,69 @@ async function getConversationHistory(
     role: message.senderType as "CUSTOMER" | "BOT",
     content: message.content,
   }));
+}
+
+function normalizeTokenCount(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null;
+}
+
+async function recordChatAiUsage(input: {
+  generationId: string;
+  attemptNumber: number;
+  provider: string;
+  model: string;
+  outcome: "SUCCEEDED" | "FAILED";
+  usage: ChatAiTokenUsage;
+  durationMs: number;
+}): Promise<void> {
+  const inputTokens = normalizeTokenCount(input.usage.inputTokens);
+  const outputTokens = normalizeTokenCount(input.usage.outputTokens);
+  const totalTokens = normalizeTokenCount(input.usage.totalTokens);
+  const inputRate = env.CHAT_AI_INPUT_USD_PER_MILLION_TOKENS;
+  const outputRate = env.CHAT_AI_OUTPUT_USD_PER_MILLION_TOKENS;
+  const pricingVersion = env.CHAT_AI_PRICING_VERSION ?? null;
+  const hasPricing = inputRate !== undefined && outputRate !== undefined && pricingVersion !== null;
+  const inputCostUsd = hasPricing && inputTokens !== null
+    ? (inputTokens * inputRate) / 1_000_000
+    : null;
+  const outputCostUsd = hasPricing && outputTokens !== null
+    ? (outputTokens * outputRate) / 1_000_000
+    : null;
+  const totalCostUsd = inputCostUsd !== null && outputCostUsd !== null
+    ? inputCostUsd + outputCostUsd
+    : null;
+
+  const data = {
+    provider: input.provider,
+    model: input.model,
+    outcome: input.outcome,
+    persistenceStatus: input.outcome === "FAILED" ? "FAILED" : "PENDING",
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    inputCostUsd,
+    outputCostUsd,
+    totalCostUsd,
+    pricingVersion: hasPricing ? pricingVersion : null,
+    durationMs: Math.max(0, Math.trunc(input.durationMs)),
+  };
+
+  await prisma.chatAiUsage.upsert({
+    where: {
+      generationId_attemptNumber: {
+        generationId: input.generationId,
+        attemptNumber: input.attemptNumber,
+      },
+    },
+    create: {
+      generationId: input.generationId,
+      attemptNumber: input.attemptNumber,
+      ...data,
+    },
+    update: data,
+  });
 }
 
 async function persistGeneratedReply(input: {
@@ -756,17 +819,45 @@ export async function generateChatAiReply(
     /*
      * Gemini runs outside database transactions.
      */
-    const generated = await provider.generateReply({
-      message: customerMessage.content,
-      history,
-      knowledgeContext: knowledgeBase.content,
+    const providerStartedAt = Date.now();
+    let generated;
+
+    try {
+      generated = await provider.generateReply({
+        message: customerMessage.content,
+        history,
+        knowledgeContext: knowledgeBase.content,
+      });
+    } catch (error) {
+      await recordChatAiUsage({
+        generationId: claim.id,
+        attemptNumber: claim.attemptCount,
+        provider: provider.name,
+        model: provider.model,
+        outcome: "FAILED",
+        usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+        durationMs: Date.now() - providerStartedAt,
+      });
+      throw error;
+    }
+
+    await recordChatAiUsage({
+      generationId: claim.id,
+      attemptNumber: claim.attemptCount,
+      provider: provider.name,
+      model: provider.model,
+      outcome: "SUCCEEDED",
+      usage: generated.usage,
+      durationMs: Date.now() - providerStartedAt,
     });
 
     /*
      * Persistence rechecks conversation status, lease token,
-     * and lease expiry under database row locks.
+     * and lease expiry under database row locks. Provider usage is
+     * recorded first so a billed response is accounted for even if
+     * this worker has lost its generation lease.
      */
-    return await persistGeneratedReply({
+    const result = await persistGeneratedReply({
       conversationId: input.conversationId,
       customerMessageId: input.customerMessageId,
       leaseToken,
@@ -775,6 +866,21 @@ export async function generateChatAiReply(
       handoffRecommended: generated.handoff.recommended,
       handoffReason: generated.handoff.reason,
     });
+
+    await prisma.chatAiUsage.updateMany({
+      where: {
+        generationId: claim.id,
+        attemptNumber: claim.attemptCount,
+      },
+      data: {
+        persistenceStatus:
+          result.botMessage?.content === generated.reply
+            ? "PERSISTED"
+            : "DISCARDED",
+      },
+    });
+
+    return result;
   } catch {
     /*
      * Only the current lease holder can mark this generation failed.
