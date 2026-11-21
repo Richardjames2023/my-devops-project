@@ -47,7 +47,7 @@ const shopCategories = [
 const placeholderClass =
   "flex w-full cursor-not-allowed items-center gap-3 px-4 py-3 text-left text-sm text-[var(--shop-muted)]";
 const activeClass =
-  "flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-[var(--shop-body)] transition-colors hover:bg-[var(--shop-blue-light)] hover:text-[var(--shop-navy)]";
+  "flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-[var(--shop-body)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange-dark)]";
 
 function ComingSoon({ children }: { children: React.ReactNode }) {
   return (
@@ -90,14 +90,14 @@ const Navbar = () => {
                 Categories
                 <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-full z-50 mt-3 w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
+              <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-full z-50 mt-0 before:absolute before:-top-3 before:left-0 before:h-3 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
                 <div className="grid max-h-[min(560px,calc(100vh-180px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
-                  <div className="overflow-y-auto border-r border-[var(--shop-border)] bg-[var(--shop-search)] p-2">
-                    <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-muted)]">Browse categories</p>
+                  <div className="overflow-y-auto border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2">
+                    <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
                     {shopCategories.map((category) => {
                       const Icon = category.icon;
                       return (
-                        <Link key={category.slug} href={`/products?category=${category.slug}`} className="group flex items-center justify-between gap-2 rounded-lg px-3 py-3 text-sm font-medium text-[var(--shop-body)] transition-colors hover:bg-white hover:text-[var(--shop-orange)]">
+                        <Link key={category.slug} href={`/products?category=${category.slug}`} className="group flex items-center justify-between gap-2 rounded-lg px-3 py-3 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-white hover:text-[var(--shop-orange)] hover:shadow-sm">
                           <span className="flex items-center gap-2"><Icon size={17} />{category.name}</span>
                           <ChevronDown size={14} className="-rotate-90 text-[var(--shop-muted)]" />
                         </Link>
@@ -105,7 +105,7 @@ const Navbar = () => {
                     })}
                   </div>
                   <div className="overflow-y-auto p-5">
-                    <div className="mb-4 flex items-center justify-between">
+                    <div className="mb-4 flex items-center justify-between border-b border-[var(--shop-peach)] pb-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wider text-[var(--shop-muted)]">Explore ShopSphere</p>
                         <h3 className="mt-1 text-lg font-bold text-[var(--shop-navy)]">Shop by category</h3>
@@ -115,7 +115,7 @@ const Navbar = () => {
                     <div className="grid grid-cols-3 gap-x-4 gap-y-5">
                       {shopCategories.filter((category) => category.slug !== "all").map((category) => (
                         <Link key={category.slug} href={`/products?category=${category.slug}`} className="group flex min-w-0 flex-col items-center rounded-lg p-2 text-center transition-colors hover:bg-[var(--shop-search)]">
-                          <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-search)] ring-1 ring-[var(--shop-border)] transition-transform duration-200 group-hover:scale-105">
+                          <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-peach-tint)] ring-1 ring-[var(--shop-peach)] transition-all duration-200 group-hover:scale-105 group-hover:ring-[var(--shop-orange)]">
                             <Image src={category.image} alt="" width={80} height={80} className="h-full w-full object-contain mix-blend-multiply" />
                           </span>
                           <span className="text-sm font-semibold text-[var(--shop-navy)] group-hover:text-[var(--shop-orange)]">{category.name}</span>
@@ -149,13 +149,13 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Account</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "account" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-full z-50 mt-2 w-[min(19rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
-                <div className="border-b border-[var(--shop-border)] p-4">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
-                    <UserRound size={18} />
+              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-full z-50 mt-0 before:absolute before:-top-2 before:left-0 before:h-2 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+                <div className="border-b border-[var(--shop-border)] bg-[var(--shop-navy)] p-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+                    <UserRound size={18} className="text-[var(--shop-orange)]" />
                     Welcome to ShopSphere
                   </div>
-                  <div className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm">
+                  <div className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
                     Sign In <ComingSoon>Coming soon</ComingSoon>
                   </div>
                 </div>
@@ -185,7 +185,7 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Help</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "help" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "help"} className={`absolute right-0 top-full z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "help" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+              <div aria-hidden={activeMenu !== "help"} className={`absolute right-0 top-full z-50 mt-0 before:absolute before:-top-2 before:left-0 before:h-2 before:w-full before:content-[''] w-[min(20rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "help" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="py-1">
                   <Link href="/help" className={activeClass}>
                     <CircleHelp size={19} /> Help Centre
@@ -214,7 +214,7 @@ const Navbar = () => {
                     <MessageCircle size={18} /> Live Chat
                     <span className="text-[9px] font-medium">Soon</span>
                   </div>
-                  <div className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-emerald-500 px-2 text-center text-xs font-bold text-emerald-600">
+                  <div className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-[var(--shop-success)] px-2 text-center text-xs font-bold text-[var(--shop-success)]">
                     <Headphones size={18} /> WhatsApp
                     <span className="text-[9px] font-medium">Soon</span>
                   </div>
