@@ -1,12 +1,24 @@
-import { Search } from "lucide-react"
+import { Search } from "lucide-react";
 
 const SearchBar = () => {
   return (
-    <div className='hidden sm:flex items-center gap-2 rounded-md ring-1 ring-gray-200 px-2 py-1 shadow-md'>
-      <Search className="w-4 h-4 text-gray-500"/>
-      <input id="search" placeholder="Search..." className="text-sm outline-0"/>
-    </div>
-  )
-}
+    <form
+      action="/products"
+      method="get"
+      role="search"
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--shop-border)] bg-[var(--shop-search)] px-2.5 transition-all focus-within:w-64 focus-within:justify-start sm:w-48 sm:justify-start lg:w-64"
+    >
+      <Search size={16} className="shrink-0 text-[var(--shop-navy)]" aria-hidden="true" />
+      <input
+        id="search"
+        name="q"
+        type="search"
+        placeholder="Search products, brands..."
+        aria-label="Search products and brands"
+        className="ml-2 min-w-0 flex-1 bg-transparent text-xs text-[var(--shop-navy)] outline-none placeholder:text-[var(--shop-muted)] max-sm:hidden"
+      />
+    </form>
+  );
+};
 
-export default SearchBar
+export default SearchBar;
