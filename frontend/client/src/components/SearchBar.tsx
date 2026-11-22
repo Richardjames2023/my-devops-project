@@ -122,14 +122,14 @@ const SearchBar = () => {
 
       </form>
       <div
-        className="pointer-events-auto absolute left-0 right-0 top-full z-[100] pt-2"
+        className="pointer-events-none absolute left-0 right-0 top-full z-[100] pt-2"
       >
         <div
           id="shop-search-suggestions"
           role="listbox"
           aria-label="Product suggestions"
           aria-hidden={!isOpen}
-          className={`max-h-[min(70vh,360px)] overflow-y-auto overscroll-contain origin-top rounded-2xl border border-[var(--shop-border)] bg-white p-2 shadow-xl [scrollbar-color:var(--shop-orange)_var(--shop-peach)] [scrollbar-width:thin] transition-all duration-200 ease-out motion-reduce:transition-none ${isOpen ? "visible translate-y-0 scale-100 opacity-100" : "invisible pointer-events-none -translate-y-2 scale-[0.98] opacity-0"}`}
+          className={`max-h-[min(70vh,360px)] overflow-y-auto overscroll-contain origin-top rounded-2xl border border-[var(--shop-border)] bg-white p-2 shadow-xl [scrollbar-color:var(--shop-orange)_var(--shop-peach)] [scrollbar-width:thin] transition-all duration-200 ease-out motion-reduce:transition-none ${isOpen ? "pointer-events-auto visible translate-y-0 scale-100 opacity-100" : "pointer-events-none invisible -translate-y-2 scale-[0.98] opacity-0"}`}
         >
         {suggestions.length > 0 ? (
           <>
