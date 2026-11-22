@@ -169,7 +169,7 @@ const Navbar = () => {
                 Categories
                 <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-[calc(100%+16px)] z-50 mt-0 before:absolute before:-top-4 before:left-0 before:h-4 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
+              <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-[calc(100%+24px)] z-50 mt-0 before:absolute before:-top-6 before:left-0 before:h-6 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
                 <div className="grid h-[440px] max-h-[min(440px,calc(100vh-120px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
                   <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2">
                     <p className="shrink-0 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
@@ -291,7 +291,7 @@ const Navbar = () => {
               </div>
             </div>
 
-            <div className="relative z-10" onMouseEnter={() => setActiveMenu("help")} onMouseLeave={() => setActiveMenu(null)}>
+            <div className="relative z-10 after:absolute after:left-0 after:top-full after:h-4 after:w-full after:content-['']" onMouseEnter={() => setActiveMenu("help")} onMouseLeave={() => setActiveMenu(null)}>
               <button
                 type="button"
                 aria-label="Help menu"
@@ -332,7 +332,7 @@ const Navbar = () => {
                     <MessageCircle size={18} /> Live Chat
                     <span className="text-[9px] font-medium">Soon</span>
                   </div>
-                  <div className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-[var(--shop-success)] px-2 text-center text-xs font-bold text-[var(--shop-success)]">
+                  <div className="flex min-h-12 items-center justify-center gap-2 rounded-lg border border-[var(--shop-success)] bg-white px-2 text-center text-xs font-bold text-[var(--shop-success)]">
                     <Headphones size={18} /> WhatsApp
                     <span className="text-[9px] font-medium">Soon</span>
                   </div>
