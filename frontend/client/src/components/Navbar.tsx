@@ -256,12 +256,16 @@ const Navbar = () => {
           </nav>
 
           <div className="order-2 flex w-full min-w-0 items-center justify-end gap-1 sm:w-auto sm:shrink-0 sm:gap-2 lg:order-3">
-            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] lg:hidden">
+            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] lg:hidden">
               Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
             </button>
             <div className="hidden sm:block"><SearchBar /></div>
 
-            <div className="relative z-10" onMouseEnter={() => setActiveMenu("account")} onMouseLeave={() => setActiveMenu(null)}>
+            <div
+              className="relative z-10"
+              onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("account"); }}
+              onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveMenu((current) => current === "account" ? null : current); }}
+            >
               <button
                 type="button"
                 aria-label="Account menu"
@@ -297,7 +301,11 @@ const Navbar = () => {
               </div>
             </div>
 
-            <div className="relative z-10" onMouseEnter={() => setActiveMenu("help")} onMouseLeave={() => setActiveMenu(null)}>
+            <div
+              className="relative z-10"
+              onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("help"); }}
+              onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveMenu((current) => current === "help" ? null : current); }}
+            >
               <button
                 type="button"
                 aria-label="Help menu"
