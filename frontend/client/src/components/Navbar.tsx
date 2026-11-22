@@ -157,6 +157,7 @@ const Navbar = () => {
             <span className="text-[21px] font-bold tracking-[-0.8px] text-[var(--shop-navy)] sm:text-[24px]">
               Shop<span className="text-[var(--shop-orange)]">Sphere</span>
             </span>
+          </Link>
           <div className="ml-auto min-w-0 flex-1 sm:hidden"><SearchBar /></div>
           </div>
 
