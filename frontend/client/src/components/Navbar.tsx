@@ -77,7 +77,6 @@ function ComingSoon({ children }: { children: React.ReactNode }) {
 
 const Navbar = () => {
   const [activeMenu, setActiveMenu] = useState<"account" | "help" | "categories" | null>(null);
-  const [canHover, setCanHover] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
@@ -87,20 +86,11 @@ const Navbar = () => {
     return () => window.removeEventListener("scroll", updateScrollState);
   }, []);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
-    const updateHoverCapability = () => setCanHover(mediaQuery.matches);
-    updateHoverCapability();
-    mediaQuery.addEventListener("change", updateHoverCapability);
-    return () => mediaQuery.removeEventListener("change", updateHoverCapability);
-  }, []);
   const headerContentRef = useRef<HTMLDivElement>(null);
   const categoryTriggerRef = useRef<HTMLButtonElement>(null);
   const categoryPanelRef = useRef<HTMLDivElement>(null);
   const categoryPointerTypeRef = useRef<"mouse" | "touch" | "pen" | null>(null);
-  const accountPointerTypeRef = useRef<"mouse" | "touch" | "pen" | null>(null);
-  const helpPointerTypeRef = useRef<"mouse" | "touch" | "pen" | null>(null);
-  const [activeCategorySlug, setActiveCategorySlug] = useState("t-shirts");
+    const [activeCategorySlug, setActiveCategorySlug] = useState("t-shirts");
   const activeCategory = shopCategories.find((category) => category.slug === activeCategorySlug) ?? shopCategories[1];
   const [catalogProducts, setCatalogProducts] = useState<CatalogPreviewProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -299,21 +289,14 @@ const Navbar = () => {
 
             <div
               className="relative z-10"
-              onPointerEnter={() => { if (canHover) setActiveMenu("account"); }}
-              onPointerLeave={() => { if (canHover) setActiveMenu((current) => current === "account" ? null : current); }}
+              onMouseEnter={() => setActiveMenu("account")}
+              onMouseLeave={() => setActiveMenu(null)}
             >
               <button
                 type="button"
                 aria-label="Account menu"
                 aria-expanded={activeMenu === "account"}
-                onPointerDown={(event) => { accountPointerTypeRef.current = event.pointerType; }}
-                onClick={() => {
-                  if (!canHover || accountPointerTypeRef.current === "touch" || accountPointerTypeRef.current === "pen") {
-                    setActiveMenu((current) => current === "account" ? null : "account");
-                  } else {
-                    setActiveMenu("account");
-                  }
-                }}
+                onClick={() => setActiveMenu((current) => current === "account" ? null : "account")}
                 className={`flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] active:bg-[var(--shop-blue-light)] focus-visible:bg-[var(--shop-blue-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] sm:px-3 ${activeMenu === "account" ? "bg-[var(--shop-blue-light)]" : ""}`}
               >
                 <UserRound size={22} strokeWidth={1.9} />
@@ -346,21 +329,14 @@ const Navbar = () => {
 
             <div
               className="relative z-10"
-              onPointerEnter={() => { if (canHover) setActiveMenu("help"); }}
-              onPointerLeave={() => { if (canHover) setActiveMenu((current) => current === "help" ? null : current); }}
+              onMouseEnter={() => setActiveMenu("help")}
+              onMouseLeave={() => setActiveMenu(null)}
             >
               <button
                 type="button"
                 aria-label="Help menu"
                 aria-expanded={activeMenu === "help"}
-                onPointerDown={(event) => { helpPointerTypeRef.current = event.pointerType; }}
-                onClick={() => {
-                  if (!canHover || helpPointerTypeRef.current === "touch" || helpPointerTypeRef.current === "pen") {
-                    setActiveMenu((current) => current === "help" ? null : "help");
-                  } else {
-                    setActiveMenu("help");
-                  }
-                }}
+                onClick={() => setActiveMenu((current) => current === "help" ? null : "help")}
                 className={`flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] active:bg-[var(--shop-blue-light)] focus-visible:bg-[var(--shop-blue-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] sm:px-3 ${activeMenu === "help" ? "bg-[var(--shop-blue-light)]" : ""}`}
               >
                 <CircleHelp size={22} strokeWidth={1.9} />
