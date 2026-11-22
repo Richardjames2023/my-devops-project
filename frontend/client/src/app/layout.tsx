@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "ShopSphere | ClickClickBuy",
+  title: "ClickClickBuy",
   description: "Discover quality essentials and everyday favourites at ClickClickBuy.",
 };
 
