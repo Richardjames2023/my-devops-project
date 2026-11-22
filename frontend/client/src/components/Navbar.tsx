@@ -236,7 +236,7 @@ const Navbar = () => {
                       {previewProducts.map((product) => {
                         const imageUrl = product.images.find((image) => image.isPrimary)?.url ?? product.images[0]?.url;
                         return (
-                          <Link key={product.id} href={`/products?category=${activeCategory.slug}`} onClick={() => setActiveMenu(null)} className="group flex w-[118px] shrink-0 snap-start flex-col items-center rounded-xl p-2 text-center transition-all duration-300 hover:-translate-y-1 hover:bg-[var(--shop-peach-tint)] sm:w-[132px]">
+                          <Link key={product.id} href={`/products/${product.id}`} onClick={() => setActiveMenu(null)} className="group flex w-[118px] shrink-0 snap-start flex-col items-center rounded-xl p-2 text-center transition-all duration-300 hover:-translate-y-1 hover:bg-[var(--shop-peach-tint)] sm:w-[132px]">
                             <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-peach-tint)] ring-1 ring-[var(--shop-peach)] transition-all duration-300 group-hover:scale-105 group-hover:ring-2 group-hover:ring-[var(--shop-orange)]">
                               {imageUrl ? <Image src={imageUrl} alt={product.name} width={80} height={80} unoptimized className="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-110" /> : <Package size={28} className="text-[var(--shop-muted)]" />}
                             </span>
