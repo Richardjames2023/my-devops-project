@@ -134,7 +134,6 @@ const SearchBar = () => {
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setActiveIndex(index)}
                 onClick={() => {
-                  setQuery("");
                   setActiveIndex(-1);
                   submitSearch(product.name);
                 }}
