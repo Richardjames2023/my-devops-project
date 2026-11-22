@@ -398,7 +398,7 @@ const Navbar = () => {
           <div ref={categoryPanelRef} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} className={`order-3 w-full lg:hidden ${activeMenu === "categories" ? "block" : "hidden"}`}>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--shop-border)] py-3 sm:grid-cols-4">
               {shopCategories.map((category) => (
-                <Link key={category.slug} href={`/products?category=${category.slug}`} onClick={() => setActiveMenu(null)} className="flex items-center gap-2 rounded-lg bg-[var(--shop-search)] p-2 text-sm font-medium text-[var(--shop-navy)]">
+                <Link key={category.slug} href={`/products?category=${category.slug}`} onClick={() => setActiveMenu(null)} className="flex items-center gap-2 rounded-lg bg-[var(--shop-search)] p-2 text-sm font-medium text-[var(--shop-navy)] transition-colors duration-200 hover:bg-[var(--shop-peach)] hover:text-[var(--shop-orange-dark)] focus-visible:bg-[var(--shop-peach)] focus-visible:text-[var(--shop-orange-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)]">
                   <Image src={category.image} alt="" width={40} height={40} className="h-10 w-10 rounded-full object-contain" />
                   {category.name}
                 </Link>
