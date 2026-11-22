@@ -78,6 +78,9 @@ function ComingSoon({ children }: { children: React.ReactNode }) {
 const Navbar = () => {
   const [activeMenu, setActiveMenu] = useState<"account" | "help" | "categories" | null>(null);
   const headerContentRef = useRef<HTMLDivElement>(null);
+  const categoryTriggerRef = useRef<HTMLButtonElement>(null);
+  const categoryPanelRef = useRef<HTMLDivElement>(null);
+  const categoryPointerTypeRef = useRef<"mouse" | "touch" | "pen" | null>(null);
   const [activeCategorySlug, setActiveCategorySlug] = useState("t-shirts");
   const activeCategory = shopCategories.find((category) => category.slug === activeCategorySlug) ?? shopCategories[1];
   const [catalogProducts, setCatalogProducts] = useState<CatalogPreviewProduct[]>([]);
@@ -270,7 +273,7 @@ const Navbar = () => {
           </nav>
 
           <div className="order-2 flex w-full min-w-0 items-center justify-end gap-1 lg:w-auto lg:shrink-0 lg:gap-2 lg:order-3">
-            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className={`mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden ${activeMenu === "categories" ? "bg-[var(--shop-peach-tint)] text-[var(--shop-orange)]" : ""}`}>
+            <button ref={categoryTriggerRef} type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onPointerDown={(event) => { categoryPointerTypeRef.current = event.pointerType; }} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} onPointerLeave={(event) => { if (event.pointerType === "mouse" && !categoryPanelRef.current?.contains(event.relatedTarget as Node | null)) setActiveMenu((current) => current === "categories" ? null : current); }} onClick={() => { if (categoryPointerTypeRef.current === "mouse") setActiveMenu("categories"); else setActiveMenu((current) => current === "categories" ? null : "categories"); }} className={`mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden ${activeMenu === "categories" ? "bg-[var(--shop-peach-tint)] text-[var(--shop-orange)]" : ""}`}>
               Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
             </button>
             <div className="hidden lg:block"><SearchBar /></div>
@@ -371,7 +374,7 @@ const Navbar = () => {
             <ShoppingCartIcon />
           </div>
 
-          <div className={`order-3 w-full overflow-hidden transition-all duration-300 ease-out lg:hidden ${activeMenu === "categories" ? "max-h-[70vh] translate-y-0 opacity-100 visible" : "max-h-0 -translate-y-2 opacity-0 invisible"}`}>
+          <div ref={categoryPanelRef} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} onPointerLeave={(event) => { if (event.pointerType === "mouse" && !categoryTriggerRef.current?.contains(event.relatedTarget as Node | null)) setActiveMenu((current) => current === "categories" ? null : current); }} className={`order-3 w-full overflow-hidden transition-all duration-300 ease-out lg:hidden ${activeMenu === "categories" ? "max-h-[70vh] translate-y-0 opacity-100 visible" : "max-h-0 -translate-y-2 opacity-0 invisible"}`}>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--shop-border)] py-3 sm:grid-cols-4">
               {shopCategories.map((category) => (
                 <Link key={category.slug} href={`/products?category=${category.slug}`} onClick={() => setActiveMenu(null)} className="flex items-center gap-2 rounded-lg bg-[var(--shop-search)] p-2 text-sm font-medium text-[var(--shop-navy)]">
