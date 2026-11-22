@@ -252,7 +252,7 @@ const Navbar = () => {
             ))}
           </nav>
 
-          <div className="order-2 flex shrink-0 items-center justify-end gap-1 sm:gap-2 lg:order-3">
+          <div className="order-2 flex w-full min-w-0 items-center justify-end gap-1 sm:w-auto sm:shrink-0 sm:gap-2 lg:order-3">
             <SearchBar />
 
             <div className="relative z-10" onMouseEnter={() => setActiveMenu("account")} onMouseLeave={() => setActiveMenu(null)}>
@@ -343,12 +343,10 @@ const Navbar = () => {
             <ShoppingCartIcon />
           </div>
 
-          <nav aria-label="Mobile and tablet navigation" className="order-4 flex w-full items-center justify-around border-t border-[var(--shop-border)] pt-2 text-[16px] font-semibold text-[var(--shop-navy)] lg:hidden">
-            {navigation.map((item) => <Link key={item.label} href={item.href} className="whitespace-nowrap hover:text-[var(--shop-orange)]">{item.label}</Link>)}
-            <button type="button" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="flex items-center gap-1 whitespace-nowrap hover:text-[var(--shop-orange)]">
-              Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
+          <nav aria-label="Mobile and tablet navigation" className="order-4 flex w-full items-center justify-center border-t border-[var(--shop-border)] pt-2 text-sm font-semibold text-[var(--shop-navy)] lg:hidden">
+            <button type="button" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="flex min-h-10 items-center gap-2 rounded-lg px-5 hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)]">
+              Categories <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
             </button>
-            <Link href="/products?sort=newest" className="whitespace-nowrap hover:text-[var(--shop-orange)]">New Arrivals</Link>
           </nav>
           <div className={`order-5 w-full overflow-hidden transition-all duration-300 ease-out lg:hidden ${activeMenu === "categories" ? "max-h-[70vh] translate-y-0 opacity-100" : "max-h-0 -translate-y-2 opacity-0"}`}>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--shop-border)] py-3 sm:grid-cols-4">
