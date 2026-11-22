@@ -140,7 +140,7 @@ const Navbar = () => {
               </button>
               <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-full z-50 mt-0 before:absolute before:-top-3 before:left-0 before:h-3 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
                 <div className="grid max-h-[min(680px,calc(100vh-120px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
-                  <div className="max-h-[400px] overflow-y-auto overscroll-y-contain border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]">
+                  <div className="max-h-[360px] overflow-y-auto overscroll-y-contain border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]">
                     <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
                     {shopCategories.map((category) => {
                       const Icon = category.icon;
