@@ -170,9 +170,10 @@ const Navbar = () => {
                 <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
               </button>
               <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-[calc(100%+24px)] z-50 mt-0 before:absolute before:-top-6 before:left-0 before:h-6 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
-                <div className="grid max-h-[min(680px,calc(100vh-120px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
-                  <div className="h-full min-h-full self-stretch overflow-y-auto overscroll-y-contain border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]">
-                    <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
+                <div className="grid h-[440px] max-h-[min(440px,calc(100vh-120px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
+                  <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2">
+                    <p className="shrink-0 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
+                    <div className="h-[308px] max-h-[308px] shrink-0 overflow-y-auto overscroll-y-contain [scrollbar-color:var(--shop-orange)_var(--shop-peach)] [scrollbar-width:thin]">
                     {shopCategories.map((category) => {
                       const Icon = category.icon;
                       return (
@@ -182,7 +183,8 @@ const Navbar = () => {
                         </button>
                       );
                     })}
-                  </div>
+                    </div>
+                  </aside>
                   <div className="min-h-0 overflow-y-auto overscroll-contain p-5 pb-8">
                     <div className="mb-4 flex items-center justify-between border-b border-[var(--shop-peach)] pb-3">
                       <div>
@@ -265,7 +267,7 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Account</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "account" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-[calc(100%+10px)] z-50 mt-0 before:absolute before:-top-[10px] before:left-0 before:h-[10px] before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-[calc(100%+24px)] z-50 mt-0 before:absolute before:-top-6 before:left-0 before:h-6 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="border-b border-[var(--shop-peach)] bg-[var(--shop-peach-tint)] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
@@ -301,7 +303,7 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Help</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "help" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "help"} className={`absolute right-0 top-[calc(100%+10px)] z-50 mt-0 before:absolute before:-top-[10px] before:left-0 before:h-[10px] before:w-full before:content-[''] w-[min(20rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "help" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+              <div aria-hidden={activeMenu !== "help"} className={`absolute right-0 top-[calc(100%+24px)] z-50 mt-0 before:absolute before:-top-6 before:left-0 before:h-6 before:w-full before:content-[''] w-[min(20rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "help" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="py-1">
                   <Link href="/help" className={activeClass}>
                     <CircleHelp size={19} /> Help Centre
