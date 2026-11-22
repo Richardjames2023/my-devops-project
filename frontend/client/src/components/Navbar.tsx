@@ -144,6 +144,7 @@ const Navbar = () => {
       <AnnouncementBar />
       <div className="border-b border-[var(--shop-border)] bg-white">
         <div className="mx-auto flex header-inner flex-wrap items-center justify-between gap-x-3 gap-y-3 py-3 sm:gap-x-4 sm:py-4">
+          <div className="order-1 flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-none">
           <Link href="/" aria-label="ShopSphere home" className="flex shrink-0 items-center gap-2">
             <Image
               src="/logo.png"
@@ -156,7 +157,8 @@ const Navbar = () => {
             <span className="text-[21px] font-bold tracking-[-0.8px] text-[var(--shop-navy)] sm:text-[24px]">
               Shop<span className="text-[var(--shop-orange)]">Sphere</span>
             </span>
-          </Link>
+          <div className="ml-auto min-w-0 flex-1 sm:hidden"><SearchBar /></div>
+          </div>
 
           <nav aria-label="Main navigation" className="order-3 hidden items-center gap-5 text-[16px] font-semibold text-[var(--shop-navy)] lg:order-2 lg:flex xl:gap-7">
             {navigation.map((item) => (
@@ -253,7 +255,10 @@ const Navbar = () => {
           </nav>
 
           <div className="order-2 flex w-full min-w-0 items-center justify-end gap-1 sm:w-auto sm:shrink-0 sm:gap-2 lg:order-3">
-            <SearchBar />
+            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] lg:hidden">
+              Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
+            </button>
+            <div className="hidden sm:block"><SearchBar /></div>
 
             <div className="relative z-10" onMouseEnter={() => setActiveMenu("account")} onMouseLeave={() => setActiveMenu(null)}>
               <button
@@ -343,12 +348,7 @@ const Navbar = () => {
             <ShoppingCartIcon />
           </div>
 
-          <nav aria-label="Mobile and tablet navigation" className="order-4 flex w-full items-center justify-center border-t border-[var(--shop-border)] pt-2 text-sm font-semibold text-[var(--shop-navy)] lg:hidden">
-            <button type="button" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="flex min-h-10 items-center gap-2 rounded-lg px-5 hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)]">
-              Categories <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
-            </button>
-          </nav>
-          <div className={`order-5 w-full overflow-hidden transition-all duration-300 ease-out lg:hidden ${activeMenu === "categories" ? "max-h-[70vh] translate-y-0 opacity-100" : "max-h-0 -translate-y-2 opacity-0"}`}>
+          <div className={`order-3 w-full overflow-hidden transition-all duration-300 ease-out lg:hidden ${activeMenu === "categories" ? "max-h-[70vh] translate-y-0 opacity-100 visible" : "max-h-0 -translate-y-2 opacity-0 invisible"}`}>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--shop-border)] py-3 sm:grid-cols-4">
               {shopCategories.map((category) => (
                 <Link key={category.slug} href={`/products?category=${category.slug}`} className="flex items-center gap-2 rounded-lg bg-[var(--shop-search)] p-2 text-sm font-medium text-[var(--shop-navy)]">
