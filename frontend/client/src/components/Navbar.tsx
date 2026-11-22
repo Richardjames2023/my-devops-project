@@ -256,7 +256,7 @@ const Navbar = () => {
           </nav>
 
           <div className="order-2 flex w-full min-w-0 items-center justify-end gap-1 lg:w-auto lg:shrink-0 lg:gap-2 lg:order-3">
-            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden">
+            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden ${activeMenu === "categories" ? "bg-[var(--shop-peach-tint)] text-[var(--shop-orange)]" : ""}">
               Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
             </button>
             <div className="hidden lg:block"><SearchBar /></div>
@@ -271,7 +271,7 @@ const Navbar = () => {
                 aria-label="Account menu"
                 aria-expanded={activeMenu === "account"}
                 onClick={() => setActiveMenu(activeMenu === "account" ? null : "account")}
-                className="flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] sm:px-3"
+                className={`flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] active:bg-[var(--shop-blue-light)] focus-visible:bg-[var(--shop-blue-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] sm:px-3 ${activeMenu === "account" ? "bg-[var(--shop-blue-light)]" : ""}`}
               >
                 <UserRound size={22} strokeWidth={1.9} />
                 <span className="hidden text-sm font-semibold sm:inline">Account</span>
@@ -311,7 +311,7 @@ const Navbar = () => {
                 aria-label="Help menu"
                 aria-expanded={activeMenu === "help"}
                 onClick={() => setActiveMenu(activeMenu === "help" ? null : "help")}
-                className="flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] sm:px-3"
+                className={`flex h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] active:bg-[var(--shop-blue-light)] focus-visible:bg-[var(--shop-blue-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] sm:px-3 ${activeMenu === "help" ? "bg-[var(--shop-blue-light)]" : ""}`}
               >
                 <CircleHelp size={22} strokeWidth={1.9} />
                 <span className="hidden text-sm font-semibold sm:inline">Help</span>
