@@ -152,11 +152,11 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
 
   const visibleProducts = [...searchedProducts].sort((a, b) => {
     switch (sort) {
-      case "oldest": return a.id - b.id;
+      case "oldest": return b.id - a.id;
       case "asc": return a.price - b.price;
       case "desc": return b.price - a.price;
       case "newest":
-      default: return b.id - a.id;
+      default: return 0;
     }
   });
 
