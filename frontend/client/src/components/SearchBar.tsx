@@ -139,7 +139,8 @@ const SearchBar = () => {
               </button>
             ))}
             <button
-              type="submit"
+              type="button"
+              onClick={() => submitSearch()}
               className="mt-1 flex w-full items-center justify-center rounded-xl border-t border-[var(--shop-border)] px-3 py-3 text-[13px] font-semibold text-[var(--shop-orange)] transition-colors hover:bg-[var(--shop-peach)]"
             >
               See all results for &ldquo;{query.trim()}&rdquo;
