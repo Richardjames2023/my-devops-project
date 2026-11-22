@@ -12,6 +12,27 @@ const SearchBar = () => {
   const [isFocused, setIsFocused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const cancelScheduledClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    cancelScheduledClose();
+    closeTimerRef.current = setTimeout(() => {
+      setIsFocused(false);
+      setActiveIndex(-1);
+      closeTimerRef.current = null;
+    }, 250);
+  };
+
+  useEffect(() => {
+    return () => cancelScheduledClose();
+  }, []);
 
   useEffect(() => {
     const closeOnOutsidePointer = (event: PointerEvent) => {
@@ -81,10 +102,12 @@ const SearchBar = () => {
     <div
       ref={searchContainerRef}
       className="relative z-[60] min-w-0 w-full lg:w-80 xl:w-[22rem]"
-      onMouseEnter={() => {
-        if (query.trim().length >= 2) {
-          setIsFocused(true);
-        }
+      onPointerEnter={() => {
+        cancelScheduledClose();
+        if (query.trim().length >= 2) setIsFocused(true);
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType === "mouse") scheduleClose();
       }}
     >
       <form
@@ -118,7 +141,13 @@ const SearchBar = () => {
       />
 
       </form>
-      <div className={`pointer-events-none absolute left-0 right-0 top-full z-[100] pt-2 ${isOpen ? "pointer-events-auto" : ""}`}>
+      <div
+        className={`pointer-events-none absolute left-0 right-0 top-full z-[100] pt-2 ${isOpen ? "pointer-events-auto" : ""}`}
+        onPointerEnter={cancelScheduledClose}
+        onPointerLeave={(event) => {
+          if (event.pointerType === "mouse") scheduleClose();
+        }}
+      >
         <div
           id="shop-search-suggestions"
           role="listbox"
