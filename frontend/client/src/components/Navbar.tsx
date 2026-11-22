@@ -26,7 +26,7 @@ import {
 import SearchBar from "./SearchBar";
 import ShoppingCartIcon from "./ShoppingCartIcon";
 import AnnouncementBar from "./AnnouncementBar";
-import { apiRequest } from "@/lib/api/client";
+import { apiRequest, getAccessToken } from "@/lib/api/client";
 
 const navigation = [
   { label: "Shop", href: "/products" },
@@ -53,6 +53,13 @@ type CatalogPreviewProduct = {
 };
 
 type CatalogPreviewResponse = { items: CatalogPreviewProduct[] };
+type CustomerOrderCountResponse = { pagination?: { total?: number } };
+type WishlistCountResponse = { wishlist?: { itemCount?: number } };
+
+function CountBadge({ count }: { count: number }) {
+  if (count < 1) return null;
+  return <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--shop-orange)] px-1.5 text-[10px] font-bold leading-none text-white">{count > 99 ? "99+" : count}</span>;
+}
 
 const placeholderClass =
   "flex w-full cursor-not-allowed items-center gap-3 px-4 py-3 text-left text-sm text-[var(--shop-muted)]";
@@ -73,6 +80,30 @@ const Navbar = () => {
   const activeCategory = shopCategories.find((category) => category.slug === activeCategorySlug) ?? shopCategories[1];
   const [catalogProducts, setCatalogProducts] = useState<CatalogPreviewProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
+  const [accountCounts, setAccountCounts] = useState({ orders: 0, wishlist: 0 });
+
+  useEffect(() => {
+    if (activeMenu !== "account") return;
+    const token = getAccessToken();
+    if (!token) {
+      setAccountCounts({ orders: 0, wishlist: 0 });
+      return;
+    }
+
+    let cancelled = false;
+    Promise.allSettled([
+      apiRequest<CustomerOrderCountResponse>("/orders?page=1&limit=1", { authenticated: true }),
+      apiRequest<WishlistCountResponse>("/wishlist", { authenticated: true }),
+    ]).then(([ordersResult, wishlistResult]) => {
+      if (cancelled) return;
+      setAccountCounts({
+        orders: ordersResult.status === "fulfilled" ? ordersResult.value.pagination?.total ?? 0 : 0,
+        wishlist: wishlistResult.status === "fulfilled" ? wishlistResult.value.wishlist?.itemCount ?? 0 : 0,
+      });
+    });
+
+    return () => { cancelled = true; };
+  }, [activeMenu]);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,12 +278,12 @@ const Navbar = () => {
                   <div className={placeholderClass}>
                     <UserRound size={19} /> My Account <ComingSoon>Coming soon</ComingSoon>
                   </div>
-                  <div className={placeholderClass}>
-                    <Package size={19} /> Orders <ComingSoon>Coming soon</ComingSoon>
-                  </div>
-                  <div className={placeholderClass}>
-                    <Heart size={19} /> Wishlist <ComingSoon>Coming soon</ComingSoon>
-                  </div>
+                  <Link href="/orders" className={activeClass}>
+                    <Package size={19} /> Orders <CountBadge count={accountCounts.orders} />
+                  </Link>
+                  <Link href="/wishlist" className={activeClass}>
+                    <Heart size={19} /> Wishlist <CountBadge count={accountCounts.wishlist} />
+                  </Link>
                 </div>
               </div>
             </div>
