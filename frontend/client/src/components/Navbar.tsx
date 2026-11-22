@@ -278,12 +278,12 @@ const Navbar = () => {
                   <div className={placeholderClass}>
                     <UserRound size={19} /> My Account <ComingSoon>Coming soon</ComingSoon>
                   </div>
-                  <Link href="/orders" className={activeClass}>
-                    <Package size={19} /> Orders <CountBadge count={accountCounts.orders} />
-                  </Link>
-                  <Link href="/wishlist" className={activeClass}>
-                    <Heart size={19} /> Wishlist <CountBadge count={accountCounts.wishlist} />
-                  </Link>
+                  <div className={placeholderClass}>
+                    <Package size={19} /> Orders <CountBadge count={accountCounts.orders} /> <ComingSoon>Coming soon</ComingSoon>
+                  </div>
+                  <div className={placeholderClass}>
+                    <Heart size={19} /> Wishlist <CountBadge count={accountCounts.wishlist} /> <ComingSoon>Coming soon</ComingSoon>
+                  </div>
                 </div>
               </div>
             </div>
