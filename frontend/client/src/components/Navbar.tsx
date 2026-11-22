@@ -283,14 +283,14 @@ const Navbar = () => {
             ))}
           </nav>
 
-          <div className="order-2 flex w-full min-w-0 items-center justify-end gap-1 lg:w-auto lg:shrink-0 lg:gap-2 lg:order-3">
+          <div className="relative order-2 flex w-full min-w-0 items-center justify-end gap-1 lg:w-auto lg:shrink-0 lg:gap-2 lg:order-3">
             <button ref={categoryTriggerRef} type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onPointerDown={(event) => { categoryPointerTypeRef.current = event.pointerType; }} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} onPointerLeave={(event) => { if (event.pointerType === "mouse" && !categoryPanelRef.current?.contains(event.relatedTarget as Node | null)) setActiveMenu((current) => current === "categories" ? null : current); }} onClick={() => { if (categoryPointerTypeRef.current === "mouse") setActiveMenu("categories"); else setActiveMenu((current) => current === "categories" ? null : "categories"); }} className={`mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden ${activeMenu === "categories" ? "bg-[var(--shop-peach-tint)] text-[var(--shop-orange)]" : ""}`}>
               Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
             </button>
             <div className="hidden lg:block"><SearchBar /></div>
 
             <div
-              className="relative z-10"
+              className="z-10 sm:relative"
               onPointerEnter={() => { if (canHover) setActiveMenu("account"); }}
               onPointerLeave={() => { if (canHover) setActiveMenu((current) => current === "account" ? null : current); }}
             >
@@ -312,7 +312,7 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Account</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "account" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-[calc(100%+16px)] z-50 mt-0 before:absolute before:-top-4 before:left-0 before:h-4 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-[calc(100%+16px)] sm:right-0 z-50 mt-0 before:absolute before:-top-4 before:left-0 before:h-4 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="border-b border-[var(--shop-peach)] bg-[var(--shop-peach-tint)] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
@@ -337,7 +337,7 @@ const Navbar = () => {
             </div>
 
             <div
-              className="relative z-10"
+              className="z-10 sm:relative"
               onPointerEnter={() => { if (canHover) setActiveMenu("help"); }}
               onPointerLeave={() => { if (canHover) setActiveMenu((current) => current === "help" ? null : current); }}
             >
