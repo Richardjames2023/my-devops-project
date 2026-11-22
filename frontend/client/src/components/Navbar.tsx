@@ -256,7 +256,7 @@ const Navbar = () => {
           </nav>
 
           <div className="order-2 flex w-full min-w-0 items-center justify-end gap-1 lg:w-auto lg:shrink-0 lg:gap-2 lg:order-3">
-            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden ${activeMenu === "categories" ? "bg-[var(--shop-peach-tint)] text-[var(--shop-orange)]" : ""}">
+            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className={`mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden ${activeMenu === "categories" ? "bg-[var(--shop-peach-tint)] text-[var(--shop-orange)]" : ""}`}>
               Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
             </button>
             <div className="hidden lg:block"><SearchBar /></div>
