@@ -126,23 +126,55 @@ const categoryProductIds: Record<string, number[]> = {
   gloves: [5, 2],
 };
 
-const ProductList = ({ category,params }: { category: string, params:"homepage" | "products" }) => {
+const ProductList = ({ category, query, sort, params }: { category?: string; query?: string; sort?: string; params: "homepage" | "products" }) => {
   const normalizedCategory = category?.toLowerCase();
-  const visibleProducts =
+  const categoryFilteredProducts =
     !normalizedCategory || normalizedCategory === "all"
       ? products
-      : products.filter((product) =>
-          (categoryProductIds[normalizedCategory] ?? []).includes(product.id),
-        );
+      : products.filter((product) => (categoryProductIds[normalizedCategory] ?? []).includes(product.id));
+
+  const normalizedQuery = query?.trim().toLocaleLowerCase() ?? "";
+  const searchedProducts = normalizedQuery
+    ? categoryFilteredProducts.filter((product) => {
+        const searchableText = [
+          product.name, product.shortDescription, product.description,
+          ...(categoryProductIds["t-shirts"]?.includes(product.id) ? ["t-shirts", "shirts", "clothing"] : []),
+          ...(categoryProductIds.shoes?.includes(product.id) ? ["shoes", "sneakers", "footwear"] : []),
+          ...(categoryProductIds.accessories?.includes(product.id) ? ["accessories"] : []),
+          ...(categoryProductIds.bags?.includes(product.id) ? ["bags", "backpacks"] : []),
+          ...(categoryProductIds.dresses?.includes(product.id) ? ["dresses"] : []),
+          ...(categoryProductIds.jackets?.includes(product.id) ? ["jackets", "hoodies", "outerwear"] : []),
+          ...(categoryProductIds.gloves?.includes(product.id) ? ["gloves"] : []),
+        ].join(" ").toLocaleLowerCase();
+        return searchableText.includes(normalizedQuery);
+      })
+    : categoryFilteredProducts;
+
+  const visibleProducts = [...searchedProducts].sort((a, b) => {
+    switch (sort) {
+      case "oldest": return a.id - b.id;
+      case "asc": return a.price - b.price;
+      case "desc": return b.price - a.price;
+      case "newest":
+      default: return b.id - a.id;
+    }
+  });
 
   return (
     <div className="w-full">
+      {query?.trim() && <p className="mb-4 text-sm text-[var(--shop-muted)]">Search results for <span className="font-semibold text-[var(--shop-navy)]">&ldquo;{query.trim()}&rdquo;</span> · {visibleProducts.length} {visibleProducts.length === 1 ? "product" : "products"} found</p>}
       <Categories />
       {params === "products" && <Filter/>}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-12">
-        {visibleProducts.map((product) => (
+        {visibleProducts.length > 0 ? visibleProducts.map((product) => (
           <ProductCard key={product.id} product={product} />
-        ))}
+        )) : (
+          <div className="col-span-full rounded-xl border border-[var(--shop-border)] bg-white px-6 py-12 text-center">
+            <h2 className="text-lg font-semibold text-[var(--shop-navy)]">No products found</h2>
+            <p className="mt-2 text-sm text-[var(--shop-muted)]">Try another product name or a broader search term.</p>
+            <Link href="/products" className="mt-4 inline-flex rounded-lg bg-[var(--shop-orange)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--shop-orange-dark)]">Browse all products</Link>
+          </div>
+        )}
       </div>
       <Link
         href={category ? `/products/?category=${category}` : "/products"}
