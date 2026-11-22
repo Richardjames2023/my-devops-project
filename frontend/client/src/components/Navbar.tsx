@@ -29,7 +29,6 @@ import AnnouncementBar from "./AnnouncementBar";
 import { apiRequest } from "@/lib/api/client";
 
 const navigation = [
-  { label: "Home", href: "/" },
   { label: "Shop", href: "/products" },
   { label: "New Arrivals", href: "/products?sort=newest" },
 ];
@@ -127,8 +126,8 @@ const Navbar = () => {
             </span>
           </Link>
 
-          <nav aria-label="Main navigation" className="order-3 hidden items-center gap-5 text-[15px] font-semibold text-[var(--shop-navy)] lg:order-2 lg:flex xl:gap-6">
-            {navigation.slice(0, 2).map((item) => (
+          <nav aria-label="Main navigation" className="order-3 hidden items-center gap-5 text-[16px] font-semibold text-[var(--shop-navy)] lg:order-2 lg:flex xl:gap-7">
+            {navigation.map((item) => (
               <Link key={item.label} href={item.href} className="whitespace-nowrap transition-colors hover:text-[var(--shop-orange)]">
                 {item.label}
               </Link>
@@ -138,9 +137,9 @@ const Navbar = () => {
                 Categories
                 <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-full z-50 mt-0 before:absolute before:-top-3 before:left-0 before:h-3 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
+              <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-[calc(100%+24px)] z-50 mt-0 before:absolute before:-top-6 before:left-0 before:h-6 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
                 <div className="grid max-h-[min(680px,calc(100vh-120px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
-                  <div className="max-h-[360px] overflow-y-auto overscroll-y-contain border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]">
+                  <div className="h-full min-h-full self-stretch overflow-y-auto overscroll-y-contain border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]">
                     <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
                     {shopCategories.map((category) => {
                       const Icon = category.icon;
@@ -234,7 +233,7 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Account</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "account" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-full z-50 mt-0 before:absolute before:-top-2 before:left-0 before:h-2 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-[calc(100%+24px)] z-50 mt-0 before:absolute before:-top-6 before:left-0 before:h-6 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="border-b border-[var(--shop-peach)] bg-[var(--shop-peach-tint)] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
@@ -310,8 +309,8 @@ const Navbar = () => {
             <ShoppingCartIcon />
           </div>
 
-          <nav aria-label="Mobile and tablet navigation" className="order-4 flex w-full items-center justify-around border-t border-[var(--shop-border)] pt-2 text-[15px] font-semibold text-[var(--shop-navy)] lg:hidden">
-            {navigation.slice(0, 2).map((item) => <Link key={item.label} href={item.href} className="whitespace-nowrap hover:text-[var(--shop-orange)]">{item.label}</Link>)}
+          <nav aria-label="Mobile and tablet navigation" className="order-4 flex w-full items-center justify-around border-t border-[var(--shop-border)] pt-2 text-[16px] font-semibold text-[var(--shop-navy)] lg:hidden">
+            {navigation.map((item) => <Link key={item.label} href={item.href} className="whitespace-nowrap hover:text-[var(--shop-orange)]">{item.label}</Link>)}
             <button type="button" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="flex items-center gap-1 whitespace-nowrap hover:text-[var(--shop-orange)]">
               Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
             </button>
