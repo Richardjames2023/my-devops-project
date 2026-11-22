@@ -9,20 +9,20 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
   const categoryFilteredProducts =
     !normalizedCategory || normalizedCategory === "all"
       ? products
-      : products.filter((product) => (categoryProductIds[normalizedCategory] ?? []).includes(product.id));
+      : products.filter((product) => (categoryProductIds[normalizedCategory] ?? []).includes(Number(product.id)));
 
   const normalizedQuery = query?.trim().toLocaleLowerCase() ?? "";
   const searchedProducts = normalizedQuery
     ? categoryFilteredProducts.filter((product) => {
         const searchableText = [
           product.name, product.shortDescription, product.description,
-          ...(categoryProductIds["t-shirts"]?.includes(product.id) ? ["t-shirts", "shirts", "clothing"] : []),
-          ...(categoryProductIds.shoes?.includes(product.id) ? ["shoes", "sneakers", "footwear"] : []),
-          ...(categoryProductIds.accessories?.includes(product.id) ? ["accessories"] : []),
-          ...(categoryProductIds.bags?.includes(product.id) ? ["bags", "backpacks"] : []),
-          ...(categoryProductIds.dresses?.includes(product.id) ? ["dresses"] : []),
-          ...(categoryProductIds.jackets?.includes(product.id) ? ["jackets", "hoodies", "outerwear"] : []),
-          ...(categoryProductIds.gloves?.includes(product.id) ? ["gloves"] : []),
+          ...(categoryProductIds["t-shirts"]?.includes(Number(product.id)) ? ["t-shirts", "shirts", "clothing"] : []),
+          ...(categoryProductIds.shoes?.includes(Number(product.id)) ? ["shoes", "sneakers", "footwear"] : []),
+          ...(categoryProductIds.accessories?.includes(Number(product.id)) ? ["accessories"] : []),
+          ...(categoryProductIds.bags?.includes(Number(product.id)) ? ["bags", "backpacks"] : []),
+          ...(categoryProductIds.dresses?.includes(Number(product.id)) ? ["dresses"] : []),
+          ...(categoryProductIds.jackets?.includes(Number(product.id)) ? ["jackets", "hoodies", "outerwear"] : []),
+          ...(categoryProductIds.gloves?.includes(Number(product.id)) ? ["gloves"] : []),
         ].join(" ").toLocaleLowerCase();
         return searchableText.includes(normalizedQuery);
       })
@@ -30,7 +30,12 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
 
   const visibleProducts = [...searchedProducts].sort((a, b) => {
     switch (sort) {
-      case "oldest": return b.id - a.id;
+      case "oldest": {
+        const numericDifference = Number(b.id) - Number(a.id);
+        return Number.isNaN(numericDifference)
+          ? String(b.id).localeCompare(String(a.id))
+          : numericDifference;
+      }
       case "asc": return a.price - b.price;
       case "desc": return b.price - a.price;
       case "newest":
