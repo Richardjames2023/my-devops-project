@@ -70,7 +70,13 @@ const SearchBar = () => {
       method="get"
       role="search"
       onSubmit={handleSubmit}
-      className="relative flex h-10 w-36 shrink-0 items-center rounded-full border border-[var(--shop-border)] bg-[var(--shop-search)] px-3 transition-colors focus-within:border-[var(--shop-orange)] focus-within:ring-2 focus-within:ring-[var(--shop-peach)] sm:w-48 md:w-56 lg:w-80 xl:w-[22rem]"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setIsFocused(false);
+          setActiveIndex(-1);
+        }
+      }}
+      className="relative z-[90] flex h-10 w-36 shrink-0 items-center rounded-full border border-[var(--shop-border)] bg-[var(--shop-search)] px-3 transition-colors focus-within:border-[var(--shop-orange)] focus-within:ring-2 focus-within:ring-[var(--shop-peach)] sm:w-48 md:w-56 lg:w-80 xl:w-[22rem]"
     >
       <button type="submit" aria-label="Search products" className="shrink-0 text-[var(--shop-navy)] transition-colors hover:text-[var(--shop-orange)]">
         <Search size={18} aria-hidden="true" />
@@ -85,7 +91,6 @@ const SearchBar = () => {
           setActiveIndex(-1);
         }}
         onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
         onKeyDown={handleKeyDown}
         placeholder="Search products, brands..."
         aria-label="Search products and brands"
@@ -96,13 +101,14 @@ const SearchBar = () => {
         className="ml-2 min-w-0 flex-1 bg-transparent text-[12px] text-[var(--shop-navy)] outline-none placeholder:text-[var(--shop-muted)] sm:text-[14px]"
       />
 
-      <div
-        id="shop-search-suggestions"
-        role="listbox"
-        aria-label="Product suggestions"
-        aria-hidden={!isOpen}
-        className={`absolute left-0 right-0 top-[calc(100%+10px)] z-[80] origin-top rounded-2xl border border-[var(--shop-border)] bg-white p-2 shadow-xl transition-all duration-200 ease-out motion-reduce:transition-none ${isOpen ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0"}`}
-      >
+      <div className="absolute left-0 right-0 top-full z-[100] pt-2">
+        <div
+          id="shop-search-suggestions"
+          role="listbox"
+          aria-label="Product suggestions"
+          aria-hidden={!isOpen}
+          className={`origin-top rounded-2xl border border-[var(--shop-border)] bg-white p-2 shadow-xl transition-all duration-200 ease-out motion-reduce:transition-none ${isOpen ? "visible translate-y-0 scale-100 opacity-100" : "invisible pointer-events-none -translate-y-2 scale-[0.98] opacity-0"}`}
+        >
         {suggestions.length > 0 ? (
           <>
             <p className="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-wider text-[var(--shop-muted)]">Suggested products</p>
@@ -138,6 +144,7 @@ const SearchBar = () => {
         ) : (
           <p className="px-3 py-4 text-center text-xs text-[var(--shop-muted)]">No matching suggestions. Press Enter to search anyway.</p>
         )}
+        </div>
       </div>
     </form>
   );
