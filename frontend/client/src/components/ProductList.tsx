@@ -116,13 +116,31 @@ const products: ProductsType = [
   },
 ];
 
+const categoryProductIds: Record<string, number[]> = {
+  "t-shirts": [1, 4],
+  shoes: [6, 7],
+  accessories: [8, 5],
+  bags: [8, 1],
+  dresses: [4, 1],
+  jackets: [2, 3, 5],
+  gloves: [5, 2],
+};
+
 const ProductList = ({ category,params }: { category: string, params:"homepage" | "products" }) => {
+  const normalizedCategory = category?.toLowerCase();
+  const visibleProducts =
+    !normalizedCategory || normalizedCategory === "all"
+      ? products
+      : products.filter((product) =>
+          (categoryProductIds[normalizedCategory] ?? []).includes(product.id),
+        );
+
   return (
     <div className="w-full">
       <Categories />
       {params === "products" && <Filter/>}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-12">
-        {products.map((product) => (
+        {visibleProducts.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
