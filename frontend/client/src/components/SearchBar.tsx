@@ -27,7 +27,7 @@ const SearchBar = () => {
       setIsFocused(false);
       setActiveIndex(-1);
       closeTimerRef.current = null;
-    }, 250);
+    }, 600);
   };
 
   useEffect(() => {
@@ -106,15 +106,15 @@ const SearchBar = () => {
         cancelScheduledClose();
         if (query.trim().length >= 2) setIsFocused(true);
       }}
-      onPointerLeave={(event) => {
-        if (event.pointerType === "mouse") scheduleClose();
-      }}
     >
       <form
         action="/products"
         method="get"
         role="search"
         onSubmit={handleSubmit}
+        onPointerLeave={(event) => {
+          if (event.pointerType === "mouse") scheduleClose();
+        }}
         className="flex h-10 w-full items-center rounded-full border border-[var(--shop-border)] bg-[var(--shop-search)] px-3 transition-colors focus-within:border-[var(--shop-orange)] focus-within:ring-2 focus-within:ring-[var(--shop-peach)]"
       >
       <button type="submit" aria-label="Search products" className="shrink-0 text-[var(--shop-navy)] transition-colors hover:text-[var(--shop-orange)]">
