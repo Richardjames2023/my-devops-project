@@ -173,7 +173,7 @@ const Navbar = () => {
       <div className={`sticky top-0 z-40 border-b border-[var(--shop-border)] bg-white transition-shadow duration-200 ${isScrolled ? "shadow-md" : ""}`}>
         <div ref={headerContentRef} onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveMenu((current) => current === "categories" ? null : current); }} className={`mx-auto flex header-inner flex-wrap items-center justify-between gap-x-3 gap-y-3 transition-[padding] duration-200 ease-out ${isScrolled ? "py-2 sm:py-2.5" : "py-3 sm:py-4"} sm:gap-x-4`}>
           <div className="order-1 flex w-full min-w-0 items-center gap-3 lg:w-auto lg:flex-none">
-          <Link href="/" aria-label="ShopSphere home" className="flex shrink-0 items-center gap-2">
+          <Link href="/" aria-label="ClickClickBuy home" className="flex shrink-0 items-center gap-2">
             <Image
               src="/logo.png"
               alt=""
@@ -183,7 +183,7 @@ const Navbar = () => {
               className={`object-contain transition-all duration-200 ${isScrolled ? "h-7 w-7 sm:h-8 sm:w-8" : "h-8 w-8 sm:h-9 sm:w-9"}`}
             />
             <span className={`font-bold tracking-[-0.8px] text-[var(--shop-navy)] transition-all duration-200 ${isScrolled ? "text-[19px] sm:text-[22px]" : "text-[21px] sm:text-[24px]"}`}>
-              Shop<span className="text-[var(--shop-orange)]">Sphere</span>
+              ClickClick<span className="text-[var(--shop-orange)]">Buy</span>
             </span>
           </Link>
           <div className="ml-auto min-w-0 flex-1 max-w-[30rem] lg:hidden"><SearchBar /></div>
@@ -314,7 +314,7 @@ const Navbar = () => {
                 <div className="border-b border-[var(--shop-peach)] bg-[var(--shop-peach-tint)] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
-                    Welcome to ShopSphere
+                    Welcome to ClickClickBuy
                   </div>
                   <div className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
                     Sign In <ComingSoon>Coming soon</ComingSoon>
