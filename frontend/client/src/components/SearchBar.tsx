@@ -73,6 +73,11 @@ const SearchBar = () => {
           setActiveIndex(-1);
         }
       }}
+      onMouseEnter={() => {
+        if (query.trim().length >= 2) {
+          setIsFocused(true);
+        }
+      }}
       onMouseLeave={() => {
         setIsFocused(false);
         setActiveIndex(-1);
