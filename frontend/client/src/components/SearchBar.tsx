@@ -66,7 +66,7 @@ const SearchBar = () => {
 
   return (
     <div
-      className="relative z-[60] w-36 shrink-0 sm:w-48 md:w-56 lg:w-80 xl:w-[22rem]"
+      className="relative z-[60] min-w-0 w-auto flex-1 sm:w-48 sm:flex-none md:w-56 lg:w-80 xl:w-[22rem]"
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setIsFocused(false);
