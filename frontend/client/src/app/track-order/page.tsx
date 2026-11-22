@@ -24,12 +24,9 @@ const TrackOrderPage = () => {
         placeholder page.
       </p>
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href="/login"
-          className="rounded-full bg-[var(--shop-navy)] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--shop-blue)]"
-        >
-          Sign in to your account
-        </Link>
+        <span className="rounded-full border border-[var(--shop-border)] bg-[var(--shop-search)] px-6 py-3 text-sm font-semibold text-[var(--shop-muted)]">
+          Account sign-in coming soon
+        </span>
         <Link
           href="/"
           className="inline-flex items-center gap-2 rounded-full border border-[var(--shop-border)] bg-white px-6 py-3 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)]"
