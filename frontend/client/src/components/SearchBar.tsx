@@ -109,6 +109,7 @@ const SearchBar = () => {
         onKeyDown={handleKeyDown}
         placeholder="Search products, brands..."
         aria-label="Search products and brands"
+        role="combobox"
         aria-autocomplete="list"
         aria-expanded={isOpen}
         aria-controls="shop-search-suggestions"
