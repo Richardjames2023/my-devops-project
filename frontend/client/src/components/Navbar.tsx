@@ -179,7 +179,7 @@ const Navbar = () => {
     <>
       <AnnouncementBar />
       <div className={`sticky top-0 z-40 border-b border-[var(--shop-border)] bg-white transition-shadow duration-200 ${isScrolled ? "shadow-md" : ""}`}>
-        <div ref={headerContentRef} className={`mx-auto flex header-inner flex-wrap items-center justify-between gap-x-3 gap-y-3 transition-[padding] duration-200 ease-out ${isScrolled ? "py-2 sm:py-2.5" : "py-3 sm:py-4"} sm:gap-x-4`}>
+        <div ref={headerContentRef} onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveMenu((current) => current === "categories" ? null : current); }} className={`mx-auto flex header-inner flex-wrap items-center justify-between gap-x-3 gap-y-3 transition-[padding] duration-200 ease-out ${isScrolled ? "py-2 sm:py-2.5" : "py-3 sm:py-4"} sm:gap-x-4`}>
           <div className="order-1 flex w-full min-w-0 items-center gap-3 lg:w-auto lg:flex-none">
           <Link href="/" aria-label="ShopSphere home" className="flex shrink-0 items-center gap-2">
             <Image
@@ -292,7 +292,7 @@ const Navbar = () => {
           </nav>
 
           <div className="relative order-2 flex w-full min-w-0 items-center justify-end gap-1 lg:w-auto lg:shrink-0 lg:gap-2 lg:order-3">
-            <button ref={categoryTriggerRef} type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onPointerDown={(event) => { categoryPointerTypeRef.current = event.pointerType; }} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} onPointerLeave={(event) => { if (event.pointerType === "mouse" && !categoryPanelRef.current?.contains(event.relatedTarget as Node | null)) setActiveMenu((current) => current === "categories" ? null : current); }} onClick={() => { if (categoryPointerTypeRef.current === "mouse") setActiveMenu("categories"); else setActiveMenu((current) => current === "categories" ? null : "categories"); }} className={`mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden ${activeMenu === "categories" ? "bg-[var(--shop-peach-tint)] text-[var(--shop-orange)]" : ""}`}>
+            <button ref={categoryTriggerRef} type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onPointerDown={(event) => { categoryPointerTypeRef.current = event.pointerType; }} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} onClick={() => { if (categoryPointerTypeRef.current === "mouse") setActiveMenu("categories"); else setActiveMenu((current) => current === "categories" ? null : "categories"); }} className={`mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden ${activeMenu === "categories" ? "bg-[var(--shop-peach-tint)] text-[var(--shop-orange)]" : ""}`}>
               Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
             </button>
             <div className="hidden lg:block"><SearchBar /></div>
@@ -407,7 +407,7 @@ const Navbar = () => {
             <ShoppingCartIcon />
           </div>
 
-          <div ref={categoryPanelRef} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} onPointerLeave={(event) => { if (event.pointerType === "mouse" && !categoryTriggerRef.current?.contains(event.relatedTarget as Node | null)) setActiveMenu((current) => current === "categories" ? null : current); }} className={`order-3 w-full lg:hidden ${activeMenu === "categories" ? "block" : "hidden"}`}>
+          <div ref={categoryPanelRef} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} className={`order-3 w-full lg:hidden ${activeMenu === "categories" ? "block" : "hidden"}`}>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--shop-border)] py-3 sm:grid-cols-4">
               {shopCategories.map((category) => (
                 <Link key={category.slug} href={`/products?category=${category.slug}`} onClick={() => setActiveMenu(null)} className="flex items-center gap-2 rounded-lg bg-[var(--shop-search)] p-2 text-sm font-medium text-[var(--shop-navy)]">
