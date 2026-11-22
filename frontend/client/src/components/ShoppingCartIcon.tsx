@@ -12,7 +12,7 @@ const ShoppingCartIcon = () => {
     <Link
       href="/cart"
       aria-label={hasHydrated ? `Shopping bag, ${itemCount} items` : "Shopping bag"}
-      className="relative flex h-9 w-9 items-center justify-center rounded-full text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)]"
+      className="relative flex h-9 w-9 items-center justify-center rounded-full text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-blue-light)] active:bg-[var(--shop-blue-light)] focus-visible:bg-[var(--shop-blue-light)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)]"
     >
       <ShoppingBag size={19} strokeWidth={1.8} />
       {hasHydrated && itemCount > 0 ? (
