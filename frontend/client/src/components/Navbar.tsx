@@ -176,7 +176,7 @@ const Navbar = () => {
       }));
 
   return (
-    <header className="w-full">
+    <>
       <AnnouncementBar />
       <div className={`sticky top-0 z-40 border-b border-[var(--shop-border)] bg-white transition-shadow duration-200 ${isScrolled ? "shadow-md" : ""}`}>
         <div ref={headerContentRef} className={`mx-auto flex header-inner flex-wrap items-center justify-between gap-x-3 gap-y-3 transition-[padding] duration-200 ease-out ${isScrolled ? "py-2 sm:py-2.5" : "py-3 sm:py-4"} sm:gap-x-4`}>
@@ -419,7 +419,7 @@ const Navbar = () => {
           </div>
         </div>
       </div>
-    </header>
+    </>
   );
 };
 
