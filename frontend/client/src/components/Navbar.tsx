@@ -42,6 +42,7 @@ const shopCategories = [
   { name: "Dresses", slug: "dresses", icon: Venus, image: "/products/4w.png", items: ["Casual dresses", "Everyday dresses", "Occasion wear"], products: [{ name: "Nike Dri Flex T-Shirt", image: "/products/4w.png" }, { name: "Nike Dri Flex T-Shirt · Pink", image: "/products/4p.png" }, { name: "Adidas CoreFit T-Shirt", image: "/products/1g.png" }] },
   { name: "Jackets", slug: "jackets", icon: Shirt, image: "/products/2g.png", items: ["Hoodies", "Zip-up jackets", "Light jackets"], products: [{ name: "Puma Ultra Warm Zip", image: "/products/2g.png" }, { name: "Nike Air Essentials Pullover", image: "/products/3gr.png" }, { name: "Under Armour StormFleece", image: "/products/5bl.png" }, { name: "Puma Ultra Warm Zip · Green", image: "/products/2gr.png" }] },
   { name: "Gloves", slug: "gloves", icon: Hand, image: "/products/5bl.png", items: ["Everyday gloves", "Cold-weather gloves"], products: [{ name: "Under Armour StormFleece", image: "/products/5bl.png" }, { name: "Under Armour StormFleece · Red", image: "/products/5r.png" }, { name: "Under Armour StormFleece · Orange", image: "/products/5o.png" }] },
+  { name: "Sportswear", slug: "sportswear", icon: Footprints, image: "/products/7g.png", items: ["Activewear", "Training tops", "Performance footwear"], products: [{ name: "Nike Ultraboost Pulse", image: "/products/7g.png" }, { name: "Nike Air Max 270", image: "/products/6g.png" }, { name: "Nike Air Essentials Pullover", image: "/products/3gr.png" }] },
 ];
 
 type CatalogPreviewProduct = {
@@ -264,7 +265,7 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Account</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "account" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-[calc(100%+24px)] z-50 mt-0 before:absolute before:-top-6 before:left-0 before:h-6 before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+              <div aria-hidden={activeMenu !== "account"} className={`absolute right-0 top-[calc(100%+10px)] z-50 mt-0 before:absolute before:-top-[10px] before:left-0 before:h-[10px] before:w-full before:content-[''] w-[min(19rem,calc(100vw-2rem))] origin-top-right rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "account" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="border-b border-[var(--shop-peach)] bg-[var(--shop-peach-tint)] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
@@ -300,7 +301,7 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Help</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "help" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "help"} className={`absolute right-0 top-full z-50 mt-0 before:absolute before:-top-2 before:left-0 before:h-2 before:w-full before:content-[''] w-[min(20rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "help" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+              <div aria-hidden={activeMenu !== "help"} className={`absolute right-0 top-[calc(100%+10px)] z-50 mt-0 before:absolute before:-top-[10px] before:left-0 before:h-[10px] before:w-full before:content-[''] w-[min(20rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "help" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="py-1">
                   <Link href="/help" className={activeClass}>
                     <CircleHelp size={19} /> Help Centre
