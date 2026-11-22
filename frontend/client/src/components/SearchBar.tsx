@@ -36,7 +36,7 @@ const SearchBar = () => {
           .toLocaleLowerCase()
           .includes(normalizedQuery),
       )
-      .slice(0, 5);
+      .slice(0, 8);
   }, [query]);
 
   const isOpen = isFocused && query.trim().length >= 2;
@@ -81,7 +81,7 @@ const SearchBar = () => {
     <div
       ref={searchContainerRef}
       className="relative z-[60] min-w-0 w-full lg:w-80 xl:w-[22rem]"
-      onBlur={(event) => {
+      onPointerLeave={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
           setIsFocused(false);
           setActiveIndex(-1);
@@ -130,7 +130,7 @@ const SearchBar = () => {
           role="listbox"
           aria-label="Product suggestions"
           aria-hidden={!isOpen}
-          className={`origin-top rounded-2xl border border-[var(--shop-border)] bg-white p-2 shadow-xl transition-all duration-200 ease-out motion-reduce:transition-none ${isOpen ? "visible translate-y-0 scale-100 opacity-100" : "invisible pointer-events-none -translate-y-2 scale-[0.98] opacity-0"}`}
+          className={`max-h-[min(70vh,360px)] overflow-y-auto overscroll-contain origin-top rounded-2xl border border-[var(--shop-border)] bg-white p-2 shadow-xl [scrollbar-color:var(--shop-orange)_var(--shop-peach)] [scrollbar-width:thin] transition-all duration-200 ease-out motion-reduce:transition-none ${isOpen ? "visible translate-y-0 scale-100 opacity-100" : "invisible pointer-events-none -translate-y-2 scale-[0.98] opacity-0"}`}
         >
         {suggestions.length > 0 ? (
           <>
