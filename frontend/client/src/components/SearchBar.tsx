@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ArrowUpRight } from "lucide-react";
 import { products } from "@/lib/catalogue";
