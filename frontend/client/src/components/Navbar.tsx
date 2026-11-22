@@ -77,6 +77,15 @@ function ComingSoon({ children }: { children: React.ReactNode }) {
 
 const Navbar = () => {
   const [activeMenu, setActiveMenu] = useState<"account" | "help" | "categories" | null>(null);
+  const [canHover, setCanHover] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const updateHoverCapability = () => setCanHover(mediaQuery.matches);
+    updateHoverCapability();
+    mediaQuery.addEventListener("change", updateHoverCapability);
+    return () => mediaQuery.removeEventListener("change", updateHoverCapability);
+  }, []);
   const headerContentRef = useRef<HTMLDivElement>(null);
   const categoryTriggerRef = useRef<HTMLButtonElement>(null);
   const categoryPanelRef = useRef<HTMLDivElement>(null);
@@ -282,8 +291,8 @@ const Navbar = () => {
 
             <div
               className="relative z-10"
-              onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("account"); }}
-              onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveMenu((current) => current === "account" ? null : current); }}
+              onPointerEnter={() => { if (canHover) setActiveMenu("account"); }}
+              onPointerLeave={() => { if (canHover) setActiveMenu((current) => current === "account" ? null : current); }}
             >
               <button
                 type="button"
@@ -291,7 +300,7 @@ const Navbar = () => {
                 aria-expanded={activeMenu === "account"}
                 onPointerDown={(event) => { accountPointerTypeRef.current = event.pointerType; }}
                 onClick={() => {
-                  if (accountPointerTypeRef.current === "touch" || accountPointerTypeRef.current === "pen") {
+                  if (!canHover || accountPointerTypeRef.current === "touch" || accountPointerTypeRef.current === "pen") {
                     setActiveMenu((current) => current === "account" ? null : "account");
                   } else {
                     setActiveMenu("account");
@@ -329,8 +338,8 @@ const Navbar = () => {
 
             <div
               className="relative z-10"
-              onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("help"); }}
-              onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveMenu((current) => current === "help" ? null : current); }}
+              onPointerEnter={() => { if (canHover) setActiveMenu("help"); }}
+              onPointerLeave={() => { if (canHover) setActiveMenu((current) => current === "help" ? null : current); }}
             >
               <button
                 type="button"
@@ -338,7 +347,7 @@ const Navbar = () => {
                 aria-expanded={activeMenu === "help"}
                 onPointerDown={(event) => { helpPointerTypeRef.current = event.pointerType; }}
                 onClick={() => {
-                  if (helpPointerTypeRef.current === "touch" || helpPointerTypeRef.current === "pen") {
+                  if (!canHover || helpPointerTypeRef.current === "touch" || helpPointerTypeRef.current === "pen") {
                     setActiveMenu((current) => current === "help" ? null : "help");
                   } else {
                     setActiveMenu("help");
