@@ -12,24 +12,24 @@ const featuredProducts = [
 const AnnouncementBar = () => {
   return (
     <div className="bg-[var(--shop-navy)] text-white">
-      <div className="header-inner mx-auto grid min-h-[44px] grid-cols-[auto_auto] items-center justify-between gap-2 py-1.5 sm:min-h-[58px] sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:justify-normal sm:gap-4">
+      <div className="header-inner mx-auto grid min-h-[48px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 py-1 sm:min-h-[58px] sm:gap-4">
         <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold sm:gap-2 sm:text-xs">
           <RotateCcw size={15} className="text-[var(--shop-orange)]" aria-hidden="true" />
           <span><span className="hidden sm:inline">30-day easy returns</span><span className="sm:hidden">30-day returns</span></span>
         </div>
 
-        <div aria-label="Featured product promotions" className="group relative hidden min-w-0 overflow-hidden rounded-md border border-white/10 bg-gradient-to-r from-[#101326] via-[#18264a] to-[#713b35] shadow-inner sm:block">
+        <div aria-label="Featured product promotions" className="group relative block min-w-0 overflow-hidden rounded-md border border-white/10 bg-gradient-to-r from-[#101326] via-[#18264a] to-[#713b35] shadow-inner">
           <div className="shopsphere-ad-track flex w-max">
             {[0, 1].map((copy) => (
               <div key={copy} className="flex shrink-0 items-center" aria-hidden={copy === 1}>
                 {featuredProducts.map((product) => (
-                  <Link href={product.href} key={product.name} tabIndex={copy === 1 ? -1 : 0} className="flex h-11 w-[250px] items-center gap-3 px-3 transition-colors hover:bg-white/10 sm:w-[310px] sm:px-4">
-                    <Image src={product.image} alt="" width={42} height={42} className="h-9 w-9 shrink-0 object-contain drop-shadow-md sm:h-10 sm:w-10" />
+                  <Link href={product.href} key={product.name} tabIndex={copy === 1 ? -1 : 0} className="flex h-10 w-[190px] items-center gap-2 px-2 transition-colors hover:bg-white/10 sm:h-11 sm:w-[310px] sm:gap-3 sm:px-4">
+                    <Image src={product.image} alt="" width={36} height={36} className="h-8 w-8 shrink-0 object-contain drop-shadow-md sm:h-10 sm:w-10" />
                     <span className="min-w-0">
                       <span className="block truncate text-[10px] font-extrabold tracking-wide text-white sm:text-xs">{product.name}</span>
-                      <span className="block truncate text-[9px] font-medium text-white/75 sm:text-[10px]">{product.detail}</span>
+                      <span className="block truncate hidden text-[9px] font-medium text-white/75 sm:block sm:text-[10px]">{product.detail}</span>
                     </span>
-                    <span className="ml-auto shrink-0 rounded-full bg-[var(--shop-orange)] px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-white sm:text-[9px]">Shop now</span>
+                    <span className="ml-auto shrink-0 rounded-full bg-[var(--shop-orange)] px-1.5 py-1 text-[8px] font-bold uppercase tracking-wider text-white sm:px-2 sm:text-[9px]">Shop now</span>
                   </Link>
                 ))}
               </div>
