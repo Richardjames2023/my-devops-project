@@ -81,12 +81,6 @@ const SearchBar = () => {
     <div
       ref={searchContainerRef}
       className="relative z-[60] min-w-0 w-full lg:w-80 xl:w-[22rem]"
-      onPointerLeave={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-          setIsFocused(false);
-          setActiveIndex(-1);
-        }
-      }}
       onMouseEnter={() => {
         if (query.trim().length >= 2) {
           setIsFocused(true);
