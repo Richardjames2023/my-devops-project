@@ -114,3 +114,29 @@ input {
     width: min(100% - 28px, 1280px);
   }
 }
+
+
+@keyframes shopsphere-ad-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.shopsphere-ad-track {
+  animation: shopsphere-ad-scroll 32s linear infinite;
+  will-change: transform;
+}
+
+.shopsphere-ad-track:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shopsphere-ad-track {
+    animation: none;
+    transform: translateX(0);
+  }
+}
