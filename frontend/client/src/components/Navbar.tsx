@@ -289,8 +289,8 @@ const Navbar = () => {
 
             <div
               className="relative z-10"
-              onMouseEnter={() => setActiveMenu("account")}
-              onMouseLeave={() => setActiveMenu(null)}
+              onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("account"); }}
+              onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveMenu((current) => current === "account" ? null : current); }}
             >
               <button
                 type="button"
@@ -329,8 +329,8 @@ const Navbar = () => {
 
             <div
               className="relative z-10"
-              onMouseEnter={() => setActiveMenu("help")}
-              onMouseLeave={() => setActiveMenu(null)}
+              onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("help"); }}
+              onPointerLeave={(event) => { if (event.pointerType === "mouse") setActiveMenu((current) => current === "help" ? null : current); }}
             >
               <button
                 type="button"
