@@ -144,7 +144,7 @@ const Navbar = () => {
       <AnnouncementBar />
       <div className="border-b border-[var(--shop-border)] bg-white">
         <div className="mx-auto flex header-inner flex-wrap items-center justify-between gap-x-3 gap-y-3 py-3 sm:gap-x-4 sm:py-4">
-          <div className="order-1 flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-none">
+          <div className="order-1 flex w-full min-w-0 items-center gap-3 lg:w-auto lg:flex-none">
           <Link href="/" aria-label="ShopSphere home" className="flex shrink-0 items-center gap-2">
             <Image
               src="/logo.png"
@@ -158,7 +158,7 @@ const Navbar = () => {
               Shop<span className="text-[var(--shop-orange)]">Sphere</span>
             </span>
           </Link>
-          <div className="ml-auto min-w-0 flex-1 sm:hidden"><SearchBar /></div>
+          <div className="ml-auto min-w-0 flex-1 lg:hidden"><SearchBar /></div>
           </div>
 
           <nav aria-label="Main navigation" className="order-3 hidden items-center gap-5 text-[16px] font-semibold text-[var(--shop-navy)] lg:order-2 lg:flex xl:gap-7">
@@ -255,11 +255,11 @@ const Navbar = () => {
             ))}
           </nav>
 
-          <div className="order-2 flex w-full min-w-0 items-center justify-end gap-1 sm:w-auto sm:shrink-0 sm:gap-2 lg:order-3">
-            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] lg:hidden">
+          <div className="order-2 flex w-full min-w-0 items-center justify-end gap-1 lg:w-auto lg:shrink-0 lg:gap-2 lg:order-3">
+            <button type="button" aria-label="Browse categories" aria-expanded={activeMenu === "categories"} onClick={() => setActiveMenu(activeMenu === "categories" ? null : "categories")} className="mr-auto flex h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-[var(--shop-peach-tint)] hover:text-[var(--shop-orange)] focus-visible:bg-[var(--shop-peach-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--shop-orange)] active:bg-[var(--shop-peach)] lg:hidden">
               Categories <ChevronDown size={15} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
             </button>
-            <div className="hidden sm:block"><SearchBar /></div>
+            <div className="hidden lg:block"><SearchBar /></div>
 
             <div
               className="relative z-10"
