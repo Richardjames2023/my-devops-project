@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -77,11 +77,25 @@ function ComingSoon({ children }: { children: React.ReactNode }) {
 
 const Navbar = () => {
   const [activeMenu, setActiveMenu] = useState<"account" | "help" | "categories" | null>(null);
+  const headerContentRef = useRef<HTMLDivElement>(null);
   const [activeCategorySlug, setActiveCategorySlug] = useState("t-shirts");
   const activeCategory = shopCategories.find((category) => category.slug === activeCategorySlug) ?? shopCategories[1];
   const [catalogProducts, setCatalogProducts] = useState<CatalogPreviewProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [accountCounts, setAccountCounts] = useState({ orders: 0, wishlist: 0 });
+
+  useEffect(() => {
+    if (!activeMenu) return;
+
+    const closeMenuOnOutsideInteraction = (event: PointerEvent) => {
+      if (!headerContentRef.current?.contains(event.target as Node)) {
+        setActiveMenu(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeMenuOnOutsideInteraction);
+    return () => document.removeEventListener("pointerdown", closeMenuOnOutsideInteraction);
+  }, [activeMenu]);
 
   useEffect(() => {
     if (activeMenu !== "account") return;
@@ -143,7 +157,7 @@ const Navbar = () => {
     <header className="w-full">
       <AnnouncementBar />
       <div className="border-b border-[var(--shop-border)] bg-white">
-        <div className="mx-auto flex header-inner flex-wrap items-center justify-between gap-x-3 gap-y-3 py-3 sm:gap-x-4 sm:py-4">
+        <div ref={headerContentRef} className="mx-auto flex header-inner flex-wrap items-center justify-between gap-x-3 gap-y-3 py-3 sm:gap-x-4 sm:py-4">
           <div className="order-1 flex w-full min-w-0 items-center gap-3 lg:w-auto lg:flex-none">
           <Link href="/" aria-label="ShopSphere home" className="flex shrink-0 items-center gap-2">
             <Image
@@ -194,13 +208,13 @@ const Navbar = () => {
                         <h3 className="text-lg font-bold text-[var(--shop-navy)]">{activeCategory.name}</h3>
                         <p className="mt-1 text-xs text-[var(--shop-muted)]">{activeCategory.items.join(" · ")}</p>
                       </div>
-                      <Link href={`/products?category=${activeCategory.slug}`} className="shrink-0 text-sm font-semibold text-[var(--shop-orange)] hover:underline">View all</Link>
+                      <Link href={`/products?category=${activeCategory.slug}`} onClick={() => setActiveMenu(null)} className="shrink-0 text-sm font-semibold text-[var(--shop-orange)] hover:underline">View all</Link>
                     </div>
                     <div key={activeCategory.slug} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-4 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]" aria-busy={catalogLoading}>
                       {previewProducts.map((product) => {
                         const imageUrl = product.images.find((image) => image.isPrimary)?.url ?? product.images[0]?.url;
                         return (
-                          <Link key={product.id} href={`/products?category=${activeCategory.slug}`} className="group flex w-[118px] shrink-0 snap-start flex-col items-center rounded-xl p-2 text-center transition-all duration-300 hover:-translate-y-1 hover:bg-[var(--shop-peach-tint)] sm:w-[132px]">
+                          <Link key={product.id} href={`/products?category=${activeCategory.slug}`} onClick={() => setActiveMenu(null)} className="group flex w-[118px] shrink-0 snap-start flex-col items-center rounded-xl p-2 text-center transition-all duration-300 hover:-translate-y-1 hover:bg-[var(--shop-peach-tint)] sm:w-[132px]">
                             <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-peach-tint)] ring-1 ring-[var(--shop-peach)] transition-all duration-300 group-hover:scale-105 group-hover:ring-2 group-hover:ring-[var(--shop-orange)]">
                               {imageUrl ? <Image src={imageUrl} alt={product.name} width={80} height={80} unoptimized className="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-110" /> : <Package size={28} className="text-[var(--shop-muted)]" />}
                             </span>
@@ -360,7 +374,7 @@ const Navbar = () => {
           <div className={`order-3 w-full overflow-hidden transition-all duration-300 ease-out lg:hidden ${activeMenu === "categories" ? "max-h-[70vh] translate-y-0 opacity-100 visible" : "max-h-0 -translate-y-2 opacity-0 invisible"}`}>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--shop-border)] py-3 sm:grid-cols-4">
               {shopCategories.map((category) => (
-                <Link key={category.slug} href={`/products?category=${category.slug}`} className="flex items-center gap-2 rounded-lg bg-[var(--shop-search)] p-2 text-sm font-medium text-[var(--shop-navy)]">
+                <Link key={category.slug} href={`/products?category=${category.slug}`} onClick={() => setActiveMenu(null)} className="flex items-center gap-2 rounded-lg bg-[var(--shop-search)] p-2 text-sm font-medium text-[var(--shop-navy)]">
                   <Image src={category.image} alt="" width={40} height={40} className="h-10 w-10 rounded-full object-contain" />
                   {category.name}
                 </Link>
