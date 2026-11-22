@@ -196,14 +196,16 @@ const Navbar = () => {
                           <span className="text-sm font-bold text-[var(--shop-orange-dark)]">★ {topRatedProduct.reviewSummary.averageRating?.toFixed(1)}</span>
                         </Link>
                       ) : (
-                        <div className="flex items-center gap-3 rounded-xl bg-[var(--shop-peach-tint)] p-3">
-                          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--shop-orange)]"><Package size={24} /></span>
-                          <span>
-                            <span className="block text-sm font-semibold text-[var(--shop-navy)]">Featured picks</span>
-                            <span className="mt-1 block text-xs text-[var(--shop-muted)]">Customer ratings will appear here as approved reviews come in.</span>
+                        <Link href={`/products?category=${activeCategory.slug}`} className="group flex max-w-md items-center gap-3 rounded-xl bg-[var(--shop-peach-tint)] p-3 transition-colors hover:bg-[var(--shop-peach)]">
+                          <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
+                            <Image src={activeCategory.products[0]?.image ?? activeCategory.image} alt={activeCategory.products[0]?.name ?? activeCategory.name} width={64} height={64} className="h-full w-full object-contain" />
                           </span>
-                          <span className="ml-auto rounded-full border border-[var(--shop-orange)] px-2 py-1 text-[10px] font-bold text-[var(--shop-orange-dark)]">FEATURED</span>
-                        </div>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-semibold text-[var(--shop-navy)] group-hover:text-[var(--shop-orange-dark)]">{activeCategory.products[0]?.name ?? `${activeCategory.name} featured pick`}</span>
+                            <span className="mt-1 block text-xs text-[var(--shop-muted)]">A featured pick while approved customer ratings become available.</span>
+                          </span>
+                          <span className="ml-auto shrink-0 rounded-full border border-[var(--shop-orange)] px-2 py-1 text-[10px] font-bold text-[var(--shop-orange-dark)]">FEATURED</span>
+                        </Link>
                       )}
                     </div>
                   </div>
