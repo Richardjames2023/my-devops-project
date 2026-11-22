@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -26,6 +26,7 @@ import {
 import SearchBar from "./SearchBar";
 import ShoppingCartIcon from "./ShoppingCartIcon";
 import AnnouncementBar from "./AnnouncementBar";
+import { apiRequest } from "@/lib/api/client";
 
 const navigation = [
   { label: "Home", href: "/" },
@@ -44,6 +45,16 @@ const shopCategories = [
   { name: "Gloves", slug: "gloves", icon: Hand, image: "/products/5bl.png", items: ["Everyday gloves", "Cold-weather gloves"], products: [{ name: "Under Armour StormFleece", image: "/products/5bl.png" }, { name: "Under Armour StormFleece · Red", image: "/products/5r.png" }, { name: "Under Armour StormFleece · Orange", image: "/products/5o.png" }] },
 ];
 
+type CatalogPreviewProduct = {
+  id: string;
+  name: string;
+  slug: string;
+  images: Array<{ url: string; isPrimary: boolean; sortOrder: number }>;
+  reviewSummary: { averageRating: number | null; totalReviews: number };
+};
+
+type CatalogPreviewResponse = { items: CatalogPreviewProduct[] };
+
 const placeholderClass =
   "flex w-full cursor-not-allowed items-center gap-3 px-4 py-3 text-left text-sm text-[var(--shop-muted)]";
 const activeClass =
@@ -61,6 +72,41 @@ const Navbar = () => {
   const [activeMenu, setActiveMenu] = useState<"account" | "help" | "categories" | null>(null);
   const [activeCategorySlug, setActiveCategorySlug] = useState("t-shirts");
   const activeCategory = shopCategories.find((category) => category.slug === activeCategorySlug) ?? shopCategories[1];
+  const [catalogProducts, setCatalogProducts] = useState<CatalogPreviewProduct[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogLoading(true);
+    const categoryQuery = activeCategorySlug === "all" ? "" : `?category=${encodeURIComponent(activeCategorySlug)}&limit=48`;
+
+    apiRequest<CatalogPreviewResponse>(`/products${categoryQuery}`)
+      .then((response) => {
+        if (!cancelled) setCatalogProducts(response.items ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogProducts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [activeCategorySlug]);
+
+  const ratedProducts = catalogProducts
+    .filter((product) => product.reviewSummary.totalReviews > 0 && product.reviewSummary.averageRating !== null)
+    .sort((a, b) => (b.reviewSummary.averageRating ?? 0) - (a.reviewSummary.averageRating ?? 0) || b.reviewSummary.totalReviews - a.reviewSummary.totalReviews);
+  const topRatedProduct = ratedProducts[0] ?? null;
+  const previewProducts = catalogProducts.length > 0
+    ? catalogProducts
+    : activeCategory.products.map((product, index) => ({
+        id: `fallback-${activeCategory.slug}-${index}`,
+        name: product.name,
+        slug: activeCategory.slug,
+        images: [{ url: product.image, isPrimary: true, sortOrder: index }],
+        reviewSummary: { averageRating: null, totalReviews: 0 },
+      }));
 
   return (
     <header className="w-full">
@@ -94,7 +140,7 @@ const Navbar = () => {
               </button>
               <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-full z-50 mt-0 before:absolute before:-top-3 before:left-0 before:h-3 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
                 <div className="grid max-h-[min(680px,calc(100vh-120px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
-                  <div className="overflow-y-auto border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2">
+                  <div className="max-h-[400px] overflow-y-auto overscroll-y-contain border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]">
                     <p className="px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
                     {shopCategories.map((category) => {
                       const Icon = category.icon;
@@ -114,15 +160,51 @@ const Navbar = () => {
                       </div>
                       <Link href={`/products?category=${activeCategory.slug}`} className="shrink-0 text-sm font-semibold text-[var(--shop-orange)] hover:underline">View all</Link>
                     </div>
-                    <div key={activeCategory.slug} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-4 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]">
-                      {activeCategory.products.map((product, index) => (
-                        <Link key={product.name + index} href={`/products?category=${activeCategory.slug}`} className="group flex w-[118px] shrink-0 snap-start flex-col items-center rounded-xl p-2 text-center transition-all duration-300 hover:-translate-y-1 hover:bg-[var(--shop-peach-tint)] sm:w-[132px]">
-                          <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-peach-tint)] ring-1 ring-[var(--shop-peach)] transition-all duration-300 group-hover:scale-105 group-hover:ring-2 group-hover:ring-[var(--shop-orange)]">
-                            <Image src={product.image} alt={product.name} width={80} height={80} className="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-110" />
+                    <div key={activeCategory.slug} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-4 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]" aria-busy={catalogLoading}>
+                      {previewProducts.map((product) => {
+                        const imageUrl = product.images.find((image) => image.isPrimary)?.url ?? product.images[0]?.url;
+                        return (
+                          <Link key={product.id} href={`/products?category=${activeCategory.slug}`} className="group flex w-[118px] shrink-0 snap-start flex-col items-center rounded-xl p-2 text-center transition-all duration-300 hover:-translate-y-1 hover:bg-[var(--shop-peach-tint)] sm:w-[132px]">
+                            <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-peach-tint)] ring-1 ring-[var(--shop-peach)] transition-all duration-300 group-hover:scale-105 group-hover:ring-2 group-hover:ring-[var(--shop-orange)]">
+                              {imageUrl ? <Image src={imageUrl} alt={product.name} width={80} height={80} unoptimized className="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-110" /> : <Package size={28} className="text-[var(--shop-muted)]" />}
+                            </span>
+                            <span className="line-clamp-2 text-xs font-semibold leading-5 text-[var(--shop-navy)] group-hover:text-[var(--shop-orange-dark)]">{product.name}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 border-t border-[var(--shop-peach)] pt-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-bold text-[var(--shop-navy)]">Top rated in {activeCategory.name}</h4>
+                          <p className="mt-0.5 text-xs text-[var(--shop-muted)]">Customer favourites in this category</p>
+                        </div>
+                        {topRatedProduct && <span className="rounded-full bg-[var(--shop-orange)] px-2.5 py-1 text-xs font-bold text-white">★ {topRatedProduct.reviewSummary.averageRating?.toFixed(1)} / 5</span>}
+                      </div>
+                      {topRatedProduct ? (
+                        <Link href={`/products/${topRatedProduct.slug}`} className="group flex max-w-md items-center gap-3 rounded-xl bg-[var(--shop-peach-tint)] p-3 transition-colors hover:bg-[var(--shop-peach)]">
+                          <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white">
+                            {(() => {
+                              const imageUrl = topRatedProduct.images.find((image) => image.isPrimary)?.url ?? topRatedProduct.images[0]?.url;
+                              return imageUrl ? <Image src={imageUrl} alt={topRatedProduct.name} width={64} height={64} unoptimized className="h-full w-full object-contain" /> : <Package size={24} />;
+                            })()}
                           </span>
-                          <span className="line-clamp-2 text-xs font-semibold leading-5 text-[var(--shop-navy)] group-hover:text-[var(--shop-orange-dark)]">{product.name}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-[var(--shop-navy)] group-hover:text-[var(--shop-orange-dark)]">{topRatedProduct.name}</span>
+                            <span className="mt-1 block text-xs text-[var(--shop-muted)]">{topRatedProduct.reviewSummary.totalReviews} approved {topRatedProduct.reviewSummary.totalReviews === 1 ? "review" : "reviews"}</span>
+                          </span>
+                          <span className="text-sm font-bold text-[var(--shop-orange-dark)]">★ {topRatedProduct.reviewSummary.averageRating?.toFixed(1)}</span>
                         </Link>
-                      ))}
+                      ) : (
+                        <div className="flex items-center gap-3 rounded-xl bg-[var(--shop-peach-tint)] p-3">
+                          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--shop-orange)]"><Package size={24} /></span>
+                          <span>
+                            <span className="block text-sm font-semibold text-[var(--shop-navy)]">Featured picks</span>
+                            <span className="mt-1 block text-xs text-[var(--shop-muted)]">Customer ratings will appear here as approved reviews come in.</span>
+                          </span>
+                          <span className="ml-auto rounded-full border border-[var(--shop-orange)] px-2 py-1 text-[10px] font-bold text-[var(--shop-orange-dark)]">FEATURED</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
