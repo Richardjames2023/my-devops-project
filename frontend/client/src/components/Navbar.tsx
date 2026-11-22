@@ -345,7 +345,7 @@ const Navbar = () => {
             </div>
 
             <div
-              className="z-10 sm:relative"
+              className="relative z-10"
               onPointerEnter={() => { if (canHover) setActiveMenu("help"); }}
               onPointerLeave={() => { if (canHover) setActiveMenu((current) => current === "help" ? null : current); }}
             >
