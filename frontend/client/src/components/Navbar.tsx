@@ -194,7 +194,7 @@ const Navbar = () => {
               Shop<span className="text-[var(--shop-orange)]">Sphere</span>
             </span>
           </Link>
-          <div className="ml-auto min-w-0 w-[55%] max-w-[30rem] lg:hidden"><SearchBar /></div>
+          <div className="ml-auto min-w-0 flex-1 max-w-[30rem] lg:hidden"><SearchBar /></div>
           </div>
 
           <nav aria-label="Main navigation" className="order-3 hidden items-center gap-5 text-[16px] font-semibold text-[var(--shop-navy)] lg:order-2 lg:flex xl:gap-7">
