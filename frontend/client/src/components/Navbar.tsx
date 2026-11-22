@@ -407,7 +407,7 @@ const Navbar = () => {
             <ShoppingCartIcon />
           </div>
 
-          <div ref={categoryPanelRef} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} onPointerLeave={(event) => { if (event.pointerType === "mouse" && !categoryTriggerRef.current?.contains(event.relatedTarget as Node | null)) setActiveMenu((current) => current === "categories" ? null : current); }} className={`order-3 w-full lg:hidden ${activeMenu === "categories" ? "visible animate-in fade-in slide-in-from-top-1 duration-150" : "hidden"}`}>
+          <div ref={categoryPanelRef} onPointerEnter={(event) => { if (event.pointerType === "mouse") setActiveMenu("categories"); }} onPointerLeave={(event) => { if (event.pointerType === "mouse" && !categoryTriggerRef.current?.contains(event.relatedTarget as Node | null)) setActiveMenu((current) => current === "categories" ? null : current); }} className={`order-3 w-full lg:hidden ${activeMenu === "categories" ? "block" : "hidden"}`}>
             <div className="grid grid-cols-2 gap-2 border-t border-[var(--shop-border)] py-3 sm:grid-cols-4">
               {shopCategories.map((category) => (
                 <Link key={category.slug} href={`/products?category=${category.slug}`} onClick={() => setActiveMenu(null)} className="flex items-center gap-2 rounded-lg bg-[var(--shop-search)] p-2 text-sm font-medium text-[var(--shop-navy)]">
