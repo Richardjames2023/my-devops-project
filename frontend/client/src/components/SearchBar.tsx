@@ -12,28 +12,6 @@ const SearchBar = () => {
   const [isFocused, setIsFocused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const searchContainerRef = useRef<HTMLDivElement>(null);
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const cancelScheduledClose = () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current);
-      closeTimerRef.current = null;
-    }
-  };
-
-  const scheduleClose = () => {
-    cancelScheduledClose();
-    closeTimerRef.current = setTimeout(() => {
-      setIsFocused(false);
-      setActiveIndex(-1);
-      closeTimerRef.current = null;
-    }, 600);
-  };
-
-  useEffect(() => {
-    return () => cancelScheduledClose();
-  }, []);
-
   useEffect(() => {
     const closeOnOutsidePointer = (event: PointerEvent) => {
       if (!searchContainerRef.current?.contains(event.target as Node)) {
@@ -102,19 +80,12 @@ const SearchBar = () => {
     <div
       ref={searchContainerRef}
       className="relative z-[60] min-w-0 w-full lg:w-80 xl:w-[22rem]"
-      onPointerEnter={() => {
-        cancelScheduledClose();
-        if (query.trim().length >= 2) setIsFocused(true);
-      }}
     >
       <form
         action="/products"
         method="get"
         role="search"
         onSubmit={handleSubmit}
-        onPointerLeave={(event) => {
-          if (event.pointerType === "mouse") scheduleClose();
-        }}
         className="flex h-10 w-full items-center rounded-full border border-[var(--shop-border)] bg-[var(--shop-search)] px-3 transition-colors focus-within:border-[var(--shop-orange)] focus-within:ring-2 focus-within:ring-[var(--shop-peach)]"
       >
       <button type="submit" aria-label="Search products" className="shrink-0 text-[var(--shop-navy)] transition-colors hover:text-[var(--shop-orange)]">
@@ -142,11 +113,7 @@ const SearchBar = () => {
 
       </form>
       <div
-        className={`pointer-events-none absolute left-0 right-0 top-full z-[100] pt-2 ${isOpen ? "pointer-events-auto" : ""}`}
-        onPointerEnter={cancelScheduledClose}
-        onPointerLeave={(event) => {
-          if (event.pointerType === "mouse") scheduleClose();
-        }}
+        className="pointer-events-auto absolute left-0 right-0 top-full z-[100] pt-2"
       >
         <div
           id="shop-search-suggestions"
