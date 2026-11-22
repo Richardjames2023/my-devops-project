@@ -115,7 +115,7 @@ const Navbar = () => {
                       <Link href={`/products?category=${activeCategory.slug}`} className="shrink-0 text-sm font-semibold text-[var(--shop-orange)] hover:underline">View all</Link>
                     </div>
                     <div key={activeCategory.slug} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-4 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]">
-                      {activeCategory.products.slice(0, 9).map((product, index) => (
+                      {activeCategory.products.map((product, index) => (
                         <Link key={product.name + index} href={`/products?category=${activeCategory.slug}`} className="group flex w-[118px] shrink-0 snap-start flex-col items-center rounded-xl p-2 text-center transition-all duration-300 hover:-translate-y-1 hover:bg-[var(--shop-peach-tint)] sm:w-[132px]">
                           <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-peach-tint)] ring-1 ring-[var(--shop-peach)] transition-all duration-300 group-hover:scale-105 group-hover:ring-2 group-hover:ring-[var(--shop-orange)]">
                             <Image src={product.image} alt={product.name} width={80} height={80} className="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-110" />
