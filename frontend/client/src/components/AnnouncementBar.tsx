@@ -30,12 +30,12 @@ const AnnouncementBar = () => {
                       <span className="block truncate text-[9px] font-medium text-white/75 sm:text-[10px]">{product.detail}</span>
                     </span>
                     <span className="ml-auto shrink-0 rounded-full bg-[var(--shop-orange)] px-2 py-1 text-[8px] font-bold uppercase tracking-wider text-white sm:text-[9px]">Shop now</span>
-                  </span>
+                  </Link>
                 ))}
               </div>
             ))}
           </div>
-        </a>
+        </div>
 
         <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold sm:gap-2 sm:text-xs">
           <ShieldCheck size={15} className="text-[var(--shop-orange)]" aria-hidden="true" />
