@@ -12,6 +12,8 @@ const SearchBar = () => {
   const [isFocused, setIsFocused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const closeOnOutsidePointer = (event: PointerEvent) => {
       if (!searchContainerRef.current?.contains(event.target as Node)) {
@@ -44,6 +46,8 @@ const SearchBar = () => {
     const normalizedValue = value.trim();
     if (!normalizedValue) return;
     setIsFocused(false);
+    setActiveIndex(-1);
+    searchInputRef.current?.blur();
     router.push(`/products?q=${encodeURIComponent(normalizedValue)}`);
   };
 
@@ -96,6 +100,7 @@ const SearchBar = () => {
         <Search size={18} aria-hidden="true" />
       </button>
       <input
+        ref={searchInputRef}
         id="search"
         name="q"
         type="search"
