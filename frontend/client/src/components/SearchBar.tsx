@@ -83,10 +83,6 @@ const SearchBar = () => {
   return (
     <div
       ref={searchContainerRef}
-      onPointerLeave={() => {
-        setIsFocused(false);
-        setActiveIndex(-1);
-      }}
       className="relative z-[60] min-w-0 w-full lg:w-80 xl:w-[22rem]"
     >
       <form
