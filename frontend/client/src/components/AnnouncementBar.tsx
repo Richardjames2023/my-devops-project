@@ -12,13 +12,13 @@ const featuredProducts = [
 const AnnouncementBar = () => {
   return (
     <div className="bg-[var(--shop-navy)] text-white">
-      <div className="header-inner mx-auto grid min-h-[58px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 py-1.5 sm:gap-4">
+      <div className="header-inner mx-auto grid min-h-[44px] grid-cols-[auto_auto] items-center justify-between gap-2 py-1.5 sm:min-h-[58px] sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:justify-normal sm:gap-4">
         <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold sm:gap-2 sm:text-xs">
           <RotateCcw size={15} className="text-[var(--shop-orange)]" aria-hidden="true" />
           <span><span className="hidden sm:inline">30-day easy returns</span><span className="sm:hidden">30-day returns</span></span>
         </div>
 
-        <div aria-label="Featured product promotions" className="group relative block min-w-0 overflow-hidden rounded-md border border-white/10 bg-gradient-to-r from-[#101326] via-[#18264a] to-[#713b35] shadow-inner">
+        <div aria-label="Featured product promotions" className="group relative hidden min-w-0 overflow-hidden rounded-md border border-white/10 bg-gradient-to-r from-[#101326] via-[#18264a] to-[#713b35] shadow-inner sm:block">
           <div className="shopsphere-ad-track flex w-max">
             {[0, 1].map((copy) => (
               <div key={copy} className="flex shrink-0 items-center" aria-hidden={copy === 1}>
