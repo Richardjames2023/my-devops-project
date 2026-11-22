@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Search, ArrowUpRight } from "lucide-react";
@@ -11,6 +11,19 @@ const SearchBar = () => {
   const [query, setQuery] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!searchContainerRef.current?.contains(event.target as Node)) {
+        setIsFocused(false);
+        setActiveIndex(-1);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, []);
 
   const suggestions = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
@@ -66,6 +79,7 @@ const SearchBar = () => {
 
   return (
     <div
+      ref={searchContainerRef}
       className="relative z-[60] min-w-0 w-full lg:w-80 xl:w-[22rem]"
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -77,10 +91,6 @@ const SearchBar = () => {
         if (query.trim().length >= 2) {
           setIsFocused(true);
         }
-      }}
-      onMouseLeave={() => {
-        setIsFocused(false);
-        setActiveIndex(-1);
       }}
     >
       <form
