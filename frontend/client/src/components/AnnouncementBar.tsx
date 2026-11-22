@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { RotateCcw, ShieldCheck } from "lucide-react";
 
 const featuredProducts = [
@@ -17,12 +18,12 @@ const AnnouncementBar = () => {
           <span><span className="hidden sm:inline">30-day easy returns</span><span className="sm:hidden">30-day returns</span></span>
         </div>
 
-        <a href={featuredProducts[0].href} aria-label="Explore featured products" className="group relative block min-w-0 overflow-hidden rounded-md border border-white/10 bg-gradient-to-r from-[#101326] via-[#18264a] to-[#713b35] shadow-inner">
+        <div aria-label="Featured product promotions" className="group relative block min-w-0 overflow-hidden rounded-md border border-white/10 bg-gradient-to-r from-[#101326] via-[#18264a] to-[#713b35] shadow-inner">
           <div className="shopsphere-ad-track flex w-max">
             {[0, 1].map((copy) => (
               <div key={copy} className="flex shrink-0 items-center" aria-hidden={copy === 1}>
                 {featuredProducts.map((product) => (
-                  <span key={product.name} className="flex h-11 w-[250px] items-center gap-3 px-3 sm:w-[310px] sm:px-4">
+                  <Link href={product.href} key={product.name} tabIndex={copy === 1 ? -1 : 0} className="flex h-11 w-[250px] items-center gap-3 px-3 transition-colors hover:bg-white/10 sm:w-[310px] sm:px-4">
                     <Image src={product.image} alt="" width={42} height={42} className="h-9 w-9 shrink-0 object-contain drop-shadow-md sm:h-10 sm:w-10" />
                     <span className="min-w-0">
                       <span className="block truncate text-[10px] font-extrabold tracking-wide text-white sm:text-xs">{product.name}</span>
