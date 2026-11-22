@@ -291,7 +291,7 @@ const Navbar = () => {
               </div>
             </div>
 
-            <div className="relative z-10 after:absolute after:left-0 after:top-full after:h-4 after:w-full after:content-['']" onMouseEnter={() => setActiveMenu("help")} onMouseLeave={() => setActiveMenu(null)}>
+            <div className="relative z-10" onMouseEnter={() => setActiveMenu("help")} onMouseLeave={() => setActiveMenu(null)}>
               <button
                 type="button"
                 aria-label="Help menu"
@@ -303,7 +303,7 @@ const Navbar = () => {
                 <span className="hidden text-sm font-semibold sm:inline">Help</span>
                 <ChevronDown size={16} className={`hidden transition-transform duration-200 sm:block ${activeMenu === "help" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "help"} className={`absolute right-0 top-[calc(100%+16px)] z-50 mt-0 before:absolute before:-top-4 before:left-0 before:h-4 before:w-full before:content-[''] w-[min(20rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "help" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
+              <div aria-hidden={activeMenu !== "help"} className={`absolute right-0 top-full z-50 mt-0 w-[min(20rem,calc(100vw-2rem))] origin-top-right overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-xl transition-all duration-200 ease-out ${activeMenu === "help" ? "visible translate-y-0 scale-100 opacity-100" : "invisible -translate-y-2 scale-[0.98] opacity-0 pointer-events-none"}`}>
                 <div className="py-1">
                   <Link href="/help" className={activeClass}>
                     <CircleHelp size={19} /> Help Centre
