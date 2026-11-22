@@ -212,7 +212,7 @@ const Navbar = () => {
                 <div className="grid h-[440px] max-h-[min(440px,calc(100vh-120px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
                   <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2">
                     <p className="shrink-0 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
-                    <div className="h-[308px] max-h-[308px] shrink-0 overflow-y-auto overscroll-y-contain [scrollbar-color:var(--shop-orange)_var(--shop-peach)] [scrollbar-width:thin]">
+                    <div className="h-[360px] max-h-[360px] shrink-0 overflow-y-auto overscroll-y-contain [scrollbar-color:var(--shop-orange)_var(--shop-peach)] [scrollbar-width:thin]">
                     {shopCategories.map((category) => {
                       const Icon = category.icon;
                       return (
