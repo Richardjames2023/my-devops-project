@@ -73,6 +73,10 @@ const SearchBar = () => {
           setActiveIndex(-1);
         }
       }}
+      onMouseLeave={() => {
+        setIsFocused(false);
+        setActiveIndex(-1);
+      }}
     >
       <form
         action="/products"
