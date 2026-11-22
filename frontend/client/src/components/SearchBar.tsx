@@ -114,7 +114,7 @@ const SearchBar = () => {
       />
 
       </form>
-      <div className="absolute left-0 right-0 top-full z-[100] pt-2">
+      <div className={`pointer-events-none absolute left-0 right-0 top-full z-[100] pt-2 ${isOpen ? "pointer-events-auto" : ""}`}>
         <div
           id="shop-search-suggestions"
           role="listbox"
