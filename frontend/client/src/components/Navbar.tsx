@@ -34,14 +34,14 @@ const navigation = [
 ];
 
 const shopCategories = [
-  { name: "All", slug: "all", icon: ShoppingBasket, image: "/products/1g.png", items: ["All products", "New arrivals", "Popular picks"] },
-  { name: "T-shirts", slug: "t-shirts", icon: Shirt, image: "/products/1g.png", items: ["Basic T-shirts", "Graphic T-shirts", "Polo shirts", "Long-sleeve T-shirts"] },
-  { name: "Shoes", slug: "shoes", icon: Footprints, image: "/products/6g.png", items: ["Casual shoes", "Sneakers", "Running shoes", "Everyday footwear"] },
-  { name: "Accessories", slug: "accessories", icon: Glasses, image: "/products/8b.png", items: ["Everyday accessories", "Fashion accessories", "Style essentials"] },
-  { name: "Bags", slug: "bags", icon: Briefcase, image: "/products/8b.png", items: ["Backpacks", "Everyday bags", "Travel bags"] },
-  { name: "Dresses", slug: "dresses", icon: Venus, image: "/products/4w.png", items: ["Casual dresses", "Everyday dresses", "Occasion wear"] },
-  { name: "Jackets", slug: "jackets", icon: Shirt, image: "/products/2g.png", items: ["Hoodies", "Zip-up jackets", "Light jackets"] },
-  { name: "Gloves", slug: "gloves", icon: Hand, image: "/products/5bl.png", items: ["Everyday gloves", "Cold-weather gloves"] },
+  { name: "All", slug: "all", icon: ShoppingBasket, image: "/products/1g.png", items: ["All products", "New arrivals", "Popular picks"], products: [{ name: "Adidas CoreFit T-Shirt", image: "/products/1g.png" }, { name: "Puma Ultra Warm Zip", image: "/products/2g.png" }, { name: "Nike Air Essentials Pullover", image: "/products/3gr.png" }, { name: "Nike Dri Flex T-Shirt", image: "/products/4w.png" }, { name: "Under Armour StormFleece", image: "/products/5bl.png" }, { name: "Nike Air Max 270", image: "/products/6g.png" }, { name: "Nike Ultraboost Pulse", image: "/products/7g.png" }, { name: "Levi's Classic Denim", image: "/products/8b.png" }] },
+  { name: "T-shirts", slug: "t-shirts", icon: Shirt, image: "/products/1g.png", items: ["Basic T-shirts", "Graphic T-shirts", "Polo shirts", "Long-sleeve T-shirts"], products: [{ name: "Adidas CoreFit T-Shirt", image: "/products/1g.png" }, { name: "Nike Dri Flex T-Shirt", image: "/products/4w.png" }, { name: "Adidas CoreFit T-Shirt · Purple", image: "/products/1p.png" }, { name: "Adidas CoreFit T-Shirt · Green", image: "/products/1gr.png" }] },
+  { name: "Shoes", slug: "shoes", icon: Footprints, image: "/products/6g.png", items: ["Casual shoes", "Sneakers", "Running shoes", "Everyday footwear"], products: [{ name: "Nike Air Max 270", image: "/products/6g.png" }, { name: "Nike Ultraboost Pulse", image: "/products/7g.png" }, { name: "Nike Air Max 270 · White", image: "/products/6w.png" }, { name: "Nike Ultraboost Pulse · Pink", image: "/products/7p.png" }] },
+  { name: "Accessories", slug: "accessories", icon: Glasses, image: "/products/8b.png", items: ["Everyday accessories", "Fashion accessories", "Style essentials"], products: [{ name: "Levi's Classic Denim", image: "/products/8b.png" }, { name: "Levi's Classic Denim · Green", image: "/products/8gr.png" }, { name: "Under Armour StormFleece", image: "/products/5bl.png" }] },
+  { name: "Bags", slug: "bags", icon: Briefcase, image: "/products/8b.png", items: ["Backpacks", "Everyday bags", "Travel bags"], products: [{ name: "Levi's Classic Denim", image: "/products/8b.png" }, { name: "Levi's Classic Denim · Green", image: "/products/8gr.png" }, { name: "Adidas CoreFit T-Shirt", image: "/products/1g.png" }] },
+  { name: "Dresses", slug: "dresses", icon: Venus, image: "/products/4w.png", items: ["Casual dresses", "Everyday dresses", "Occasion wear"], products: [{ name: "Nike Dri Flex T-Shirt", image: "/products/4w.png" }, { name: "Nike Dri Flex T-Shirt · Pink", image: "/products/4p.png" }, { name: "Adidas CoreFit T-Shirt", image: "/products/1g.png" }] },
+  { name: "Jackets", slug: "jackets", icon: Shirt, image: "/products/2g.png", items: ["Hoodies", "Zip-up jackets", "Light jackets"], products: [{ name: "Puma Ultra Warm Zip", image: "/products/2g.png" }, { name: "Nike Air Essentials Pullover", image: "/products/3gr.png" }, { name: "Under Armour StormFleece", image: "/products/5bl.png" }, { name: "Puma Ultra Warm Zip · Green", image: "/products/2gr.png" }] },
+  { name: "Gloves", slug: "gloves", icon: Hand, image: "/products/5bl.png", items: ["Everyday gloves", "Cold-weather gloves"], products: [{ name: "Under Armour StormFleece", image: "/products/5bl.png" }, { name: "Under Armour StormFleece · Red", image: "/products/5r.png" }, { name: "Under Armour StormFleece · Orange", image: "/products/5o.png" }] },
 ];
 
 const placeholderClass =
@@ -59,6 +59,8 @@ function ComingSoon({ children }: { children: React.ReactNode }) {
 
 const Navbar = () => {
   const [activeMenu, setActiveMenu] = useState<"account" | "help" | "categories" | null>(null);
+  const [activeCategorySlug, setActiveCategorySlug] = useState("t-shirts");
+  const activeCategory = shopCategories.find((category) => category.slug === activeCategorySlug) ?? shopCategories[1];
 
   return (
     <header className="w-full">
@@ -97,29 +99,28 @@ const Navbar = () => {
                     {shopCategories.map((category) => {
                       const Icon = category.icon;
                       return (
-                        <Link key={category.slug} href={`/products?category=${category.slug}`} className="group flex items-center justify-between gap-2 rounded-lg px-3 py-3 text-sm font-semibold text-[var(--shop-navy)] transition-colors hover:bg-white hover:text-[var(--shop-orange)] hover:shadow-sm">
+                        <button key={category.slug} type="button" onMouseEnter={() => setActiveCategorySlug(category.slug)} onFocus={() => setActiveCategorySlug(category.slug)} onClick={() => setActiveCategorySlug(category.slug)} aria-pressed={activeCategorySlug === category.slug} className={`group flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left text-sm font-semibold transition-colors ${activeCategorySlug === category.slug ? "bg-white text-[var(--shop-orange-dark)] shadow-sm ring-1 ring-[var(--shop-peach)]" : "text-[var(--shop-navy)] hover:bg-white hover:text-[var(--shop-orange)]"}`}>
                           <span className="flex items-center gap-2"><Icon size={17} />{category.name}</span>
                           <ChevronDown size={14} className="-rotate-90 text-[var(--shop-muted)]" />
-                        </Link>
+                        </button>
                       );
                     })}
                   </div>
                   <div className="min-h-0 overflow-y-auto overscroll-contain p-5 pb-8">
                     <div className="mb-4 flex items-center justify-between border-b border-[var(--shop-peach)] pb-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-[var(--shop-muted)]">Explore ShopSphere</p>
-                        <h3 className="mt-1 text-lg font-bold text-[var(--shop-navy)]">Shop by category</h3>
+                        <h3 className="text-lg font-bold text-[var(--shop-navy)]">{activeCategory.name}</h3>
+                        <p className="mt-1 text-xs text-[var(--shop-muted)]">{activeCategory.items.join(" · ")}</p>
                       </div>
-                      <Link href="/products" className="text-sm font-semibold text-[var(--shop-orange)] hover:underline">View all</Link>
+                      <Link href={`/products?category=${activeCategory.slug}`} className="shrink-0 text-sm font-semibold text-[var(--shop-orange)] hover:underline">View all</Link>
                     </div>
-                    <div className="grid grid-cols-3 gap-x-4 gap-y-5">
-                      {shopCategories.filter((category) => category.slug !== "all").map((category) => (
-                        <Link key={category.slug} href={`/products?category=${category.slug}`} className="group flex min-w-0 flex-col items-center rounded-lg p-2 text-center transition-colors hover:bg-[var(--shop-search)]">
-                          <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-peach-tint)] ring-1 ring-[var(--shop-peach)] transition-all duration-200 group-hover:scale-105 group-hover:ring-[var(--shop-orange)]">
-                            <Image src={category.image} alt="" width={80} height={80} className="h-full w-full object-contain mix-blend-multiply" />
+                    <div key={activeCategory.slug} className="flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-4 [scrollbar-color:var(--shop-orange)_var(--shop-peach-tint)] [scrollbar-width:thin]">
+                      {activeCategory.products.slice(0, 9).map((product, index) => (
+                        <Link key={product.name + index} href={`/products?category=${activeCategory.slug}`} className="group flex w-[118px] shrink-0 snap-start flex-col items-center rounded-xl p-2 text-center transition-all duration-300 hover:-translate-y-1 hover:bg-[var(--shop-peach-tint)] sm:w-[132px]">
+                          <span className="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[var(--shop-peach-tint)] ring-1 ring-[var(--shop-peach)] transition-all duration-300 group-hover:scale-105 group-hover:ring-2 group-hover:ring-[var(--shop-orange)]">
+                            <Image src={product.image} alt={product.name} width={80} height={80} className="h-full w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-110" />
                           </span>
-                          <span className="text-sm font-semibold text-[var(--shop-navy)] group-hover:text-[var(--shop-orange)]">{category.name}</span>
-                          <span className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--shop-muted)]">{category.items.slice(0, 2).join(" · ")}</span>
+                          <span className="line-clamp-2 text-xs font-semibold leading-5 text-[var(--shop-navy)] group-hover:text-[var(--shop-orange-dark)]">{product.name}</span>
                         </Link>
                       ))}
                     </div>
