@@ -1,49 +1,23 @@
-import Image from "next/image";
 import Link from "next/link";
-import { RotateCcw, ShieldCheck } from "lucide-react";
+import { RotateCcw, ShieldCheck, Truck } from "lucide-react";
 
-const featuredProducts = [
-  { name: "Puma Ultra Warm Zip", detail: "Layer up in comfort", image: "/products/2g.png", href: "/products?category=jackets" },
-  { name: "Nike Air Essentials", detail: "Everyday style, easy comfort", image: "/products/3gr.png", href: "/products?category=jackets" },
-  { name: "Nike Air Max 270", detail: "Find your next favourite pair", image: "/products/6g.png", href: "/products?category=shoes" },
-  { name: "Nike Ultraboost Pulse", detail: "Made to move with you", image: "/products/7g.png", href: "/products?category=sportswear" },
-];
-
-const AnnouncementBar = () => {
-  return (
-    <div className="bg-[var(--shop-navy)] text-white">
-      <div className="header-inner mx-auto grid min-h-[48px] grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1 py-1 sm:min-h-[58px] sm:gap-4">
-        <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold sm:gap-2 sm:text-xs">
-          <RotateCcw size={15} className="text-[var(--shop-orange)]" aria-hidden="true" />
-          <span><span className="hidden sm:inline">30-day easy returns</span><span className="sm:hidden">30-day returns</span></span>
-        </div>
-
-        <div aria-label="Featured product promotions" className="group relative block min-w-0 overflow-hidden rounded-md border border-white/10 bg-gradient-to-r from-[#101326] via-[#18264a] to-[#713b35] shadow-inner">
-          <div className="shopsphere-ad-track flex w-max">
-            {[0, 1].map((copy) => (
-              <div key={copy} className="flex shrink-0 items-center" aria-hidden={copy === 1}>
-                {featuredProducts.map((product) => (
-                  <Link href={product.href} key={product.name} tabIndex={copy === 1 ? -1 : 0} className="flex h-10 w-[190px] items-center gap-2 px-2 transition-colors hover:bg-white/10 sm:h-11 sm:w-[310px] sm:gap-3 sm:px-4">
-                    <Image src={product.image} alt="" width={36} height={36} className="h-8 w-8 shrink-0 object-contain drop-shadow-md sm:h-10 sm:w-10" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[10px] font-extrabold tracking-wide text-white sm:text-xs">{product.name}</span>
-                      <span className="block truncate hidden text-[9px] font-medium text-white/75 sm:block sm:text-[10px]">{product.detail}</span>
-                    </span>
-                    <span className="ml-auto shrink-0 rounded-full bg-[var(--shop-orange)] px-1.5 py-1 text-[8px] font-bold uppercase tracking-wider text-white sm:px-2 sm:text-[9px]">Shop now</span>
-                  </Link>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-[10px] font-semibold sm:gap-2 sm:text-xs">
-          <ShieldCheck size={15} className="text-[var(--shop-orange)]" aria-hidden="true" />
-          <span><span className="hidden sm:inline">Secure checkout</span><span className="sm:hidden">Secure</span></span>
-        </div>
-      </div>
+const AnnouncementBar = () => (
+  <div className="bg-[var(--shop-navy)] text-white">
+    <div className="header-inner mx-auto flex min-h-10 flex-wrap items-center justify-center gap-x-6 gap-y-2 py-2 text-[11px] font-semibold sm:min-h-11 sm:justify-between sm:text-xs">
+      <Link href="/delivery-information" className="inline-flex items-center gap-2 transition-colors hover:text-[var(--shop-orange)]">
+        <Truck size={15} className="text-[var(--shop-orange)]" aria-hidden="true" />
+        <span>Delivery across Nigeria</span>
+      </Link>
+      <Link href="/returns-policy" className="inline-flex items-center gap-2 transition-colors hover:text-[var(--shop-orange)]">
+        <RotateCcw size={15} className="text-[var(--shop-orange)]" aria-hidden="true" />
+        <span>7-day returns policy</span>
+      </Link>
+      <Link href="/payment-information" className="inline-flex items-center gap-2 transition-colors hover:text-[var(--shop-orange)]">
+        <ShieldCheck size={15} className="text-[var(--shop-orange)]" aria-hidden="true" />
+        <span>Payment information</span>
+      </Link>
     </div>
-  );
-};
+  </div>
+);
 
 export default AnnouncementBar;
