@@ -45,6 +45,13 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
 
   return (
     <div className="w-full">
+      {params === "homepage" && (
+        <div className="mb-5 flex flex-col gap-1 sm:mb-6">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--shop-orange-dark)]">Made for your everyday</p>
+          <h2 className="text-2xl font-extrabold tracking-tight text-[var(--shop-navy)] sm:text-3xl">Find something you’ll love</h2>
+          <p className="max-w-2xl text-sm leading-6 text-[var(--shop-muted)] sm:text-base">Browse the collections and discover pieces to make your everyday style your own.</p>
+        </div>
+      )}
       {query?.trim() && <p className="mb-4 text-sm text-[var(--shop-muted)]">Search results for <span className="font-semibold text-[var(--shop-navy)]">&ldquo;{query.trim()}&rdquo;</span> · {visibleProducts.length} {visibleProducts.length === 1 ? "product" : "products"} found</p>}
       <Categories />
       {params === "products" && <Filter/>}
