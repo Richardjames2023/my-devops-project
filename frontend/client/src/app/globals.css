@@ -1631,3 +1631,53 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     transition: none;
   }
 }
+
+
+/* Homepage product pagination */
+.shop-categories__load-more-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 26px 0 8px;
+}
+
+.shop-categories__load-more-wrap p {
+  margin: 0;
+  color: var(--shop-muted);
+  font-size: 12px;
+}
+
+.shop-categories__load-more {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid var(--shop-navy);
+  border-radius: 9px;
+  padding: 0 20px;
+  color: white;
+  background: var(--shop-navy);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.shop-categories__load-more:hover {
+  transform: translateY(-1px);
+  border-color: var(--shop-blue);
+  background: var(--shop-blue);
+}
+
+.shop-categories__load-more:focus-visible {
+  outline: 3px solid var(--shop-blue);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-categories__load-more {
+    transition: none;
+  }
+}
