@@ -399,3 +399,113 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .hero-slider__content { animation: none; }
 }
 
+
+/* Homepage customer-confidence benefits strip */
+.trust-benefits {
+  width: 100%;
+  margin: 0 0 42px;
+  border-top: 1px solid var(--shop-border);
+  border-bottom: 1px solid var(--shop-border);
+  background: var(--shop-surface);
+}
+
+.trust-benefits__list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 22px 12px;
+  list-style: none;
+}
+
+.trust-benefits__item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 13px;
+  padding: 8px 22px;
+}
+
+.trust-benefits__item + .trust-benefits__item {
+  border-left: 1px solid var(--shop-border);
+}
+
+.trust-benefits__icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  color: var(--shop-blue);
+}
+
+.trust-benefits__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.trust-benefits__title {
+  color: var(--shop-navy);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.trust-benefits__description {
+  color: var(--shop-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1000px) {
+  .trust-benefits__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 12px 4px;
+  }
+
+  .trust-benefits__item {
+    padding: 15px 18px;
+  }
+
+  .trust-benefits__item:nth-child(3) {
+    border-left: 0;
+  }
+
+  .trust-benefits__item:nth-child(n + 3) {
+    border-top: 1px solid var(--shop-border);
+  }
+}
+
+@media (max-width: 480px) {
+  .trust-benefits { margin-bottom: 32px; }
+
+  .trust-benefits__list {
+    padding: 8px 0;
+  }
+
+  .trust-benefits__item {
+    align-items: flex-start;
+    gap: 9px;
+    padding: 13px 8px;
+  }
+
+  .trust-benefits__icon {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .trust-benefits__icon svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .trust-benefits__title { font-size: 12px; }
+  .trust-benefits__description { font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trust-benefits * { scroll-behavior: auto; }
+}
