@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import { AppError } from "../../common/errors/AppError";
-import { createBannerSchema, listBannersQuerySchema, positionSchema, targetUrlSchema, updateBannerSchema } from "./promotion-banner.validation";
+import { bannerContentFieldsSchema, createBannerSchema, listBannersQuerySchema, positionSchema, targetUrlSchema, updateBannerSchema } from "./promotion-banner.validation";
 import { createBanner, deleteBanner, deleteDefaultBanner, getBanner, getPublicBanners, listBanners, setDefaultBanner, updateBanner } from "./promotion-banner.service";
 
 function actor(req: AuthenticatedRequest): string {
@@ -76,15 +76,31 @@ export async function remove(req: AuthenticatedRequest, res: Response): Promise<
 export async function putDefault(req: AuthenticatedRequest, res: Response): Promise<void> {
   const parsed = z.object({
     position: positionSchema,
-   targetUrl: targetUrlSchema,
+    targetUrl: targetUrlSchema,
     altText: z.string().trim().max(255).nullable().optional(),
-  }).safeParse({ ...req.body, position: req.params.position });
+    ...bannerContentFieldsSchema.shape,
+  }).refine((value) => {
+    const hasPrimary = value.primaryCtaLabel != null || value.primaryCtaUrl != null;
+    const hasSecondary = value.secondaryCtaLabel != null || value.secondaryCtaUrl != null;
+    return (!hasPrimary || (Boolean(value.primaryCtaLabel) && Boolean(value.primaryCtaUrl))) &&
+      (!hasSecondary || (Boolean(value.secondaryCtaLabel) && Boolean(value.secondaryCtaUrl)));
+  }, { path: ["primaryCtaLabel"], message: "Each CTA label and URL must be provided together, or both omitted" })
+    .safeParse({ ...req.body, position: req.params.position });
   if (!parsed.success) {
     res.status(400).json({ message: "Validation failed", errors: z.flattenError(parsed.error).fieldErrors });
     return;
   }
   const files = uploadedFiles(req);
-  const banner = await setDefaultBanner(parsed.data.position, files.image, parsed.data.targetUrl ?? null, parsed.data.altText ?? null, actor(req), metadata(req), files.mobileImage);
+  const banner = await setDefaultBanner(
+    parsed.data.position,
+    files.image,
+    parsed.data.targetUrl ?? null,
+    parsed.data.altText ?? null,
+    parsed.data,
+    actor(req),
+    metadata(req),
+    files.mobileImage,
+  );
   res.status(200).json({ message: "Default promotion banner saved successfully", banner });
 }
 export async function removeDefault(req: AuthenticatedRequest, res: Response): Promise<void> {
