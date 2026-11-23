@@ -142,7 +142,8 @@ describe("Promotion banner HTTP API authorization and validation", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("banners");
-    expect(Object.keys(response.body.banners).sort()).toEqual(["bottom", "hero", "top"]);
+    expect(Object.keys(response.body.banners).sort()).toEqual(["bottom", "hero", "heroSlides", "top"]);
+    expect(response.body.banners.heroSlides).toEqual([]);
   });
 
   it("rejects staff management requests without a bearer token", async () => {
@@ -204,6 +205,21 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     expect(response.body.errors).toHaveProperty("title");
     expect(response.body.errors).toHaveProperty("startAt");
     expect(response.body.errors).toHaveProperty("endAt");
+  });
+
+  it("rejects a CTA with a label but no destination", async () => {
+    const response = await request(app)
+      .post(basePath)
+      .set("Authorization", `Bearer ${authorizedToken}`)
+      .field("title", "Incomplete CTA")
+      .field("position", "HERO")
+      .field("startAt", new Date(Date.now() + 60_000).toISOString())
+      .field("endAt", new Date(Date.now() + 3_600_000).toISOString())
+      .field("primaryCtaLabel", "Shop now");
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Validation failed");
+    expect(response.body.errors).toHaveProperty("primaryCtaLabel");
   });
 
   it("requires an image for a valid banner creation request", async () => {
