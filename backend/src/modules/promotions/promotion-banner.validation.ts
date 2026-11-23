@@ -22,7 +22,7 @@ export const targetUrlSchema = z
 
 const optionalText = (max: number) =>
   z.preprocess(
-    (value) => value === "" ? null : value,
+    (value) => typeof value === "string" && value.trim() === "" ? null : value,
     z.string().trim().max(max).nullable().optional(),
   );
 
