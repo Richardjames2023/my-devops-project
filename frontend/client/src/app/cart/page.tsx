@@ -128,14 +128,14 @@ const CartPageContent = () => {
               // SINGLE CART ITEM
               <div
                 className="flex items-center justify-between"
-                key={item.id + item.selectedSize + item.selectedColor}
+                key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}
               >
                 {/* IMAGE AND DETAILS */}
                 <div className="flex gap-8">
                   {/* IMAGE */}
                   <div className="relative w-32 h-32 bg-gray-50 rounded-lg overflow-hidden">
                     <Image
-                      src={item.images[item.selectedColor]}
+                      src={item.images[item.selectedColor] ?? item.images.default ?? Object.values(item.images)[0]}
                       alt={item.name}
                       fill
                       className="object-contain"
@@ -148,12 +148,9 @@ const CartPageContent = () => {
                       <p className="text-xs text-gray-500">
                         Quantity: {item.quantity}
                       </p>
-                      <p className="text-xs text-gray-500">
-                        Size: {item.selectedSize}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Color: {item.selectedColor}
-                      </p>
+                      {item.selectedSize && <p className="text-xs text-gray-500">Size: {item.selectedSize}</p>}
+                      {item.selectedColor && item.selectedColor !== "default" && <p className="text-xs text-gray-500">Color: {item.selectedColor}</p>}
+                      {!item.selectedSize && (!item.selectedColor || item.selectedColor === "default") && <p className="text-xs text-gray-500">Standard item</p>}
                     </div>
                     <p className="font-medium">${item.price.toFixed(2)}</p>
                   </div>
