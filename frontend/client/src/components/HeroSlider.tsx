@@ -11,22 +11,18 @@ const slides = [
     title: "Smart Appliances for Modern Living",
     description:
       "Discover practical kitchen essentials and home appliances designed to make everyday living easier.",
-    image: "/hero/hero-kitchen.jpg",
-    imageAlt:
-      "Air fryer, blender, electric kettle and toaster arranged on a bright modern kitchen counter",
+    image: "https://cdn.shopify.com/s/files/1/0478/5989/2377/files/small-kitchen-appliances-everyday-cooking-guide.jpg?v=1777131849",
+    imageAlt: "Air fryer, blender and toaster arranged on a modern kitchen counter",
     primaryLabel: "Shop Appliances",
-    secondaryLabel: "Explore Products",
   },
   {
     eyebrow: "ELECTRONICS & GADGETS",
     title: "Bring Your Everyday Tech Together",
     description:
       "Explore laptops, headphones, speakers, smartwatches and useful everyday electronics.",
-    image: "/hero/hero-electronics.jpg",
-    imageAlt:
-      "Laptop, headphones, speaker, smartwatch, earbuds and camera arranged on a modern tabletop",
+    image: "https://images.unsplash.com/photo-1590643924142-b1b492f1dddc?auto=format&fit=crop&w=1800&q=85",
+    imageAlt: "Laptop, camera, smartwatch and electronics accessories arranged on a tabletop",
     primaryLabel: "Shop Electronics",
-    secondaryLabel: "Explore Products",
   },
 ];
 
@@ -76,7 +72,7 @@ export default function HeroSlider() {
       <div className="hero-slider__stage">
         {slides.map((slide, index) => (
           <div
-            key={slide.image}
+            key={slide.eyebrow}
             className={`hero-slider__visual ${index === activeIndex ? "is-active" : ""}`}
             aria-hidden={index !== activeIndex}
           >
@@ -84,6 +80,7 @@ export default function HeroSlider() {
               src={slide.image}
               alt={slide.imageAlt}
               fill
+              unoptimized
               priority={index === 0}
               sizes="(max-width: 768px) 100vw, 1280px"
               className="hero-slider__image"
@@ -106,25 +103,15 @@ export default function HeroSlider() {
               <ArrowUpRight aria-hidden="true" size={19} strokeWidth={2.5} />
             </Link>
             <Link href="/products" className="hero-slider__button hero-slider__button--secondary">
-              {activeSlide.secondaryLabel}
+              Explore Products
             </Link>
           </div>
         </div>
 
-        <button
-          type="button"
-          className="hero-slider__arrow hero-slider__arrow--previous"
-          onClick={goPrevious}
-          aria-label="Previous featured collection"
-        >
+        <button type="button" className="hero-slider__arrow hero-slider__arrow--previous" onClick={goPrevious} aria-label="Previous featured collection">
           <ArrowLeft size={21} strokeWidth={2.4} />
         </button>
-        <button
-          type="button"
-          className="hero-slider__arrow hero-slider__arrow--next"
-          onClick={goNext}
-          aria-label="Next featured collection"
-        >
+        <button type="button" className="hero-slider__arrow hero-slider__arrow--next" onClick={goNext} aria-label="Next featured collection">
           <ArrowRight size={21} strokeWidth={2.4} />
         </button>
 
