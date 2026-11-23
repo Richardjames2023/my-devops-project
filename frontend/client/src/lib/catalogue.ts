@@ -150,7 +150,7 @@ export const products: ProductsType = [
     colors: [],
     tags: ["DIY", "toolkit", "repair", "hardware"],
     stockStatus: "in-stock",
-    images: { default: "https://images.unsplash.com/photo-1581147036324-c1c89c2c8b5c?w=900&auto=format&fit=crop&q=85" },
+    images: { default: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=900&auto=format&fit=crop&q=85" },
   },
   {
     id: "demo-tools-002",
