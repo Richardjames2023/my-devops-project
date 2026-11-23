@@ -119,8 +119,8 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 
 .hero-slider__stage {
   position: relative;
-  min-height: 410px;
-  height: clamp(410px, 34vw, 500px);
+  min-height: 360px;
+  height: clamp(360px, 29vw, 430px);
   overflow: hidden;
   border: 1px solid rgba(29, 82, 189, 0.08);
   border-radius: 22px;
@@ -176,12 +176,39 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   color: var(--shop-orange-dark);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.13em;
   text-transform: uppercase;
+}
+
+
+.hero-slider__badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  margin-bottom: 12px;
+  border: 1px solid rgba(236, 112, 46, 0.18);
+  border-radius: 999px;
+  padding: 6px 11px;
+  color: var(--shop-orange-dark);
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+}
+
+.hero-slider__button--secondary {
+  color: var(--shop-navy);
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(8, 28, 65, 0.14);
+}
+
+.hero-slider__button--secondary:hover {
+  background: var(--shop-surface);
+  box-shadow: 0 7px 16px rgba(8, 28, 65, 0.1);
 }
 
 .hero-slider__eyebrow-mark {
@@ -340,7 +367,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 }
 
 @media (max-width: 900px) {
-  .hero-slider__stage { height: 430px; min-height: 410px; }
+  .hero-slider__stage { height: 390px; min-height: 370px; }
   .hero-slider__content { left: 48px; width: 54%; }
   .hero-slider__title { font-size: clamp(36px, 5vw, 49px); }
   .hero-slider__wash {
@@ -356,7 +383,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 
 @media (max-width: 640px) {
   .hero-slider { margin: 10px 0 26px; }
-  .hero-slider__stage { height: 570px; min-height: 0; border-radius: 17px; }
+  .hero-slider__stage { height: 500px; min-height: 0; border-radius: 17px; }
   .hero-slider__image { object-position: 64% center; }
   .hero-slider__wash {
     background: linear-gradient(
