@@ -8,7 +8,7 @@ const benefits = [
   },
   {
     title: "Secure payments",
-    description: "Complete your order through our Paystack checkout.",
+    description: "Clear payment information when you are ready to check out.",
     Icon: ShieldCheck,
   },
   {
