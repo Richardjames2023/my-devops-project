@@ -2,12 +2,18 @@ import { z } from "zod";
 
 export type ProductType = {
   id: string | number;
+  sku: string;
   name: string;
+  brand: string;
+  categoryName: string;
+  categorySlug: string;
   shortDescription: string;
   description: string;
   price: number;
   sizes: string[];
   colors: string[];
+  tags: string[];
+  stockStatus: "in-stock" | "low-stock" | "out-of-stock";
   images: Record<string, string>;
 };
 
