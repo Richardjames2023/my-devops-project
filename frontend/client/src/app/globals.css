@@ -193,6 +193,25 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   background: var(--shop-orange);
 }
 
+.hero-slider__badge {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  margin: 0 0 16px;
+  border: 1px solid rgba(236, 112, 46, 0.2);
+  border-radius: 999px;
+  padding: 7px 13px;
+  color: var(--shop-orange-dark);
+  background: rgba(255, 255, 255, 0.88);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  box-shadow: 0 3px 10px rgba(8, 28, 65, 0.06);
+}
+
 .hero-slider__title {
   max-width: 570px;
   margin: 0;
