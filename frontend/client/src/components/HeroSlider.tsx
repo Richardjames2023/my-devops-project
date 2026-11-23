@@ -14,7 +14,10 @@ type HeroSlide = {
   eyebrow?: string;
   title?: string;
   description?: string;
-  badge?: string;
+  badge?: {
+    value: string;
+    label: string;
+  };
   image: string;
   imageAlt: string;
   primaryCta?: HeroCallToAction;
@@ -27,7 +30,7 @@ const slides: HeroSlide[] = [
     title: "Smart Appliances for Modern Living",
     description:
       "Discover practical kitchen essentials and home appliances designed to make everyday living easier.",
-    badge: "50% OFF",
+    badge: { value: "50%", label: "OFF" },
     image: "https://cdn.shopify.com/s/files/1/0478/5989/2377/files/small-kitchen-appliances-everyday-cooking-guide.jpg?v=1777131849",
     imageAlt: "Air fryer, blender, toaster and coffee maker arranged on a modern kitchen counter",
     primaryCta: {
@@ -40,7 +43,7 @@ const slides: HeroSlide[] = [
     title: "Bring Your Everyday Tech Together",
     description:
       "Explore useful electronics and everyday essentials selected to make life a little easier.",
-    badge: "New In",
+    badge: { value: "NEW", label: "IN" },
     image: "https://images.unsplash.com/photo-1590643924142-b1b492f1dddc?auto=format&fit=crop&w=1800&q=85",
     imageAlt: "Laptop, camera, smartwatch and electronics accessories arranged on a tabletop",
     primaryCta: {
@@ -57,7 +60,7 @@ const slides: HeroSlide[] = [
     title: "Make More of Every Day",
     description:
       "Find practical essentials that make preparing meals and managing your home simpler.",
-    badge: "Everyday Favourites",
+    badge: { value: "EVERYDAY", label: "FAVOURITES" },
     image: "https://www.premiumhomesource.com/cdn/shop/files/2001-04_henck-zwil_enfingy_appliances-001_2.jpg?v=1738588042&width=1000",
     imageAlt: "Coordinated black blender, toaster and electric kettle displayed together",
     secondaryCta: {
@@ -143,7 +146,10 @@ export default function HeroSlider() {
           )}
 
           {activeSlide.badge && (
-            <span className="hero-slider__badge">{activeSlide.badge}</span>
+            <div className="hero-slider__badge" aria-label={`${activeSlide.badge.value} ${activeSlide.badge.label}`}>
+              <span className="hero-slider__badge-value">{activeSlide.badge.value}</span>
+              <span className="hero-slider__badge-label">{activeSlide.badge.label}</span>
+            </div>
           )}
 
           {activeSlide.title && (
