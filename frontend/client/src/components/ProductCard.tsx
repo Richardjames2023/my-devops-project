@@ -1,3 +1,5 @@
+"use client";
+
 import useCartStore from "@/stores/cartStore";
 import { ProductType } from "@/types";
 import { ShoppingCart } from "lucide-react";
