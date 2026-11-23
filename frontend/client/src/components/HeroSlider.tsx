@@ -12,7 +12,7 @@ const slides = [
     description:
       "Discover practical kitchen essentials and home appliances designed to make everyday living easier.",
     image: "https://cdn.shopify.com/s/files/1/0478/5989/2377/files/small-kitchen-appliances-everyday-cooking-guide.jpg?v=1777131849",
-    imageAlt: "Air fryer, blender and toaster arranged on a modern kitchen counter",
+    imageAlt: "Air fryer, blender, toaster and coffee maker arranged on a modern kitchen counter",
     primaryLabel: "Shop Appliances",
   },
   {
@@ -23,6 +23,15 @@ const slides = [
     image: "https://images.unsplash.com/photo-1590643924142-b1b492f1dddc?auto=format&fit=crop&w=1800&q=85",
     imageAlt: "Laptop, camera, smartwatch and electronics accessories arranged on a tabletop",
     primaryLabel: "Shop Electronics",
+  },
+  {
+    eyebrow: "SMALL APPLIANCES",
+    title: "Make More of Every Day",
+    description:
+      "Find the everyday appliances that make preparing meals and managing your home simpler.",
+    image: "https://www.premiumhomesource.com/cdn/shop/files/2001-04_henck-zwil_enfingy_appliances-001_2.jpg?v=1738588042&width=1000",
+    imageAlt: "Coordinated black blender, toaster and electric kettle displayed together",
+    primaryLabel: "Shop Home Essentials",
   },
 ];
 
