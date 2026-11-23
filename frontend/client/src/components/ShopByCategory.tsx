@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowUpRight, ChevronRight, Plus, Search, ShoppingCart, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronRight, Plus, Search, ShoppingCart, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { categories, products } from "@/lib/catalogue";
 import useCartStore from "@/stores/cartStore";
@@ -36,6 +36,7 @@ const formatPrice = (price: number) =>
 export default function ShopByCategory() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [categoryQuery, setCategoryQuery] = useState("");
+  const [isCategoryDirectoryOpen, setIsCategoryDirectoryOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState("");
@@ -49,6 +50,8 @@ export default function ShopByCategory() {
       ),
     [categoryQuery],
   );
+
+  const homepageCategories = categories.slice(0, 5);
 
   const visibleProducts = useMemo(
     () =>
@@ -102,21 +105,6 @@ export default function ShopByCategory() {
       </div>
 
       <div className="shop-categories__toolbar">
-        <div className="shop-categories__category-search">
-          <Search size={16} aria-hidden="true" />
-          <input
-            type="search"
-            value={categoryQuery}
-            onChange={(event) => setCategoryQuery(event.target.value)}
-            placeholder="Find a category"
-            aria-label="Search categories"
-          />
-          {categoryQuery ? (
-            <button type="button" onClick={() => setCategoryQuery("")} aria-label="Clear category search">
-              <X size={15} />
-            </button>
-          ) : null}
-        </div>
         <div className="shop-categories__category-list" aria-label="Filter products by category">
           <button
             type="button"
@@ -126,7 +114,7 @@ export default function ShopByCategory() {
           >
             All products
           </button>
-          {visibleCategories.map((category) => (
+          {homepageCategories.map((category) => (
             <button
               key={category.slug}
               type="button"
@@ -137,9 +125,19 @@ export default function ShopByCategory() {
               {category.name}
             </button>
           ))}
-          {visibleCategories.length === 0 ? (
-            <span className="shop-categories__no-categories">No matching categories</span>
-          ) : null}
+          <button
+            type="button"
+            className="shop-categories__all-categories"
+            onClick={() => {
+              setCategoryQuery("");
+              setIsCategoryDirectoryOpen(true);
+            }}
+            aria-haspopup="dialog"
+            aria-expanded={isCategoryDirectoryOpen}
+          >
+            All categories <ChevronDown size={15} aria-hidden="true" />
+            <span>{categories.length}</span>
+          </button>
         </div>
       </div>
 
@@ -196,6 +194,95 @@ export default function ShopByCategory() {
           <Link href="/products">Browse the full catalogue <ChevronRight size={15} /></Link>
         </div>
       )}
+
+      {isCategoryDirectoryOpen ? (
+        <div
+          className="shop-categories__modal-backdrop shop-categories__directory-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsCategoryDirectoryOpen(false);
+          }}
+        >
+          <section
+            className="shop-categories__directory-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="category-directory-title"
+          >
+            <div className="shop-categories__directory-header">
+              <div>
+                <p className="shop-categories__eyebrow">EXPLORE THE STORE</p>
+                <h3 id="category-directory-title">All categories</h3>
+                <p>Choose a department to see its products right here.</p>
+              </div>
+              <button
+                type="button"
+                className="shop-categories__modal-close"
+                onClick={() => setIsCategoryDirectoryOpen(false)}
+                aria-label="Close categories"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="shop-categories__directory-search">
+              <Search size={17} aria-hidden="true" />
+              <input
+                type="search"
+                value={categoryQuery}
+                onChange={(event) => setCategoryQuery(event.target.value)}
+                placeholder="Search all categories..."
+                aria-label="Search all categories"
+                autoFocus
+              />
+              {categoryQuery ? (
+                <button type="button" onClick={() => setCategoryQuery("")} aria-label="Clear search">
+                  <X size={15} />
+                </button>
+              ) : null}
+            </div>
+            <div className="shop-categories__directory-list">
+              <button
+                type="button"
+                className="shop-categories__directory-item"
+                onClick={() => {
+                  setActiveCategory("all");
+                  setIsCategoryDirectoryOpen(false);
+                }}
+              >
+                <span className="shop-categories__directory-item-copy">
+                  <strong>All products</strong>
+                  <small>Browse products across every department</small>
+                </span>
+                <ChevronRight size={18} />
+              </button>
+              {visibleCategories.map((category) => {
+                const count = products.filter((product) => product.categorySlug === category.slug).length;
+                return (
+                  <button
+                    key={category.slug}
+                    type="button"
+                    className="shop-categories__directory-item"
+                    onClick={() => {
+                      setActiveCategory(category.slug);
+                      setIsCategoryDirectoryOpen(false);
+                    }}
+                  >
+                    <span className="shop-categories__directory-item-copy">
+                      <strong>{category.name}</strong>
+                      <small>{categoryDescriptions[category.slug] ?? "Explore this department"}</small>
+                    </span>
+                    <span className="shop-categories__directory-count">{count} {count === 1 ? "item" : "items"}</span>
+                    <ChevronRight size={18} />
+                  </button>
+                );
+              })}
+              {visibleCategories.length === 0 ? (
+                <p className="shop-categories__directory-empty">No categories match your search.</p>
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {quickViewProduct ? (
         <div
