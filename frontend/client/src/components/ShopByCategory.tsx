@@ -22,9 +22,8 @@ const categoryDescriptions: Record<string, string> = {
   "home-decor": "Finishing touches for your space",
 };
 
-const featuredProducts = categories
-  .map((category) => products.find((product) => product.categorySlug === category.slug))
-  .filter((product): product is Product => Boolean(product));
+const INITIAL_PRODUCT_LIMIT = 8;
+const PRODUCT_BATCH_SIZE = 8;
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("en-NG", {
@@ -35,6 +34,7 @@ const formatPrice = (price: number) =>
 
 export default function ShopByCategory() {
   const [activeCategory, setActiveCategory] = useState("all");
+  const [visibleProductLimit, setVisibleProductLimit] = useState(INITIAL_PRODUCT_LIMIT);
   const [categoryQuery, setCategoryQuery] = useState("");
   const [isCategoryDirectoryOpen, setIsCategoryDirectoryOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
@@ -53,13 +53,20 @@ export default function ShopByCategory() {
 
   const homepageCategories = categories.slice(0, 5);
 
-  const visibleProducts = useMemo(
+  const filteredProducts = useMemo(
     () =>
       activeCategory === "all"
-        ? featuredProducts
+        ? products
         : products.filter((product) => product.categorySlug === activeCategory),
     [activeCategory],
   );
+
+  const visibleProducts = filteredProducts.slice(0, visibleProductLimit);
+
+  const selectCategory = (slug: string) => {
+    setActiveCategory(slug);
+    setVisibleProductLimit(INITIAL_PRODUCT_LIMIT);
+  };
 
   const activeCategoryName =
     activeCategory === "all"
@@ -110,7 +117,7 @@ export default function ShopByCategory() {
             type="button"
             className={`shop-categories__category-chip ${activeCategory === "all" ? "is-active" : ""}`}
             aria-pressed={activeCategory === "all"}
-            onClick={() => setActiveCategory("all")}
+            onClick={() => selectCategory("all")}
           >
             All products
           </button>
@@ -120,7 +127,7 @@ export default function ShopByCategory() {
               type="button"
               className={`shop-categories__category-chip ${activeCategory === category.slug ? "is-active" : ""}`}
               aria-pressed={activeCategory === category.slug}
-              onClick={() => setActiveCategory(category.slug)}
+              onClick={() => selectCategory(category.slug)}
             >
               {category.name}
             </button>
@@ -146,7 +153,7 @@ export default function ShopByCategory() {
           <h3>{activeCategoryName}</h3>
           <p>{activeCategory === "all" ? "A selection from across our departments" : categoryDescriptions[activeCategory]}</p>
         </div>
-        <span>{visibleProducts.length} {visibleProducts.length === 1 ? "item" : "items"}</span>
+        <span>Showing {visibleProducts.length} of {filteredProducts.length} {filteredProducts.length === 1 ? "item" : "items"}</span>
       </div>
 
       {visibleProducts.length ? (
@@ -194,6 +201,19 @@ export default function ShopByCategory() {
           <Link href="/products">Browse the full catalogue <ChevronRight size={15} /></Link>
         </div>
       )}
+
+      {visibleProducts.length < filteredProducts.length ? (
+        <div className="shop-categories__load-more-wrap">
+          <p>Showing {visibleProducts.length} of {filteredProducts.length} products</p>
+          <button
+            type="button"
+            className="shop-categories__load-more"
+            onClick={() => setVisibleProductLimit((limit) => limit + PRODUCT_BATCH_SIZE)}
+          >
+            Load more products <ChevronDown size={16} aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
 
       {isCategoryDirectoryOpen ? (
         <div
@@ -245,7 +265,7 @@ export default function ShopByCategory() {
                 type="button"
                 className="shop-categories__directory-item"
                 onClick={() => {
-                  setActiveCategory("all");
+                  selectCategory("all");
                   setIsCategoryDirectoryOpen(false);
                 }}
               >
@@ -263,7 +283,7 @@ export default function ShopByCategory() {
                     type="button"
                     className="shop-categories__directory-item"
                     onClick={() => {
-                      setActiveCategory(category.slug);
+                      selectCategory(category.slug);
                       setIsCategoryDirectoryOpen(false);
                     }}
                   >
