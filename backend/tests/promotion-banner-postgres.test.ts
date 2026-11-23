@@ -44,6 +44,14 @@ async function insertBanner(options: {
   endAt: Date;
   priority?: number;
   createdAt?: Date;
+  eyebrow?: string;
+  headline?: string;
+  description?: string;
+  badgeText?: string;
+  primaryCtaLabel?: string;
+  primaryCtaUrl?: string;
+  secondaryCtaLabel?: string;
+  secondaryCtaUrl?: string;
 }): Promise<string> {
   const id = randomUUID();
   createdBannerIds.push(id);
@@ -52,8 +60,11 @@ async function insertBanner(options: {
   await pool.query(
     `INSERT INTO promotion_banners
       (id, title, "imageUrl", "publicId", position, "startAt", "endAt",
-       status, priority, "createdByStaffAccountId", "createdAt", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+       status, priority, "createdByStaffAccountId", "createdAt", "updatedAt",
+       eyebrow, headline, description, "badgeText", "primaryCtaLabel", "primaryCtaUrl",
+       "secondaryCtaLabel", "secondaryCtaUrl")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(),
+       $12, $13, $14, $15, $16, $17, $18, $19)`,
     [
       id,
       options.title,
@@ -66,24 +77,46 @@ async function insertBanner(options: {
       options.priority ?? 0,
       staffId,
       toUtcTimestamp(options.createdAt ?? new Date()),
+      options.eyebrow ?? null,
+      options.headline ?? null,
+      options.description ?? null,
+      options.badgeText ?? null,
+      options.primaryCtaLabel ?? null,
+      options.primaryCtaUrl ?? null,
+      options.secondaryCtaLabel ?? null,
+      options.secondaryCtaUrl ?? null,
     ],
   );
   return id;
 }
 
-async function insertDefault(position: "HERO" | "TOP" | "BOTTOM") {
+async function insertDefault(
+  position: "HERO" | "TOP" | "BOTTOM",
+  content: { eyebrow?: string; headline?: string; description?: string; badgeText?: string;
+    primaryCtaLabel?: string; primaryCtaUrl?: string; secondaryCtaLabel?: string; secondaryCtaUrl?: string } = {},
+) {
   const id = randomUUID();
   createdDefaultIds.push(id);
   await pool.query(
     `INSERT INTO promotion_banner_defaults
-      (id, position, "imageUrl", "publicId", "updatedByStaffAccountId", "createdAt", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+      (id, position, "imageUrl", "publicId", "updatedByStaffAccountId", "createdAt", "updatedAt",
+       eyebrow, headline, description, "badgeText", "primaryCtaLabel", "primaryCtaUrl",
+       "secondaryCtaLabel", "secondaryCtaUrl")
+     VALUES ($1, $2, $3, $4, $5, NOW(), NOW(), $6, $7, $8, $9, $10, $11, $12, $13)`,
     [
       id,
       position,
       `https://images.example.test/default-${position.toLowerCase()}.jpg`,
       `promotion-test/default-${id}`,
       staffId,
+      content.eyebrow ?? null,
+      content.headline ?? null,
+      content.description ?? null,
+      content.badgeText ?? null,
+      content.primaryCtaLabel ?? null,
+      content.primaryCtaUrl ?? null,
+      content.secondaryCtaLabel ?? null,
+      content.secondaryCtaUrl ?? null,
     ],
   );
   return id;
@@ -138,6 +171,12 @@ describe("PostgreSQL promotion banner storefront resolution", () => {
       startAt: activeStart,
       endAt: activeEnd,
       priority: 10,
+      eyebrow: "KITCHEN & HOME",
+      headline: "Smart Appliances for Modern Living",
+      description: "Discover useful kitchen essentials.",
+      badgeText: "NEW IN",
+      primaryCtaLabel: "Shop appliances",
+      primaryCtaUrl: "/collections/appliances",
     });
     await insertBanner({
       position: "HERO",
@@ -175,11 +214,23 @@ describe("PostgreSQL promotion banner storefront resolution", () => {
       type: "scheduled",
       id: winningId,
       title: "Priority winner",
+      eyebrow: "KITCHEN & HOME",
+      headline: "Smart Appliances for Modern Living",
+      description: "Discover useful kitchen essentials.",
+      badge: { text: "NEW IN" },
+      primaryCta: { label: "Shop appliances", url: "/collections/appliances" },
+      secondaryCta: null,
     });
   });
 
   it("uses the configured default when no scheduled banner is active", async () => {
-    await insertDefault("TOP");
+    await insertDefault("TOP", {
+      eyebrow: "EVERYDAY ESSENTIALS",
+      headline: "Useful finds for every home",
+      badgeText: "JUST ARRIVED",
+      secondaryCtaLabel: "Browse collection",
+      secondaryCtaUrl: "/collections/home",
+    });
     await insertBanner({
       position: "TOP",
       title: "Not started yet",
@@ -191,6 +242,11 @@ describe("PostgreSQL promotion banner storefront resolution", () => {
     expect(result.top).toMatchObject({
       type: "default",
       imageUrl: "https://images.example.test/default-top.jpg",
+      eyebrow: "EVERYDAY ESSENTIALS",
+      headline: "Useful finds for every home",
+      badge: { text: "JUST ARRIVED" },
+      primaryCta: null,
+      secondaryCta: { label: "Browse collection", url: "/collections/home" },
     });
   });
 
