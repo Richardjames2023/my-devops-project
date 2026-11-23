@@ -497,6 +497,41 @@ export async function deleteDefaultBanner(
   return { position, deleted: true, cloudinaryCleanupQueued: true };
 }
 
+type PublicBannerFields = Pick<
+  PromotionBanner,
+  | "imageUrl"
+  | "mobileImageUrl"
+  | "altText"
+  | "targetUrl"
+  | "eyebrow"
+  | "headline"
+  | "description"
+  | "badgeText"
+  | "primaryCtaLabel"
+  | "primaryCtaUrl"
+  | "secondaryCtaLabel"
+  | "secondaryCtaUrl"
+>;
+
+function publicBannerContent(banner: PublicBannerFields) {
+  return {
+    imageUrl: banner.imageUrl,
+    mobileImageUrl: banner.mobileImageUrl,
+    altText: banner.altText,
+    targetUrl: banner.targetUrl,
+    eyebrow: banner.eyebrow,
+    headline: banner.headline,
+    description: banner.description,
+    badge: banner.badgeText ? { text: banner.badgeText } : null,
+    primaryCta: banner.primaryCtaLabel && banner.primaryCtaUrl
+      ? { label: banner.primaryCtaLabel, url: banner.primaryCtaUrl }
+      : null,
+    secondaryCta: banner.secondaryCtaLabel && banner.secondaryCtaUrl
+      ? { label: banner.secondaryCtaLabel, url: banner.secondaryCtaUrl }
+      : null,
+  };
+}
+
 export async function getPublicBanners() {
   // Promotion schedule columns are PostgreSQL TIMESTAMP WITHOUT TIME ZONE.
   // Store and compare their values as UTC wall-clock timestamps to avoid the
@@ -513,8 +548,23 @@ export async function getPublicBanners() {
     prisma.promotionBannerDefault.findMany(),
   ]);
 
+  const heroCampaigns = scheduled.filter((item) => item.position === "HERO");
+  const heroFallback = defaults.find((item) => item.position === "HERO");
+
   const output: Record<string, unknown> = {
     hero: null,
+    heroSlides: heroCampaigns.length > 0
+      ? heroCampaigns.map((banner) => ({
+          type: "scheduled",
+          id: banner.id,
+          title: banner.title,
+          ...publicBannerContent(banner),
+          startsAt: banner.startAt,
+          endsAt: banner.endAt,
+        }))
+      : heroFallback
+        ? [{ type: "default", ...publicBannerContent(heroFallback) }]
+        : [],
     top: null,
     bottom: null,
   };
@@ -522,14 +572,8 @@ export async function getPublicBanners() {
   const positions = ["HERO", "TOP", "BOTTOM"] as const;
 
   for (const position of positions) {
-    const banner = scheduled.find(
-      (item) => item.position === position,
-    );
-
-    const fallback = defaults.find(
-      (item) => item.position === position,
-    );
-
+    const banner = scheduled.find((item) => item.position === position);
+    const fallback = defaults.find((item) => item.position === position);
     const key = position.toLowerCase();
 
     if (banner) {
@@ -537,40 +581,14 @@ export async function getPublicBanners() {
         type: "scheduled",
         id: banner.id,
         title: banner.title,
-        imageUrl: banner.imageUrl,
-        mobileImageUrl: banner.mobileImageUrl,
-        altText: banner.altText,
-        targetUrl: banner.targetUrl,
-        eyebrow: banner.eyebrow,
-        headline: banner.headline,
-        description: banner.description,
-        badge: banner.badgeText ? { text: banner.badgeText } : null,
-        primaryCta: banner.primaryCtaLabel && banner.primaryCtaUrl
-          ? { label: banner.primaryCtaLabel, url: banner.primaryCtaUrl }
-          : null,
-        secondaryCta: banner.secondaryCtaLabel && banner.secondaryCtaUrl
-          ? { label: banner.secondaryCtaLabel, url: banner.secondaryCtaUrl }
-          : null,
+        ...publicBannerContent(banner),
         startsAt: banner.startAt,
         endsAt: banner.endAt,
       };
     } else if (fallback) {
       output[key] = {
         type: "default",
-        imageUrl: fallback.imageUrl,
-        mobileImageUrl: fallback.mobileImageUrl,
-        altText: fallback.altText,
-        targetUrl: fallback.targetUrl,
-        eyebrow: fallback.eyebrow,
-        headline: fallback.headline,
-        description: fallback.description,
-        badge: fallback.badgeText ? { text: fallback.badgeText } : null,
-        primaryCta: fallback.primaryCtaLabel && fallback.primaryCtaUrl
-          ? { label: fallback.primaryCtaLabel, url: fallback.primaryCtaUrl }
-          : null,
-        secondaryCta: fallback.secondaryCtaLabel && fallback.secondaryCtaUrl
-          ? { label: fallback.secondaryCtaLabel, url: fallback.secondaryCtaUrl }
-          : null,
+        ...publicBannerContent(fallback),
       };
     }
   }
