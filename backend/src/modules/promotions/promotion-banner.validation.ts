@@ -40,10 +40,10 @@ const ctaFields = {
 
 function hasPairedCta(
   value: {
-    primaryCtaLabel?: string | null;
-    primaryCtaUrl?: string | null;
-    secondaryCtaLabel?: string | null;
-    secondaryCtaUrl?: string | null;
+    primaryCtaLabel?: string | null | undefined;
+    primaryCtaUrl?: string | null | undefined;
+    secondaryCtaLabel?: string | null | undefined;
+    secondaryCtaUrl?: string | null | undefined;
   },
   partial: boolean,
 ) {
