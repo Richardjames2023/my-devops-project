@@ -86,7 +86,7 @@ export const products: ProductsType = [
     colors: [],
     tags: ["lamp", "LED", "lighting", "desk", "rechargeable"],
     stockStatus: "in-stock",
-    images: { default: "https://images.unsplash.com/photo-150 lamp".replace(" ", "") },
+    images: { default: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=900&auto=format&fit=crop&q=85" },
   },
   {
     id: "demo-electrical-002",
