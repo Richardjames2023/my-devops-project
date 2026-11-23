@@ -60,7 +60,7 @@ const slides: HeroSlide[] = [
     title: "Make More of Every Day",
     description:
       "Find practical essentials that make preparing meals and managing your home simpler.",
-    badge: { value: "EVERYDAY", label: "FAVOURITES" },
+    badge: { value: "TOP", label: "PICKS" },
     image: "https://www.premiumhomesource.com/cdn/shop/files/2001-04_henck-zwil_enfingy_appliances-001_2.jpg?v=1738588042&width=1000",
     imageAlt: "Coordinated black blender, toaster and electric kettle displayed together",
     secondaryCta: {
