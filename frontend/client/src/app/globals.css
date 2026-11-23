@@ -399,13 +399,3 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .hero-slider__content { animation: none; }
 }
 
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-slider__visual,
-  .hero-slider__button,
-  .hero-slider__arrow,
-  .hero-slider__dot { transition: none; }
-  .hero-slider__content { animation: none; }
-}
