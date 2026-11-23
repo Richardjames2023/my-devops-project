@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, Pause, Play } from "lucide-react";
 
 type HeroCallToAction = {
   label: string;
@@ -11,70 +11,59 @@ type HeroCallToAction = {
 };
 
 type HeroSlide = {
-  eyebrow?: string;
-  title?: string;
-  description?: string;
-  badge?: {
-    value: string;
-    label: string;
-  };
+  eyebrow: string;
+  title: string;
+  description: string;
   image: string;
   imageAlt: string;
-  primaryCta?: HeroCallToAction;
-  secondaryCta?: HeroCallToAction;
+  primaryCta: HeroCallToAction;
 };
 
 const slides: HeroSlide[] = [
   {
-    eyebrow: "KITCHEN & HOME APPLIANCES",
-    title: "Make Every Day in the Kitchen Easier",
+    eyebrow: "EVERYDAY STYLE",
+    title: "Find the Pieces That Feel Like You.",
     description:
-      "Spend less time on the prep and more time enjoying the moment. Find the appliances that make busy mornings, quick meals and family dinners feel effortless.",
-    badge: { value: "50%", label: "OFF" },
-    image: "https://cdn.shopify.com/s/files/1/0478/5989/2377/files/small-kitchen-appliances-everyday-cooking-guide.jpg?v=1777131849",
-    imageAlt: "Air fryer, blender, toaster and coffee maker arranged on a modern kitchen counter",
+      "Refresh your everyday wardrobe with easy-to-wear T-shirts, versatile layers and styles you can make your own.",
+    image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=1800&q=85",
+    imageAlt: "Minimal everyday T-shirt styled for a clean casual wardrobe",
     primaryCta: {
-      label: "Shop Appliances",
-      href: "/products",
+      label: "Shop T-shirts",
+      href: "/products?category=t-shirts",
     },
   },
   {
-    eyebrow: "ELECTRICAL & EVERYDAY TECH",
-    title: "A Smarter Setup for Everything You Do",
+    eyebrow: "FOOTWEAR",
+    title: "Make Every Step Count.",
     description:
-      "From getting work done to switching off at the end of the day, discover useful tech that keeps you connected, productive and entertained.",
-    badge: { value: "NEW", label: "IN" },
-    image: "https://images.unsplash.com/photo-1590643924142-b1b492f1dddc?auto=format&fit=crop&w=1800&q=85",
-    imageAlt: "Laptop, camera, smartwatch and electronics accessories arranged on a tabletop",
+      "Find everyday sneakers that bring comfort and confidence to the places your day takes you.",
+    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1800&q=85",
+    imageAlt: "Red athletic sneaker photographed against a clean background",
     primaryCta: {
-      label: "Shop Electronics",
-      href: "/products",
-    },
-    secondaryCta: {
-      label: "Explore Categories",
-      href: "/products",
+      label: "Explore Shoes",
+      href: "/products?category=shoes",
     },
   },
   {
-    eyebrow: "KITCHEN & DINING",
-    title: "Bring More Joy to the Everyday",
+    eyebrow: "BAGS & ACCESSORIES",
+    title: "Take Your Essentials Wherever Life Goes.",
     description:
-      "Set the table, make something delicious and make yourself at home with practical kitchen favourites chosen for everyday living.",
-    badge: { value: "TOP", label: "PICKS" },
-    image: "https://www.premiumhomesource.com/cdn/shop/files/2001-04_henck-zwil_enfingy_appliances-001_2.jpg?v=1738588042&width=1000",
-    imageAlt: "Coordinated black blender, toaster and electric kettle displayed together",
-    secondaryCta: {
-      label: "Explore Products",
-      href: "/products",
+      "Bring your everyday look together with practical finishing touches and carry-all essentials.",
+    image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1800&q=85",
+    imageAlt: "Everyday backpack photographed as a lifestyle accessory",
+    primaryCta: {
+      label: "Shop Bags",
+      href: "/products?category=bags",
     },
   },
 ];
 
-const AUTOPLAY_INTERVAL = 6000;
+const AUTOPLAY_INTERVAL = 7000;
 
 export default function HeroSlider() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isAutoplayEnabled, setIsAutoplayEnabled] = useState(true);
 
   const goTo = useCallback((index: number) => {
     setActiveIndex((index + slides.length) % slides.length);
@@ -89,13 +78,17 @@ export default function HeroSlider() {
   }, []);
 
   useEffect(() => {
-    if (isPaused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (
+      !isAutoplayEnabled ||
+      isPaused ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       return;
     }
 
     const interval = window.setInterval(goNext, AUTOPLAY_INTERVAL);
     return () => window.clearInterval(interval);
-  }, [goNext, isPaused]);
+  }, [goNext, isAutoplayEnabled, isPaused]);
 
   const activeSlide = slides[activeIndex];
 
@@ -116,17 +109,17 @@ export default function HeroSlider() {
       <div className="hero-slider__stage">
         {slides.map((slide, index) => (
           <div
-            key={slide.eyebrow ?? slide.title ?? `slide-${index}`}
+            key={slide.eyebrow}
             className={`hero-slider__visual ${index === activeIndex ? "is-active" : ""}`}
             aria-hidden={index !== activeIndex}
           >
             <Image
               src={slide.image}
-              alt={slide.imageAlt}
+              alt={index === activeIndex ? slide.imageAlt : ""}
               fill
               unoptimized
               priority={index === 0}
-              sizes="(max-width: 768px) 100vw, 1280px"
+              sizes="(max-width: 768px) 100vw, 1400px"
               className="hero-slider__image"
             />
           </div>
@@ -136,53 +129,25 @@ export default function HeroSlider() {
 
         <div
           className="hero-slider__content"
-          key={activeSlide.eyebrow ?? activeSlide.title ?? activeIndex}
+          key={activeSlide.eyebrow}
+          aria-live="polite"
         >
-          {activeSlide.eyebrow && (
-            <span className="hero-slider__eyebrow">
-              <span className="hero-slider__eyebrow-mark" />
-              {activeSlide.eyebrow}
-            </span>
-          )}
-
-          {activeSlide.title && (
-            <h1 className="hero-slider__title">{activeSlide.title}</h1>
-          )}
-
-          {activeSlide.description && (
-            <p className="hero-slider__description">{activeSlide.description}</p>
-          )}
-
-          {(activeSlide.primaryCta || activeSlide.secondaryCta) && (
-            <div className="hero-slider__actions">
-              {activeSlide.primaryCta && (
-                <Link
-                  href={activeSlide.primaryCta.href}
-                  className="hero-slider__button hero-slider__button--primary"
-                >
-                  {activeSlide.primaryCta.label}
-                  <ArrowUpRight aria-hidden="true" size={19} strokeWidth={2.5} />
-                </Link>
-              )}
-
-              {activeSlide.secondaryCta && (
-                <Link
-                  href={activeSlide.secondaryCta.href}
-                  className="hero-slider__button hero-slider__button--secondary"
-                >
-                  {activeSlide.secondaryCta.label}
-                </Link>
-              )}
-            </div>
-          )}
-        </div>
-
-        {activeSlide.badge && (
-          <div className="hero-slider__badge" aria-label={`${activeSlide.badge.value} ${activeSlide.badge.label}`}>
-            <span className="hero-slider__badge-value">{activeSlide.badge.value}</span>
-            <span className="hero-slider__badge-label">{activeSlide.badge.label}</span>
+          <span className="hero-slider__eyebrow">
+            <span className="hero-slider__eyebrow-mark" />
+            {activeSlide.eyebrow}
+          </span>
+          <h1 className="hero-slider__title">{activeSlide.title}</h1>
+          <p className="hero-slider__description">{activeSlide.description}</p>
+          <div className="hero-slider__actions">
+            <Link
+              href={activeSlide.primaryCta.href}
+              className="hero-slider__button hero-slider__button--primary"
+            >
+              {activeSlide.primaryCta.label}
+              <ArrowUpRight aria-hidden="true" size={19} strokeWidth={2.5} />
+            </Link>
           </div>
-        )}
+        </div>
 
         <button
           type="button"
@@ -201,17 +166,28 @@ export default function HeroSlider() {
           <ArrowRight size={21} strokeWidth={2.4} />
         </button>
 
-        <div className="hero-slider__pagination" aria-label="Choose featured collection">
-          {slides.map((slide, index) => (
-            <button
-              key={slide.eyebrow ?? slide.title ?? `slide-${index}`}
-              type="button"
-              onClick={() => goTo(index)}
-              className={`hero-slider__dot ${index === activeIndex ? "is-active" : ""}`}
-              aria-label={`Show slide ${index + 1}: ${(slide.eyebrow ?? slide.title ?? "featured collection").toLowerCase()}`}
-              aria-current={index === activeIndex ? "true" : undefined}
-            />
-          ))}
+        <div className="hero-slider__controls">
+          <div className="hero-slider__pagination" aria-label="Choose featured collection">
+            {slides.map((slide, index) => (
+              <button
+                key={slide.eyebrow}
+                type="button"
+                onClick={() => goTo(index)}
+                className={`hero-slider__dot ${index === activeIndex ? "is-active" : ""}`}
+                aria-label={`Show slide ${index + 1}: ${slide.eyebrow.toLowerCase()}`}
+                aria-current={index === activeIndex ? "true" : undefined}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="hero-slider__autoplay"
+            onClick={() => setIsAutoplayEnabled((enabled) => !enabled)}
+            aria-label={isAutoplayEnabled ? "Pause automatic slide changes" : "Resume automatic slide changes"}
+          >
+            {isAutoplayEnabled ? <Pause size={13} /> : <Play size={13} />}
+            <span>{isAutoplayEnabled ? "Pause" : "Play"}</span>
+          </button>
         </div>
       </div>
     </section>
