@@ -5,33 +5,65 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, ArrowUpRight } from "lucide-react";
 
-const slides = [
+type HeroCallToAction = {
+  label: string;
+  href: string;
+};
+
+type HeroSlide = {
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  badge?: string;
+  image: string;
+  imageAlt: string;
+  primaryCta?: HeroCallToAction;
+  secondaryCta?: HeroCallToAction;
+};
+
+const slides: HeroSlide[] = [
   {
     eyebrow: "KITCHEN & HOME APPLIANCES",
     title: "Smart Appliances for Modern Living",
     description:
       "Discover practical kitchen essentials and home appliances designed to make everyday living easier.",
+    badge: "50% OFF",
     image: "https://cdn.shopify.com/s/files/1/0478/5989/2377/files/small-kitchen-appliances-everyday-cooking-guide.jpg?v=1777131849",
     imageAlt: "Air fryer, blender, toaster and coffee maker arranged on a modern kitchen counter",
-    primaryLabel: "Shop Appliances",
+    primaryCta: {
+      label: "Shop Appliances",
+      href: "/products",
+    },
   },
   {
-    eyebrow: "ELECTRONICS & GADGETS",
+    eyebrow: "ELECTRICAL & EVERYDAY TECH",
     title: "Bring Your Everyday Tech Together",
     description:
-      "Explore laptops, headphones, speakers, smartwatches and useful everyday electronics.",
+      "Explore useful electronics and everyday essentials selected to make life a little easier.",
+    badge: "New In",
     image: "https://images.unsplash.com/photo-1590643924142-b1b492f1dddc?auto=format&fit=crop&w=1800&q=85",
     imageAlt: "Laptop, camera, smartwatch and electronics accessories arranged on a tabletop",
-    primaryLabel: "Shop Electronics",
+    primaryCta: {
+      label: "Shop Electronics",
+      href: "/products",
+    },
+    secondaryCta: {
+      label: "Explore Categories",
+      href: "/products",
+    },
   },
   {
-    eyebrow: "SMALL APPLIANCES",
+    eyebrow: "KITCHEN & DINING",
     title: "Make More of Every Day",
     description:
-      "Find the everyday appliances that make preparing meals and managing your home simpler.",
+      "Find practical essentials that make preparing meals and managing your home simpler.",
+    badge: "Everyday Favourites",
     image: "https://www.premiumhomesource.com/cdn/shop/files/2001-04_henck-zwil_enfingy_appliances-001_2.jpg?v=1738588042&width=1000",
     imageAlt: "Coordinated black blender, toaster and electric kettle displayed together",
-    primaryLabel: "Shop Home Essentials",
+    secondaryCta: {
+      label: "Explore Products",
+      href: "/products",
+    },
   },
 ];
 
@@ -81,7 +113,7 @@ export default function HeroSlider() {
       <div className="hero-slider__stage">
         {slides.map((slide, index) => (
           <div
-            key={slide.eyebrow}
+            key={slide.eyebrow ?? slide.title ?? `slide-${index}`}
             className={`hero-slider__visual ${index === activeIndex ? "is-active" : ""}`}
             aria-hidden={index !== activeIndex}
           >
@@ -99,39 +131,78 @@ export default function HeroSlider() {
 
         <div className="hero-slider__wash" />
 
-        <div className="hero-slider__content" key={activeSlide.eyebrow}>
-          <span className="hero-slider__eyebrow">
-            <span className="hero-slider__eyebrow-mark" />
-            {activeSlide.eyebrow}
-          </span>
-          <h1 className="hero-slider__title">{activeSlide.title}</h1>
-          <p className="hero-slider__description">{activeSlide.description}</p>
-          <div className="hero-slider__actions">
-            <Link href="/products" className="hero-slider__button hero-slider__button--primary">
-              {activeSlide.primaryLabel}
-              <ArrowUpRight aria-hidden="true" size={19} strokeWidth={2.5} />
-            </Link>
-            <Link href="/products" className="hero-slider__button hero-slider__button--secondary">
-              Explore Products
-            </Link>
-          </div>
+        <div
+          className="hero-slider__content"
+          key={activeSlide.eyebrow ?? activeSlide.title ?? activeIndex}
+        >
+          {activeSlide.eyebrow && (
+            <span className="hero-slider__eyebrow">
+              <span className="hero-slider__eyebrow-mark" />
+              {activeSlide.eyebrow}
+            </span>
+          )}
+
+          {activeSlide.badge && (
+            <span className="hero-slider__badge">{activeSlide.badge}</span>
+          )}
+
+          {activeSlide.title && (
+            <h1 className="hero-slider__title">{activeSlide.title}</h1>
+          )}
+
+          {activeSlide.description && (
+            <p className="hero-slider__description">{activeSlide.description}</p>
+          )}
+
+          {(activeSlide.primaryCta || activeSlide.secondaryCta) && (
+            <div className="hero-slider__actions">
+              {activeSlide.primaryCta && (
+                <Link
+                  href={activeSlide.primaryCta.href}
+                  className="hero-slider__button hero-slider__button--primary"
+                >
+                  {activeSlide.primaryCta.label}
+                  <ArrowUpRight aria-hidden="true" size={19} strokeWidth={2.5} />
+                </Link>
+              )}
+
+              {activeSlide.secondaryCta && (
+                <Link
+                  href={activeSlide.secondaryCta.href}
+                  className="hero-slider__button hero-slider__button--secondary"
+                >
+                  {activeSlide.secondaryCta.label}
+                </Link>
+              )}
+            </div>
+          )}
         </div>
 
-        <button type="button" className="hero-slider__arrow hero-slider__arrow--previous" onClick={goPrevious} aria-label="Previous featured collection">
+        <button
+          type="button"
+          className="hero-slider__arrow hero-slider__arrow--previous"
+          onClick={goPrevious}
+          aria-label="Previous featured collection"
+        >
           <ArrowLeft size={21} strokeWidth={2.4} />
         </button>
-        <button type="button" className="hero-slider__arrow hero-slider__arrow--next" onClick={goNext} aria-label="Next featured collection">
+        <button
+          type="button"
+          className="hero-slider__arrow hero-slider__arrow--next"
+          onClick={goNext}
+          aria-label="Next featured collection"
+        >
           <ArrowRight size={21} strokeWidth={2.4} />
         </button>
 
         <div className="hero-slider__pagination" aria-label="Choose featured collection">
           {slides.map((slide, index) => (
             <button
-              key={slide.eyebrow}
+              key={slide.eyebrow ?? slide.title ?? `slide-${index}`}
               type="button"
               onClick={() => goTo(index)}
               className={`hero-slider__dot ${index === activeIndex ? "is-active" : ""}`}
-              aria-label={`Show slide ${index + 1}: ${slide.eyebrow.toLowerCase()}`}
+              aria-label={`Show slide ${index + 1}: ${(slide.eyebrow ?? slide.title ?? "featured collection").toLowerCase()}`}
               aria-current={index === activeIndex ? "true" : undefined}
             />
           ))}
