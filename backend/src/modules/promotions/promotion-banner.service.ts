@@ -12,6 +12,7 @@ import {
 import { createAuditLog } from "../../common/utils/audit-log";
 import { logger } from "../../config/logger";
 import type {
+  BannerContentInput,
   CreateBannerInput,
   UpdateBannerInput,
 } from "./promotion-banner.validation";
