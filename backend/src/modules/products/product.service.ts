@@ -81,6 +81,38 @@ const adminProductInclude = {
   },
 } satisfies Prisma.ProductInclude;
 
+async function presentCatalogProducts(
+  products: Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>[],
+) {
+  if (products.length === 0) return [];
+
+  const summaries = await prisma.productReview.groupBy({
+    by: ["productId"],
+    where: {
+      productId: { in: products.map((product) => product.id) },
+      status: "APPROVED",
+    },
+    _avg: { rating: true },
+    _count: { _all: true },
+  });
+  const summariesByProductId = new Map(
+    summaries.map((summary) => [summary.productId, summary]),
+  );
+
+  return products.map((product) => {
+    const summary = summariesByProductId.get(product.id);
+    return {
+      ...presentProduct(product),
+      reviewSummary: {
+        averageRating: summary?._avg.rating
+          ? Number(summary._avg.rating.toFixed(2))
+          : null,
+        totalReviews: summary?._count._all ?? 0,
+      },
+    };
+  });
+}
+
 function presentProduct(
   product: Prisma.ProductGetPayload<{ select: typeof publicProductSelect }>,
 ) {
@@ -471,7 +503,7 @@ export async function listCatalogProducts(query: ProductCatalogQuery) {
     });
 
     return {
-      items: sortedIds.map(presentProduct),
+      items: await presentCatalogProducts(sortedIds),
       pagination: {
         page: query.page,
         limit: query.limit,
@@ -498,7 +530,7 @@ export async function listCatalogProducts(query: ProductCatalogQuery) {
   ]);
 
   return {
-    items: products.map(presentProduct),
+    items: await presentCatalogProducts(products),
     pagination: {
       page: query.page,
       limit: query.limit,

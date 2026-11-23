@@ -19,6 +19,7 @@ const Filter = () => {
       <select
         name="sort"
         id="sort"
+        value={searchParams.get("sort") ?? "newest"}
         className="ring-1 ring-gray-200 shadow-md p-1 rounded-sm"
         onChange={(e) => handleFilter(e.target.value)}
       >
