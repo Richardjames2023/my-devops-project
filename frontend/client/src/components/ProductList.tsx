@@ -41,7 +41,7 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
         </div>
       )}
       {query?.trim() && <p className="mb-4 text-sm text-[var(--shop-muted)]">Search results for <span className="font-semibold text-[var(--shop-navy)]">&ldquo;{query.trim()}&rdquo;</span> · {visibleProducts.length} {visibleProducts.length === 1 ? "product" : "products"} found</p>}
-      <Categories />
+      {params === "products" && <Categories />}
       {params === "products" && <Filter />}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {visibleProducts.length > 0 ? visibleProducts.map((product) => <ProductCard key={product.id} product={product} />) : (
