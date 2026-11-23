@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowUpRight, Check, ChevronRight, Plus, Search, ShoppingCart, X } from "lucide-react";
+import { ArrowUpRight, ChevronRight, Plus, Search, ShoppingCart, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { categories, products } from "@/lib/catalogue";
 import useCartStore from "@/stores/cartStore";
@@ -21,6 +21,10 @@ const categoryDescriptions: Record<string, string> = {
   "office-stationery": "Desk, work and study essentials",
   "home-decor": "Finishing touches for your space",
 };
+
+const featuredProducts = categories
+  .map((category) => products.find((product) => product.categorySlug === category.slug))
+  .filter((product): product is Product => Boolean(product));
 
 const formatPrice = (price: number) =>
   new Intl.NumberFormat("en-NG", {
@@ -49,7 +53,7 @@ export default function ShopByCategory() {
   const visibleProducts = useMemo(
     () =>
       activeCategory === "all"
-        ? products.slice(0, 8)
+        ? featuredProducts
         : products.filter((product) => product.categorySlug === activeCategory),
     [activeCategory],
   );
