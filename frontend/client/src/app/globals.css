@@ -509,3 +509,154 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .trust-benefits * { scroll-behavior: auto; }
 }
+
+/* Trust benefits actions */
+.trust-benefits__link {
+  display: flex;
+  width: 100%;
+  min-height: 76px;
+  align-items: center;
+  gap: 13px;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.trust-benefits__link:focus-visible {
+  outline: 3px solid var(--shop-blue);
+  outline-offset: 4px;
+}
+
+.trust-benefits__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  color: var(--shop-blue);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.trust-benefits__link:hover .trust-benefits__action {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.trust-benefits__item {
+  padding: 8px 18px;
+}
+
+@media (max-width: 480px) {
+  .trust-benefits__link {
+    align-items: flex-start;
+    gap: 9px;
+  }
+
+  .trust-benefits__action {
+    font-size: 11px;
+  }
+}
+
+/* Informational pages linked from the homepage trust strip */
+.store-info-page {
+  width: min(100% - 48px, 900px);
+  margin: 38px auto 72px;
+  border: 1px solid var(--shop-border);
+  border-radius: 18px;
+  padding: clamp(24px, 5vw, 52px);
+  background: var(--shop-surface);
+  box-shadow: var(--shop-shadow);
+}
+
+.store-info-page__back {
+  display: inline-flex;
+  margin-bottom: 30px;
+  color: var(--shop-blue);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.store-info-page__eyebrow {
+  margin: 0 0 12px;
+  color: var(--shop-orange-dark);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.store-info-page h1 {
+  margin: 0;
+  font-size: clamp(30px, 5vw, 46px);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+}
+
+.store-info-page__intro {
+  max-width: 720px;
+  margin: 18px 0 34px;
+  color: var(--shop-body);
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.store-info-page__section {
+  margin-top: 28px;
+  border-top: 1px solid var(--shop-border);
+  padding-top: 24px;
+}
+
+.store-info-page__section h2 {
+  margin: 0 0 12px;
+  font-size: 19px;
+  font-weight: 750;
+}
+
+.store-info-page__section p,
+.store-info-page__section li {
+  color: var(--shop-muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.store-info-page__section ul {
+  margin: 0;
+  padding-left: 21px;
+}
+
+.store-info-page__zones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 24px;
+  margin-bottom: 12px !important;
+}
+
+.store-info-page__primary-link {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 10px;
+  margin-top: 30px;
+  border-radius: 10px;
+  padding: 0 20px;
+  color: white;
+  background: var(--shop-orange);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.store-info-page__primary-link:hover {
+  background: var(--shop-orange-dark);
+}
+
+@media (max-width: 640px) {
+  .store-info-page {
+    width: calc(100% - 28px);
+    margin: 22px auto 48px;
+    border-radius: 14px;
+  }
+
+  .store-info-page__intro { font-size: 15px; }
+  .store-info-page__zones { grid-template-columns: 1fr; }
+}
