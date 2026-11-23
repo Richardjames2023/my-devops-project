@@ -132,10 +132,17 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity 850ms ease;
+  transform: scale(1.035);
+  transition:
+    opacity 1250ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 6500ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
-.hero-slider__visual.is-active { opacity: 1; }
+.hero-slider__visual.is-active {
+  opacity: 1;
+  transform: scale(1);
+}
 
 .hero-slider__image {
   object-fit: cover;
@@ -216,7 +223,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 
 .hero-slider__button {
   display: inline-flex;
-  min-height: 52px;
+  min-height: 48px;
   align-items: center;
   justify-content: center;
   gap: 12px;
@@ -225,40 +232,40 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   padding: 0 23px;
   font-size: 14px;
   font-weight: 750;
-  transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+  transition: transform 220ms ease, box-shadow 220ms ease, background-color 220ms ease;
 }
 
 .hero-slider__button:hover { transform: translateY(-2px); }
 
 .hero-slider__button--primary {
   color: var(--shop-surface);
-  background: linear-gradient(180deg, #f18449 0%, var(--shop-orange) 52%, #d95f22 100%);
-  border-color: rgba(158, 74, 27, 0.24);
+  background: linear-gradient(180deg, #f27d3e 0%, var(--shop-orange) 100%);
+  border-color: rgba(158, 74, 27, 0.12);
   box-shadow:
-    0 4px 0 #b95722,
-    0 8px 18px rgba(158, 74, 27, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+    0 5px 12px rgba(158, 74, 27, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .hero-slider__button--primary:hover {
-  background: linear-gradient(180deg, #e9783a 0%, var(--shop-orange-dark) 100%);
+  background: linear-gradient(180deg, #ed793e 0%, var(--shop-orange) 100%);
   box-shadow:
-    0 2px 0 #783712,
-    0 8px 18px rgba(158, 74, 27, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    0 7px 15px rgba(158, 74, 27, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
 }
 
 .hero-slider__button--secondary {
   border-color: rgba(8, 28, 65, 0.18);
   color: var(--shop-navy);
-  background: linear-gradient(180deg, #ffffff 0%, var(--shop-blue-light) 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f5f8fd 100%);
   box-shadow:
-    0 4px 0 rgba(8, 28, 65, 0.14),
-    0 7px 16px rgba(8, 28, 65, 0.1),
+    0 5px 12px rgba(8, 28, 65, 0.09),
     inset 0 1px 0 #ffffff;
 }
 
-.hero-slider__button--secondary:hover { background: var(--shop-surface); }
+.hero-slider__button--secondary:hover {
+  background: var(--shop-surface);
+  box-shadow: 0 7px 15px rgba(8, 28, 65, 0.12);
+}
 
 .hero-slider__arrow {
   position: absolute;
