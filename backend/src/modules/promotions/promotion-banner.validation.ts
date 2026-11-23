@@ -26,11 +26,16 @@ const optionalText = (max: number) =>
     z.string().trim().max(max).nullable().optional(),
   );
 
+const optionalUrl = z.preprocess(
+  (value) => value === "" ? null : value,
+  targetUrlSchema,
+);
+
 const ctaFields = {
   primaryCtaLabel: optionalText(60),
-  primaryCtaUrl: targetUrlSchema,
+  primaryCtaUrl: optionalUrl,
   secondaryCtaLabel: optionalText(60),
-  secondaryCtaUrl: targetUrlSchema,
+  secondaryCtaUrl: optionalUrl,
 };
 
 function hasPairedCta(
