@@ -49,6 +49,49 @@ describe("promotion banner validation", () => {
     expect(createBannerSchema.safeParse({ ...valid, targetUrl: "/collections/sale" }).success).toBe(true);
   });
 
+  it("accepts free-text campaign badges such as NEW IN", () => {
+    const result = createBannerSchema.safeParse({ ...valid, badgeText: "NEW IN" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.badgeText).toBe("NEW IN");
+  });
+
+  it("allows both CTA buttons to be omitted", () => {
+    expect(createBannerSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("allows only one CTA when its label and destination are both supplied", () => {
+    expect(createBannerSchema.safeParse({
+      ...valid,
+      primaryCtaLabel: "Start shopping",
+      primaryCtaUrl: "/products",
+    }).success).toBe(true);
+  });
+
+  it("rejects a CTA when only its label or destination is supplied", () => {
+    expect(createBannerSchema.safeParse({
+      ...valid,
+      primaryCtaLabel: "Start shopping",
+    }).success).toBe(false);
+    expect(createBannerSchema.safeParse({
+      ...valid,
+      secondaryCtaUrl: "/products",
+    }).success).toBe(false);
+  });
+
+  it("allows updating or clearing a CTA only when both fields are included", () => {
+    expect(updateBannerSchema.safeParse({
+      primaryCtaLabel: "Shop now",
+      primaryCtaUrl: "/products",
+    }).success).toBe(true);
+    expect(updateBannerSchema.safeParse({
+      primaryCtaLabel: "",
+      primaryCtaUrl: "",
+    }).success).toBe(true);
+    expect(updateBannerSchema.safeParse({
+      primaryCtaLabel: "Shop now",
+    }).success).toBe(false);
+  });
+
   it("requires at least one field when updating", () => {
     expect(updateBannerSchema.safeParse({}).success).toBe(false);
   });

@@ -410,6 +410,14 @@ model PromotionBanner {
   position                PromotionBannerPosition
   targetUrl               String?
   altText                 String?
+  eyebrow                 String?
+  headline                String?
+  description             String?
+  badgeText               String?
+  primaryCtaLabel         String?
+  primaryCtaUrl           String?
+  secondaryCtaLabel       String?
+  secondaryCtaUrl         String?
   startAt                 DateTime
   endAt                   DateTime
   status                  PromotionBannerStatus   @default(DRAFT)
@@ -433,6 +441,14 @@ model PromotionBannerDefault {
   mobilePublicId          String?                 @unique
   targetUrl               String?
   altText                 String?
+  eyebrow                 String?
+  headline                String?
+  description             String?
+  badgeText               String?
+  primaryCtaLabel         String?
+  primaryCtaUrl           String?
+  secondaryCtaLabel       String?
+  secondaryCtaUrl         String?
   updatedByStaffAccountId String                  @db.Uuid
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt

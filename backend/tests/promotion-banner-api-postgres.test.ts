@@ -142,7 +142,8 @@ describe("Promotion banner HTTP API authorization and validation", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveProperty("banners");
-    expect(Object.keys(response.body.banners).sort()).toEqual(["bottom", "hero", "top"]);
+    expect(Object.keys(response.body.banners).sort()).toEqual(["bottom", "hero", "heroSlides", "top"]);
+    expect(response.body.banners.heroSlides).toEqual([]);
   });
 
   it("rejects staff management requests without a bearer token", async () => {
@@ -204,6 +205,21 @@ describe("Promotion banner HTTP API authorization and validation", () => {
     expect(response.body.errors).toHaveProperty("title");
     expect(response.body.errors).toHaveProperty("startAt");
     expect(response.body.errors).toHaveProperty("endAt");
+  });
+
+  it("rejects a CTA with a label but no destination", async () => {
+    const response = await request(app)
+      .post(basePath)
+      .set("Authorization", `Bearer ${authorizedToken}`)
+      .field("title", "Incomplete CTA")
+      .field("position", "HERO")
+      .field("startAt", new Date(Date.now() + 60_000).toISOString())
+      .field("endAt", new Date(Date.now() + 3_600_000).toISOString())
+      .field("primaryCtaLabel", "Shop now");
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Validation failed");
+    expect(response.body.errors).toHaveProperty("primaryCtaLabel");
   });
 
   it("requires an image for a valid banner creation request", async () => {
@@ -309,6 +325,12 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .field("priority", "25")
       .field("status", "DRAFT")
       .field("targetUrl", "/collections/lifecycle")
+      .field("eyebrow", "KITCHEN & HOME")
+      .field("headline", "Smart Appliances for Modern Living")
+      .field("description", "Discover useful kitchen essentials.")
+      .field("badgeText", "NEW IN")
+      .field("primaryCtaLabel", "Shop appliances")
+      .field("primaryCtaUrl", "/collections/appliances")
       .attach("image", image, { filename: "banner.png", contentType: "image/png" })
       .attach("mobileImage", Buffer.from(validPngImage), { filename: "banner-mobile.png", contentType: "image/png" });
 
@@ -319,6 +341,14 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       priority: 25,
       status: "DRAFT",
       targetUrl: "/collections/lifecycle",
+      eyebrow: "KITCHEN & HOME",
+      headline: "Smart Appliances for Modern Living",
+      description: "Discover useful kitchen essentials.",
+      badgeText: "NEW IN",
+      primaryCtaLabel: "Shop appliances",
+      primaryCtaUrl: "/collections/appliances",
+      secondaryCtaLabel: null,
+      secondaryCtaUrl: null,
       publicId: expect.stringContaining("test/promotion-banner-"),
       mobilePublicId: expect.stringContaining("test/promotion-banner-"),
     });
@@ -344,11 +374,19 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .patch(`${basePath}/${bannerId}`)
       .set("Authorization", authorization)
       .field("title", "Updated API lifecycle banner")
-      .field("priority", "40");
+      .field("priority", "40")
+      .field("headline", "Updated smart appliances")
+      .field("badgeText", "")
+      .field("primaryCtaLabel", "")
+      .field("primaryCtaUrl", "");
     expect(updated.status).toBe(200);
     expect(updated.body.banner).toMatchObject({
       title: "Updated API lifecycle banner",
       priority: 40,
+      headline: "Updated smart appliances",
+      badgeText: null,
+      primaryCtaLabel: null,
+      primaryCtaUrl: null,
     });
 
     const desktopPublicIdBeforeMobileUpdate = updated.body.banner.publicId as string;
@@ -525,6 +563,12 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .set("Authorization", authorization)
       .field("targetUrl", "/collections/default-one")
       .field("altText", "Default banner one")
+      .field("eyebrow", "DELIVERY ACROSS ABUJA")
+      .field("headline", "Half-price delivery over ₦50,000")
+      .field("description", "Taken off at checkout.")
+      .field("badgeText", "50% OFF DELIVERY")
+      .field("secondaryCtaLabel", "Start shopping")
+      .field("secondaryCtaUrl", "/products")
       .attach("image", image, { filename: "default-one.png", contentType: "image/png" })
       .attach("mobileImage", Buffer.from(validPngImage), { filename: "default-one-mobile.png", contentType: "image/png" });
 
@@ -533,6 +577,14 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       position: "TOP",
       targetUrl: "/collections/default-one",
       altText: "Default banner one",
+      eyebrow: "DELIVERY ACROSS ABUJA",
+      headline: "Half-price delivery over ₦50,000",
+      description: "Taken off at checkout.",
+      badgeText: "50% OFF DELIVERY",
+      primaryCtaLabel: null,
+      primaryCtaUrl: null,
+      secondaryCtaLabel: "Start shopping",
+      secondaryCtaUrl: "/products",
     });
     const firstPublicId = first.body.banner.publicId as string;
     const defaultId = first.body.banner.id as string;
@@ -542,6 +594,11 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       .set("Authorization", authorization)
       .field("targetUrl", "/collections/default-two")
       .field("altText", "Default banner two")
+      .field("eyebrow", "NEW SEASON")
+      .field("headline", "Fresh finds for every day")
+      .field("badgeText", "NEW IN")
+      .field("primaryCtaLabel", "Shop now")
+      .field("primaryCtaUrl", "/products")
       .attach("image", image, { filename: "default-two.png", contentType: "image/png" })
       .attach("mobileImage", Buffer.from(validPngImage), { filename: "default-two-mobile.png", contentType: "image/png" });
 
@@ -550,6 +607,13 @@ describe("Promotion banner HTTP API authorization and validation", () => {
       id: defaultId,
       targetUrl: "/collections/default-two",
       altText: "Default banner two",
+      eyebrow: "NEW SEASON",
+      headline: "Fresh finds for every day",
+      badgeText: "NEW IN",
+      primaryCtaLabel: "Shop now",
+      primaryCtaUrl: "/products",
+      secondaryCtaLabel: null,
+      secondaryCtaUrl: null,
     });
     expect(replaced.body.banner.publicId).not.toBe(firstPublicId);
 

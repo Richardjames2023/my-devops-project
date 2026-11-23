@@ -12,6 +12,7 @@ import {
 import { createAuditLog } from "../../common/utils/audit-log";
 import { logger } from "../../config/logger";
 import type {
+  BannerContentInput,
   CreateBannerInput,
   UpdateBannerInput,
 } from "./promotion-banner.validation";
@@ -136,6 +137,14 @@ export async function createBanner(
           endAt: new Date(input.endAt),
           targetUrl: input.targetUrl ?? null,
           altText: input.altText ?? null,
+          eyebrow: input.eyebrow ?? null,
+          headline: input.headline ?? null,
+          description: input.description ?? null,
+          badgeText: input.badgeText ?? null,
+          primaryCtaLabel: input.primaryCtaLabel ?? null,
+          primaryCtaUrl: input.primaryCtaUrl ?? null,
+          secondaryCtaLabel: input.secondaryCtaLabel ?? null,
+          secondaryCtaUrl: input.secondaryCtaUrl ?? null,
           priority: input.priority,
           status: input.status,
           imageUrl: asset.url,
@@ -157,6 +166,14 @@ export async function createBanner(
           endAt: banner.endAt.toISOString(),
           targetUrl: banner.targetUrl,
           altText: banner.altText,
+          eyebrow: banner.eyebrow,
+          headline: banner.headline,
+          description: banner.description,
+          badgeText: banner.badgeText,
+          primaryCtaLabel: banner.primaryCtaLabel,
+          primaryCtaUrl: banner.primaryCtaUrl,
+          secondaryCtaLabel: banner.secondaryCtaLabel,
+          secondaryCtaUrl: banner.secondaryCtaUrl,
           priority: banner.priority,
           status: banner.status,
         },
@@ -256,6 +273,14 @@ export async function updateBanner(
           ...(input.endAt !== undefined ? { endAt: nextEnd } : {}),
           ...(input.targetUrl !== undefined ? { targetUrl: input.targetUrl } : {}),
           ...(input.altText !== undefined ? { altText: input.altText } : {}),
+          ...(input.eyebrow !== undefined ? { eyebrow: input.eyebrow } : {}),
+          ...(input.headline !== undefined ? { headline: input.headline } : {}),
+          ...(input.description !== undefined ? { description: input.description } : {}),
+          ...(input.badgeText !== undefined ? { badgeText: input.badgeText } : {}),
+          ...(input.primaryCtaLabel !== undefined ? { primaryCtaLabel: input.primaryCtaLabel } : {}),
+          ...(input.primaryCtaUrl !== undefined ? { primaryCtaUrl: input.primaryCtaUrl } : {}),
+          ...(input.secondaryCtaLabel !== undefined ? { secondaryCtaLabel: input.secondaryCtaLabel } : {}),
+          ...(input.secondaryCtaUrl !== undefined ? { secondaryCtaUrl: input.secondaryCtaUrl } : {}),
           ...(input.priority !== undefined ? { priority: input.priority } : {}),
           ...(input.status !== undefined ? { status: input.status } : {}),
           ...(asset ? { imageUrl: asset.url, publicId: asset.publicId } : {}),
@@ -278,6 +303,14 @@ export async function updateBanner(
           endAt: existing.endAt.toISOString(),
           targetUrl: existing.targetUrl,
           altText: existing.altText,
+          eyebrow: existing.eyebrow,
+          headline: existing.headline,
+          description: existing.description,
+          badgeText: existing.badgeText,
+          primaryCtaLabel: existing.primaryCtaLabel,
+          primaryCtaUrl: existing.primaryCtaUrl,
+          secondaryCtaLabel: existing.secondaryCtaLabel,
+          secondaryCtaUrl: existing.secondaryCtaUrl,
           priority: existing.priority,
           status: existing.status,
           imageReplaced: false,
@@ -289,6 +322,14 @@ export async function updateBanner(
           endAt: banner.endAt.toISOString(),
           targetUrl: banner.targetUrl,
           altText: banner.altText,
+          eyebrow: banner.eyebrow,
+          headline: banner.headline,
+          description: banner.description,
+          badgeText: banner.badgeText,
+          primaryCtaLabel: banner.primaryCtaLabel,
+          primaryCtaUrl: banner.primaryCtaUrl,
+          secondaryCtaLabel: banner.secondaryCtaLabel,
+          secondaryCtaUrl: banner.secondaryCtaUrl,
           priority: banner.priority,
           status: banner.status,
           imageReplaced: Boolean(asset),
@@ -342,6 +383,7 @@ export async function setDefaultBanner(
   file: Express.Multer.File | undefined,
   targetUrl: string | null,
   altText: string | null,
+  content: BannerContentInput,
   staffId: string,
   metadata: { ipAddress?: string; userAgent?: string } = {},
   mobileFile?: Express.Multer.File,
@@ -361,12 +403,30 @@ export async function setDefaultBanner(
         create: {
           position, imageUrl: asset.url, publicId: asset.publicId,
           ...(mobileAsset ? { mobileImageUrl: mobileAsset.url, mobilePublicId: mobileAsset.publicId } : {}),
-          targetUrl, altText, updatedByStaffAccountId: staffId,
+          targetUrl, altText,
+          eyebrow: content.eyebrow ?? null,
+          headline: content.headline ?? null,
+          description: content.description ?? null,
+          badgeText: content.badgeText ?? null,
+          primaryCtaLabel: content.primaryCtaLabel ?? null,
+          primaryCtaUrl: content.primaryCtaUrl ?? null,
+          secondaryCtaLabel: content.secondaryCtaLabel ?? null,
+          secondaryCtaUrl: content.secondaryCtaUrl ?? null,
+          updatedByStaffAccountId: staffId,
         },
         update: {
           imageUrl: asset.url, publicId: asset.publicId,
           ...(mobileAsset ? { mobileImageUrl: mobileAsset.url, mobilePublicId: mobileAsset.publicId } : {}),
-          targetUrl, altText, updatedByStaffAccountId: staffId,
+          targetUrl, altText,
+          eyebrow: content.eyebrow ?? null,
+          headline: content.headline ?? null,
+          description: content.description ?? null,
+          badgeText: content.badgeText ?? null,
+          primaryCtaLabel: content.primaryCtaLabel ?? null,
+          primaryCtaUrl: content.primaryCtaUrl ?? null,
+          secondaryCtaLabel: content.secondaryCtaLabel ?? null,
+          secondaryCtaUrl: content.secondaryCtaUrl ?? null,
+          updatedByStaffAccountId: staffId,
         },
       });
 
@@ -384,9 +444,23 @@ export async function setDefaultBanner(
             position: existing.position,
             targetUrl: existing.targetUrl,
             altText: existing.altText,
+            eyebrow: existing.eyebrow,
+            headline: existing.headline,
+            description: existing.description,
+            badgeText: existing.badgeText,
+            primaryCtaLabel: existing.primaryCtaLabel,
+            primaryCtaUrl: existing.primaryCtaUrl,
+            secondaryCtaLabel: existing.secondaryCtaLabel,
+            secondaryCtaUrl: existing.secondaryCtaUrl,
           },
         } : {}),
-        newValues: { position, targetUrl, altText },
+        newValues: {
+          position, targetUrl, altText,
+          eyebrow: value.eyebrow, headline: value.headline,
+          description: value.description, badgeText: value.badgeText,
+          primaryCtaLabel: value.primaryCtaLabel, primaryCtaUrl: value.primaryCtaUrl,
+          secondaryCtaLabel: value.secondaryCtaLabel, secondaryCtaUrl: value.secondaryCtaUrl,
+        },
         ...auditMetadata(metadata),
       });
       return value;
@@ -423,6 +497,41 @@ export async function deleteDefaultBanner(
   return { position, deleted: true, cloudinaryCleanupQueued: true };
 }
 
+type PublicBannerFields = Pick<
+  PromotionBanner,
+  | "imageUrl"
+  | "mobileImageUrl"
+  | "altText"
+  | "targetUrl"
+  | "eyebrow"
+  | "headline"
+  | "description"
+  | "badgeText"
+  | "primaryCtaLabel"
+  | "primaryCtaUrl"
+  | "secondaryCtaLabel"
+  | "secondaryCtaUrl"
+>;
+
+function publicBannerContent(banner: PublicBannerFields) {
+  return {
+    imageUrl: banner.imageUrl,
+    mobileImageUrl: banner.mobileImageUrl,
+    altText: banner.altText,
+    targetUrl: banner.targetUrl,
+    eyebrow: banner.eyebrow,
+    headline: banner.headline,
+    description: banner.description,
+    badge: banner.badgeText ? { text: banner.badgeText } : null,
+    primaryCta: banner.primaryCtaLabel && banner.primaryCtaUrl
+      ? { label: banner.primaryCtaLabel, url: banner.primaryCtaUrl }
+      : null,
+    secondaryCta: banner.secondaryCtaLabel && banner.secondaryCtaUrl
+      ? { label: banner.secondaryCtaLabel, url: banner.secondaryCtaUrl }
+      : null,
+  };
+}
+
 export async function getPublicBanners() {
   // Promotion schedule columns are PostgreSQL TIMESTAMP WITHOUT TIME ZONE.
   // Store and compare their values as UTC wall-clock timestamps to avoid the
@@ -439,8 +548,23 @@ export async function getPublicBanners() {
     prisma.promotionBannerDefault.findMany(),
   ]);
 
+  const heroCampaigns = scheduled.filter((item) => item.position === "HERO");
+  const heroFallback = defaults.find((item) => item.position === "HERO");
+
   const output: Record<string, unknown> = {
     hero: null,
+    heroSlides: heroCampaigns.length > 0
+      ? heroCampaigns.map((banner) => ({
+          type: "scheduled",
+          id: banner.id,
+          title: banner.title,
+          ...publicBannerContent(banner),
+          startsAt: banner.startAt,
+          endsAt: banner.endAt,
+        }))
+      : heroFallback
+        ? [{ type: "default", ...publicBannerContent(heroFallback) }]
+        : [],
     top: null,
     bottom: null,
   };
@@ -448,14 +572,8 @@ export async function getPublicBanners() {
   const positions = ["HERO", "TOP", "BOTTOM"] as const;
 
   for (const position of positions) {
-    const banner = scheduled.find(
-      (item) => item.position === position,
-    );
-
-    const fallback = defaults.find(
-      (item) => item.position === position,
-    );
-
+    const banner = scheduled.find((item) => item.position === position);
+    const fallback = defaults.find((item) => item.position === position);
     const key = position.toLowerCase();
 
     if (banner) {
@@ -463,20 +581,14 @@ export async function getPublicBanners() {
         type: "scheduled",
         id: banner.id,
         title: banner.title,
-        imageUrl: banner.imageUrl,
-        mobileImageUrl: banner.mobileImageUrl,
-        altText: banner.altText,
-        targetUrl: banner.targetUrl,
+        ...publicBannerContent(banner),
         startsAt: banner.startAt,
         endsAt: banner.endAt,
       };
     } else if (fallback) {
       output[key] = {
         type: "default",
-        imageUrl: fallback.imageUrl,
-        mobileImageUrl: fallback.mobileImageUrl,
-        altText: fallback.altText,
-        targetUrl: fallback.targetUrl,
+        ...publicBannerContent(fallback),
       };
     }
   }

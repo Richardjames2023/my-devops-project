@@ -5,7 +5,7 @@ import { AppError } from "../../common/errors/AppError";
 const MAX_SIZE = 8 * 1024 * 1024;
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { files: 2, fileSize: MAX_SIZE, fields: 12, parts: 14 },
+  limits: { files: 2, fileSize: MAX_SIZE, fields: 20, parts: 22 },
   fileFilter: (_req, file, callback) => {
     if (!["image/jpeg", "image/png", "image/webp", "image/avif"].includes(file.mimetype)) {
       callback(new AppError("Only JPEG, PNG, WebP, and AVIF images are allowed", 400));
