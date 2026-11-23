@@ -158,7 +158,7 @@ describe("PostgreSQL promotion banner storefront resolution", () => {
     const activeStart = new Date(now.getTime() - 60_000);
     const activeEnd = new Date(now.getTime() + 60_000);
 
-    await insertBanner({
+    const lowerPriorityId = await insertBanner({
       position: "HERO",
       title: "Lower priority",
       startAt: activeStart,
@@ -221,6 +221,10 @@ describe("PostgreSQL promotion banner storefront resolution", () => {
       primaryCta: { label: "Shop appliances", url: "/collections/appliances" },
       secondaryCta: null,
     });
+    expect(result.heroSlides).toMatchObject([
+      { id: winningId, headline: "Smart Appliances for Modern Living" },
+      { id: lowerPriorityId, headline: null, badge: null, primaryCta: null, secondaryCta: null },
+    ]);
   });
 
   it("uses the configured default when no scheduled banner is active", async () => {
@@ -251,6 +255,17 @@ describe("PostgreSQL promotion banner storefront resolution", () => {
   });
 
   it("uses the default after a scheduled banner expires and keeps an unconfigured slot null", async () => {
+    await pool.query(
+      'DELETE FROM promotion_banners WHERE position = \'HERO\' AND id = ANY($1::uuid[])',
+      [createdBannerIds],
+    );
+    await insertDefault("HERO", {
+      eyebrow: "BACKUP COLLECTION",
+      headline: "Shop everyday favourites",
+      badgeText: "NEW IN",
+      primaryCtaLabel: "Browse now",
+      primaryCtaUrl: "/products",
+    });
     await insertDefault("BOTTOM");
     await insertBanner({
       position: "BOTTOM",
@@ -261,6 +276,16 @@ describe("PostgreSQL promotion banner storefront resolution", () => {
 
     const result = await getPublicBanners();
     expect(result.bottom).toMatchObject({ type: "default" });
+    expect(result.heroSlides).toMatchObject([
+      {
+        type: "default",
+        eyebrow: "BACKUP COLLECTION",
+        headline: "Shop everyday favourites",
+        badge: { text: "NEW IN" },
+        primaryCta: { label: "Browse now", url: "/products" },
+        secondaryCta: null,
+      },
+    ]);
   });
 
   it("breaks equal-priority ties using the latest start time", async () => {
