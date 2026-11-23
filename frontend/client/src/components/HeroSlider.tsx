@@ -12,48 +12,59 @@ type HeroCallToAction = {
 
 type HeroSlide = {
   eyebrow: string;
+  badgeText?: string;
   title: string;
   description: string;
   image: string;
   imageAlt: string;
   primaryCta: HeroCallToAction;
+  secondaryCta?: HeroCallToAction;
 };
 
 const slides: HeroSlide[] = [
   {
-    eyebrow: "EVERYDAY STYLE",
-    title: "Find the Pieces That Feel Like You.",
+    eyebrow: "EVERYDAY ESSENTIALS",
+    title: "Everything You Need, All in One Place.",
     description:
-      "Refresh your everyday wardrobe with easy-to-wear T-shirts, versatile layers and styles you can make your own.",
-    image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=1800&q=85",
-    imageAlt: "Minimal everyday T-shirt styled for a clean casual wardrobe",
+      "Discover useful finds for your home, kitchen, garden and everyday life. Shop practical essentials that make each day a little easier.",
+    image: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1800&q=85",
+    imageAlt: "Warm, thoughtfully furnished modern living space",
     primaryCta: {
-      label: "Shop T-shirts",
-      href: "/products?category=t-shirts",
+      label: "Explore Products",
+      href: "/products",
+    },
+    secondaryCta: {
+      label: "Shop Home & Living",
+      href: "/products?category=home-living",
     },
   },
   {
-    eyebrow: "FOOTWEAR",
-    title: "Make Every Step Count.",
+    eyebrow: "KITCHEN & DINING",
+    badgeText: "Everyday Favourites",
+    title: "Make More of Every Moment at Home.",
     description:
-      "Find everyday sneakers that bring comfort and confidence to the places your day takes you.",
-    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1800&q=85",
-    imageAlt: "Red athletic sneaker photographed against a clean background",
+      "Find practical kitchen tools, cookware and dining essentials that help make preparing and sharing meals easier.",
+    image: "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=1800&q=85",
+    imageAlt: "Bright, organised modern kitchen with everyday cooking essentials",
     primaryCta: {
-      label: "Explore Shoes",
-      href: "/products?category=shoes",
+      label: "Shop Kitchen & Dining",
+      href: "/products?category=kitchen-dining",
     },
   },
   {
-    eyebrow: "BAGS & ACCESSORIES",
-    title: "Take Your Essentials Wherever Life Goes.",
+    eyebrow: "GARDEN & OUTDOOR",
+    title: "Make Room for the Outdoors.",
     description:
-      "Bring your everyday look together with practical finishing touches and carry-all essentials.",
-    image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1800&q=85",
-    imageAlt: "Everyday backpack photographed as a lifestyle accessory",
+      "Explore useful gardening and outdoor essentials for caring for your plants and making more of your outdoor space.",
+    image: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=1800&q=85",
+    imageAlt: "Green plants and gardening essentials in a bright outdoor space",
     primaryCta: {
-      label: "Shop Bags",
-      href: "/products?category=bags",
+      label: "Shop Garden & Outdoor",
+      href: "/products?category=garden-outdoor",
+    },
+    secondaryCta: {
+      label: "Explore All Products",
+      href: "/products",
     },
   },
 ];
@@ -132,6 +143,9 @@ export default function HeroSlider() {
           key={activeSlide.eyebrow}
           aria-live="polite"
         >
+          {activeSlide.badgeText ? (
+            <span className="hero-slider__badge">{activeSlide.badgeText}</span>
+          ) : null}
           <span className="hero-slider__eyebrow">
             <span className="hero-slider__eyebrow-mark" />
             {activeSlide.eyebrow}
@@ -146,6 +160,14 @@ export default function HeroSlider() {
               {activeSlide.primaryCta.label}
               <ArrowUpRight aria-hidden="true" size={19} strokeWidth={2.5} />
             </Link>
+            {activeSlide.secondaryCta ? (
+              <Link
+                href={activeSlide.secondaryCta.href}
+                className="hero-slider__button hero-slider__button--secondary"
+              >
+                {activeSlide.secondaryCta.label}
+              </Link>
+            ) : null}
           </div>
         </div>
 
