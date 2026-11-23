@@ -145,13 +145,6 @@ export default function HeroSlider() {
             </span>
           )}
 
-          {activeSlide.badge && (
-            <div className="hero-slider__badge" aria-label={`${activeSlide.badge.value} ${activeSlide.badge.label}`}>
-              <span className="hero-slider__badge-value">{activeSlide.badge.value}</span>
-              <span className="hero-slider__badge-label">{activeSlide.badge.label}</span>
-            </div>
-          )}
-
           {activeSlide.title && (
             <h1 className="hero-slider__title">{activeSlide.title}</h1>
           )}
@@ -183,6 +176,13 @@ export default function HeroSlider() {
             </div>
           )}
         </div>
+
+        {activeSlide.badge && (
+          <div className="hero-slider__badge" aria-label={`${activeSlide.badge.value} ${activeSlide.badge.label}`}>
+            <span className="hero-slider__badge-value">{activeSlide.badge.value}</span>
+            <span className="hero-slider__badge-label">{activeSlide.badge.label}</span>
+          </div>
+        )}
 
         <button
           type="button"
