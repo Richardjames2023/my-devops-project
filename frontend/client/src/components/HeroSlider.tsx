@@ -27,9 +27,9 @@ type HeroSlide = {
 const slides: HeroSlide[] = [
   {
     eyebrow: "KITCHEN & HOME APPLIANCES",
-    title: "Smart Appliances for Modern Living",
+    title: "Make Every Day in the Kitchen Easier",
     description:
-      "Discover practical kitchen essentials and home appliances designed to make everyday living easier.",
+      "Spend less time on the prep and more time enjoying the moment. Find the appliances that make busy mornings, quick meals and family dinners feel effortless.",
     badge: { value: "50%", label: "OFF" },
     image: "https://cdn.shopify.com/s/files/1/0478/5989/2377/files/small-kitchen-appliances-everyday-cooking-guide.jpg?v=1777131849",
     imageAlt: "Air fryer, blender, toaster and coffee maker arranged on a modern kitchen counter",
@@ -40,9 +40,9 @@ const slides: HeroSlide[] = [
   },
   {
     eyebrow: "ELECTRICAL & EVERYDAY TECH",
-    title: "Bring Your Everyday Tech Together",
+    title: "A Smarter Setup for Everything You Do",
     description:
-      "Explore useful electronics and everyday essentials selected to make life a little easier.",
+      "From getting work done to switching off at the end of the day, discover useful tech that keeps you connected, productive and entertained.",
     badge: { value: "NEW", label: "IN" },
     image: "https://images.unsplash.com/photo-1590643924142-b1b492f1dddc?auto=format&fit=crop&w=1800&q=85",
     imageAlt: "Laptop, camera, smartwatch and electronics accessories arranged on a tabletop",
@@ -57,9 +57,9 @@ const slides: HeroSlide[] = [
   },
   {
     eyebrow: "KITCHEN & DINING",
-    title: "Make More of Every Day",
+    title: "Bring More Joy to the Everyday",
     description:
-      "Find practical essentials that make preparing meals and managing your home simpler.",
+      "Set the table, make something delicious and make yourself at home with practical kitchen favourites chosen for everyday living.",
     badge: { value: "TOP", label: "PICKS" },
     image: "https://www.premiumhomesource.com/cdn/shop/files/2001-04_henck-zwil_enfingy_appliances-001_2.jpg?v=1738588042&width=1000",
     imageAlt: "Coordinated black blender, toaster and electric kettle displayed together",
