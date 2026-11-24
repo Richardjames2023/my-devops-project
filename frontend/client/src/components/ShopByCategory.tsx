@@ -22,7 +22,7 @@ const categoryDescriptions: Record<string, string> = {
   "home-decor": "Finishing touches for your space",
 };
 
-const INITIAL_PRODUCT_LIMIT = 8;
+const INITIAL_PRODUCT_LIMIT = 10;
 const PRODUCT_BATCH_SIZE = 8;
 
 const formatPrice = (price: number) =>
@@ -150,7 +150,7 @@ export default function ShopByCategory() {
 
       <div className="shop-categories__products-heading">
         <div>
-          <h3>{activeCategoryName}</h3>
+          {activeCategory !== "all" ? <h3>{activeCategoryName}</h3> : null}
           <p>{activeCategory === "all" ? "A selection from across our departments" : categoryDescriptions[activeCategory]}</p>
         </div>
         <span>Showing {visibleProducts.length} of {filteredProducts.length} {filteredProducts.length === 1 ? "item" : "items"}</span>
