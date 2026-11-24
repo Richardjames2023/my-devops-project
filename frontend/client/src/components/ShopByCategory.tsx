@@ -96,7 +96,12 @@ export default function ShopByCategory() {
       ? "All products"
       : categories.find((category) => category.slug === activeCategory)?.name ?? "Products";
 
+  const closeQuickView = () => {
+    if (quickViewProduct) setIsQuickViewClosing(true);
+  };
+
   const openQuickView = (product: Product) => {
+    setIsQuickViewClosing(false);
     setQuickViewProduct(product);
     setQuantity(1);
     setSelectedSize(product.sizes[0] ?? "");
@@ -389,7 +394,7 @@ export default function ShopByCategory() {
 
       {quickViewProduct ? (
         <div
-          className="shop-categories__modal-backdrop"
+          className={`shop-categories__modal-backdrop${isQuickViewClosing ? " is-closing" : ""}`}
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) closeQuickView();
