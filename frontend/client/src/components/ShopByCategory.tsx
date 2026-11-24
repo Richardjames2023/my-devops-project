@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowUpRight, ChevronDown, ChevronRight, Plus, Search, ShoppingCart, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, ChevronRight, Plus, Search, ShoppingCart, Star, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { categories, products } from "@/lib/catalogue";
 import useCartStore from "@/stores/cartStore";
@@ -180,8 +180,37 @@ export default function ShopByCategory() {
                 <button type="button" className="shop-categories__product-name" onClick={() => openQuickView(product)}>
                   {product.name}
                 </button>
-                <div className="shop-categories__product-bottom">
+                <div className="shop-categories__product-price-row">
                   <strong>{formatPrice(product.price)}</strong>
+                  {product.compareAtPrice && product.compareAtPrice > product.price ? (
+                    <>
+                      <del>{formatPrice(product.compareAtPrice)}</del>
+                      <span className="shop-categories__discount">
+                        {Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)}% off
+                      </span>
+                    </>
+                  ) : product.discountPercent && product.discountPercent > 0 ? (
+                    <span className="shop-categories__discount">{product.discountPercent}% off</span>
+                  ) : null}
+                </div>
+                {(product.reviewSummary?.totalReviews || product.soldCount || (product.availableQuantity !== undefined && product.availableQuantity !== null)) ? (
+                  <div className="shop-categories__product-signals">
+                    {product.reviewSummary && product.reviewSummary.totalReviews > 0 && product.reviewSummary.averageRating !== null ? (
+                      <span className="shop-categories__rating">
+                        <Star size={12} fill="currentColor" aria-hidden="true" />
+                        {product.reviewSummary.averageRating.toFixed(1)}
+                        <small>({product.reviewSummary.totalReviews.toLocaleString("en-NG")})</small>
+                      </span>
+                    ) : null}
+                    {product.soldCount && product.soldCount > 0 ? (
+                      <span>{product.soldCount.toLocaleString("en-NG")} sold</span>
+                    ) : null}
+                    {product.availableQuantity !== undefined && product.availableQuantity !== null && product.availableQuantity > 0 && product.availableQuantity <= 5 ? (
+                      <span className="shop-categories__stock-warning">Only {product.availableQuantity} left</span>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="shop-categories__product-bottom">
                   <button
                     type="button"
                     className="shop-categories__quick-add"
@@ -204,13 +233,13 @@ export default function ShopByCategory() {
 
       {visibleProducts.length < filteredProducts.length ? (
         <div className="shop-categories__load-more-wrap">
-          <p>Showing {visibleProducts.length} of {filteredProducts.length} products</p>
+          <p>Showing <strong>{visibleProducts.length}</strong> of <strong>{filteredProducts.length}</strong> products</p>
           <button
             type="button"
             className="shop-categories__load-more"
             onClick={() => setVisibleProductLimit((limit) => limit + PRODUCT_BATCH_SIZE)}
           >
-            Show {Math.min(PRODUCT_BATCH_SIZE, filteredProducts.length - visibleProducts.length)} more products <ChevronDown size={16} aria-hidden="true" />
+            Show {Math.min(PRODUCT_BATCH_SIZE, filteredProducts.length - visibleProducts.length)} more <ChevronDown size={16} aria-hidden="true" />
           </button>
         </div>
       ) : null}
