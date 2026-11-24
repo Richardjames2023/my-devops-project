@@ -2765,3 +2765,47 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   color: var(--shop-muted);
   font-size: 12px;
 }
+
+
+/* Quick-view entrance: soft fade/scale on desktop, gentle sheet rise on mobile */
+@keyframes shop-quick-view-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes shop-quick-view-modal-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.shop-categories__modal-backdrop {
+  animation: shop-quick-view-backdrop-in 190ms ease-out both;
+}
+.shop-categories__quick-modal {
+  transform-origin: center;
+  animation: shop-quick-view-modal-in 240ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  will-change: transform, opacity;
+}
+@media (max-width: 640px) {
+  .shop-categories__modal-backdrop {
+    align-items: end;
+    padding: 0;
+    background: rgba(5, 17, 39, 0.52);
+  }
+  .shop-categories__quick-modal {
+    width: 100%;
+    max-height: 94dvh;
+    border-radius: 22px 22px 0 0;
+    transform-origin: bottom center;
+    animation: shop-quick-view-mobile-in 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+}
+@keyframes shop-quick-view-mobile-in {
+  from { opacity: 0.7; transform: translate3d(0, 32px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-categories__modal-backdrop,
+  .shop-categories__quick-modal {
+    animation: none !important;
+    will-change: auto;
+  }
+}
