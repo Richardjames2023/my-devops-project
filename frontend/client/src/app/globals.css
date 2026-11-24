@@ -2026,3 +2026,53 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     font-size: 9px;
   }
 }
+
+
+/* Category shopping heading and full-width category filter row */
+.shop-categories__heading-accent {
+  color: var(--shop-orange);
+}
+
+.shop-categories__toolbar {
+  width: 100%;
+}
+
+.shop-categories__category-list {
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible;
+  gap: 9px;
+  padding: 1px;
+}
+
+.shop-categories__category-chip,
+.shop-categories__all-categories {
+  min-height: 40px;
+}
+
+@media (min-width: 1200px) {
+  .shop-categories__category-list {
+    gap: 10px;
+  }
+
+  .shop-categories__category-chip {
+    padding-inline: 17px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 640px) {
+  .shop-categories__category-list {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 1px 1px 6px;
+  }
+
+  .shop-categories__category-chip,
+  .shop-categories__all-categories {
+    min-height: 37px;
+  }
+}
