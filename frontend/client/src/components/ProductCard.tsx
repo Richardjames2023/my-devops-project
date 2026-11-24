@@ -45,7 +45,7 @@ const ProductCard = ({ product }: { product: ProductType }) => {
   return (
     <article className="overflow-hidden rounded-xl border border-[var(--shop-border)] bg-white shadow-sm transition-shadow hover:shadow-lg">
       <Link href={`/products/${product.id}`} className="block">
-        <div className="relative aspect-[4/3] bg-[var(--shop-search)]">
+        <div className="relative aspect-[1.4/1] bg-[var(--shop-search)]">
           <Image
             src={imageSrc}
             alt={product.name}
@@ -55,11 +55,11 @@ const ProductCard = ({ product }: { product: ProductType }) => {
           />
         </div>
       </Link>
-      <div className="flex flex-col gap-3 p-4">
-        <div className="min-h-16">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--shop-orange-dark)]">{product.categoryName}</p>
-          <h2 className="font-semibold text-[var(--shop-navy)]">{product.name}</h2>
-          <p className="mt-1 line-clamp-2 text-sm text-[var(--shop-muted)]">{product.shortDescription}</p>
+      <div className="flex flex-col gap-2 p-3">
+        <div className="flex flex-col gap-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--shop-orange-dark)]">{product.categoryName}</p>
+          <h2 className="line-clamp-2 font-semibold leading-snug text-[var(--shop-navy)]">{product.name}</h2>
+          <p className="line-clamp-1 text-xs text-[var(--shop-muted)]">{product.shortDescription}</p>
         </div>
         <div className="flex items-center justify-between gap-3">
           <p className="font-bold text-[var(--shop-navy)]">₦{product.price.toLocaleString("en-NG")}</p>
@@ -67,7 +67,7 @@ const ProductCard = ({ product }: { product: ProductType }) => {
             type="button"
             onClick={handleAddToCart}
             disabled={product.stockStatus === "out-of-stock"}
-            className="flex items-center gap-2 rounded-lg bg-[var(--shop-navy)] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--shop-orange-dark)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg bg-[var(--shop-orange)] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--shop-orange-dark)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <ShoppingCart className="h-4 w-4" />
             Add to Cart
