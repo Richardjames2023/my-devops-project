@@ -2611,3 +2611,61 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     gap: 6px;
   }
 }
+
+
+/* Correct desktop quick-view gallery placement: thumbnails beside the hero image */
+@media (min-width: 641px) {
+  .shop-categories__modal-gallery {
+    grid-template-columns: 68px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: stretch;
+  }
+
+  .shop-categories__gallery-thumbnails {
+    grid-column: 1;
+    grid-row: 1;
+    width: 68px;
+    flex-direction: column;
+    align-items: stretch;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .shop-categories__gallery-thumbnail,
+  .shop-categories__gallery-placeholder {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+  }
+
+  .shop-categories__modal-image {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 0;
+  }
+
+  .shop-categories__modal-review-summary {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .shop-categories__gallery-thumbnails {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .shop-categories__modal-image {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .shop-categories__modal-review-summary {
+    grid-column: 1;
+    grid-row: 3;
+  }
+}
