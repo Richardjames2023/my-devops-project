@@ -5,7 +5,7 @@ import Categories from "./Categories";
 import ProductCard from "./ProductCard";
 import Link from "next/link";
 import Filter from "./Filter";
-import { categories, products } from "@/lib/catalogue";
+import { products } from "@/lib/catalogue";
 
 const HOME_FILTERS = [
   { label: "All finds", slug: "all" },
@@ -15,7 +15,7 @@ const HOME_FILTERS = [
   { label: "Lighting", slug: "electrical-lighting" },
 ];
 
-const HOMEPAGE_INITIAL_LIMIT = 8;
+const HOMEPAGE_INITIAL_LIMIT = 10;
 
 const ProductList = ({ category, query, sort, params }: { category?: string; query?: string; sort?: string; params: "homepage" | "products" }) => {
   const [homeFilter, setHomeFilter] = useState("all");
@@ -66,10 +66,9 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
         {params === "homepage" && (
           <>
             <div className="homepage-collection__intro">
-              <span className="homepage-collection__eyebrow">A LITTLE SOMETHING FOR EVERY DAY</span>
               <div className="homepage-collection__intro-row">
                 <div>
-                  <h2 id="homepage-collection-title">Something useful is waiting for you.</h2>
+                  <h2 id="homepage-collection-title">Something <span className="homepage-collection__title-accent">useful</span> is waiting for you.</h2>
                   <p>From everyday essentials to little upgrades, find things that make life easier.</p>
                 </div>
                 <span className="homepage-collection__intro-note" aria-hidden="true">GOOD FINDS. EVERYDAY.</span>
