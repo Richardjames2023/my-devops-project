@@ -2076,3 +2076,12 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     min-height: 37px;
   }
 }
+
+
+/* Keep the primary category filters and directory action on one line */
+.shop-categories__category-list {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
