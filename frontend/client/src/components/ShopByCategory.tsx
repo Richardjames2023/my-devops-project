@@ -79,7 +79,7 @@ export default function ShopByCategory() {
     setQuantity(1);
     setSelectedSize(product.sizes[0] ?? "");
     setSelectedColor(product.colors[0] ?? "default");
-    setActiveGalleryImage("default");
+    setActiveGalleryImage(Object.keys(product.images)[0] ?? "default");
   };
 
   const handleAddToCart = (product: Product, amount = 1, size = product.sizes[0] ?? "", color = product.colors[0] ?? "default") => {
@@ -390,7 +390,7 @@ export default function ShopByCategory() {
             <div className="shop-categories__modal-gallery">
               <div className="shop-categories__modal-image">
                 <Image
-                  src={quickViewProduct.images[activeGalleryImage] ?? quickViewProduct.images[selectedColor] ?? quickViewProduct.images.default ?? Object.values(quickViewProduct.images)[0]}
+                  src={quickViewProduct.images[activeGalleryImage] ?? quickViewProduct.images.default ?? Object.values(quickViewProduct.images)[0]}
                   alt={quickViewProduct.name}
                   fill
                   unoptimized
@@ -419,6 +419,7 @@ export default function ShopByCategory() {
                     <div className="shop-categories__gallery-placeholder" key={`placeholder-${index}`} aria-label="Additional product image placeholder">
                       <ImageIcon size={19} />
                       <span>{["Side view", "Detail", "In use"][index] ?? "More views"}</span>
+                      <small>Photo coming</small>
                     </div>
                   ))
                 ) : null}
