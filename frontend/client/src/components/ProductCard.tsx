@@ -65,12 +65,14 @@ const ProductCard = ({ product }: { product: ProductType }) => {
           <p className="font-bold text-[var(--shop-navy)]">₦{product.price.toLocaleString("en-NG")}</p>
           <button
             type="button"
+            aria-label={`Add ${product.name} to cart`}
+            title="Add to cart"
             onClick={handleAddToCart}
             disabled={product.stockStatus === "out-of-stock"}
             className="flex items-center gap-1.5 rounded-lg bg-[var(--shop-orange)] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--shop-orange-dark)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <ShoppingCart className="h-4 w-4" />
-            Add to Cart
+            <ShoppingCart className="h-4 w-4" aria-hidden="true" />
+            <span className="product-card__add-label">Add to Cart</span>
           </button>
         </div>
       </div>
