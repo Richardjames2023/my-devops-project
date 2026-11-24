@@ -1912,3 +1912,117 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     font-size: 9px;
   }
 }
+
+
+/* Larger desktop catalogue density and more legible product details */
+.shop-categories__product-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.shop-categories__product-name {
+  font-size: 14px;
+  line-height: 1.42;
+}
+
+.shop-categories__product-signals {
+  font-size: 11px;
+  gap: 5px 9px;
+}
+
+.shop-categories__rating small {
+  font-size: 11px;
+}
+
+.shop-categories__signal-placeholder,
+.shop-categories__stock-available {
+  font-size: 10px;
+}
+
+.shop-categories__price-details > strong {
+  font-size: 15px;
+}
+
+.shop-categories__price-details > del {
+  font-size: 11px;
+}
+
+.shop-categories__discount {
+  font-size: 10px;
+}
+
+.shop-categories__product-price-row .shop-categories__quick-add {
+  min-height: 35px;
+  padding-inline: 11px;
+  font-size: 12px;
+}
+
+.shop-categories__image-category {
+  font-size: 10px;
+}
+
+.shop-categories__quick-view {
+  font-size: 11px;
+}
+
+@media (min-width: 901px) and (max-width: 1199px) {
+  .shop-categories__product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .shop-categories__product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .shop-categories__product-name {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 640px) {
+  .shop-categories__product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shop-categories__product-name {
+    font-size: 12px;
+  }
+
+  .shop-categories__product-signals {
+    font-size: 9px;
+  }
+
+  .shop-categories__rating small,
+  .shop-categories__signal-placeholder,
+  .shop-categories__stock-available {
+    font-size: 9px;
+  }
+
+  .shop-categories__price-details > strong {
+    font-size: 12px;
+  }
+
+  .shop-categories__price-details > del {
+    font-size: 9px;
+  }
+
+  .shop-categories__discount {
+    font-size: 8px;
+  }
+
+  .shop-categories__product-price-row .shop-categories__quick-add {
+    min-height: 30px;
+    padding-inline: 8px;
+    font-size: 10px;
+  }
+
+  .shop-categories__image-category {
+    font-size: 9px;
+  }
+
+  .shop-categories__quick-view {
+    font-size: 9px;
+  }
+}
