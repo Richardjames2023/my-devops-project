@@ -180,6 +180,39 @@ export default function ShopByCategory() {
                 <button type="button" className="shop-categories__product-name" onClick={() => openQuickView(product)}>
                   {product.name}
                 </button>
+                <div className="shop-categories__product-signals" aria-label="Product reviews, sales and availability">
+                  {product.reviewSummary && product.reviewSummary.totalReviews > 0 && product.reviewSummary.averageRating !== null ? (
+                    <span className="shop-categories__rating">
+                      <Star size={12} fill="currentColor" aria-hidden="true" />
+                      {product.reviewSummary.averageRating.toFixed(1)}
+                      <small>({product.reviewSummary.totalReviews.toLocaleString("en-NG")})</small>
+                    </span>
+                  ) : (
+                    <span className="shop-categories__signal-placeholder">
+                      <Star size={12} aria-hidden="true" /> No reviews yet
+                    </span>
+                  )}
+                  {product.soldCount !== undefined && product.soldCount !== null ? (
+                    <span>{product.soldCount.toLocaleString("en-NG")} sold</span>
+                  ) : (
+                    <span className="shop-categories__signal-placeholder">0 sold</span>
+                  )}
+                  {product.availableQuantity !== undefined && product.availableQuantity !== null ? (
+                    product.availableQuantity === 0 || product.stockStatus === "out-of-stock" ? (
+                      <span className="shop-categories__stock-warning">Out of stock</span>
+                    ) : product.availableQuantity <= 5 ? (
+                      <span className="shop-categories__stock-warning">Only {product.availableQuantity} left</span>
+                    ) : (
+                      <span className="shop-categories__stock-available">{product.availableQuantity} available</span>
+                    )
+                  ) : product.stockStatus === "out-of-stock" ? (
+                    <span className="shop-categories__stock-warning">Out of stock</span>
+                  ) : product.stockStatus === "low-stock" ? (
+                    <span className="shop-categories__stock-warning">Low stock</span>
+                  ) : (
+                    <span className="shop-categories__stock-available">In stock</span>
+                  )}
+                </div>
                 <div className="shop-categories__product-price-row">
                   <div className="shop-categories__price-details">
                     <strong>{formatPrice(product.price)}</strong>
@@ -202,40 +235,6 @@ export default function ShopByCategory() {
                   >
                     <Plus size={15} /> Add
                   </button>
-                </div>
-                <div className="shop-categories__product-signals" aria-label="Product reviews, sales and availability">
-                  {product.reviewSummary && product.reviewSummary.totalReviews > 0 && product.reviewSummary.averageRating !== null ? (
-                    <span className="shop-categories__rating">
-                      <Star size={12} fill="currentColor" aria-hidden="true" />
-                      {product.reviewSummary.averageRating.toFixed(1)}
-                      <small>({product.reviewSummary.totalReviews.toLocaleString("en-NG")})</small>
-                    </span>
-                  ) : (
-                    <span className="shop-categories__signal-placeholder">
-                      <Star size={12} aria-hidden="true" />
-                      {product.reviewSummary?.totalReviews === 0 ? "No reviews yet" : "Reviews coming soon"}
-                    </span>
-                  )}
-                  {product.soldCount !== undefined && product.soldCount !== null ? (
-                    <span>{product.soldCount.toLocaleString("en-NG")} sold</span>
-                  ) : (
-                    <span className="shop-categories__signal-placeholder">Sales data coming soon</span>
-                  )}
-                  {product.availableQuantity !== undefined && product.availableQuantity !== null ? (
-                    product.availableQuantity === 0 || product.stockStatus === "out-of-stock" ? (
-                      <span className="shop-categories__stock-warning">Out of stock</span>
-                    ) : product.availableQuantity <= 5 ? (
-                      <span className="shop-categories__stock-warning">Only {product.availableQuantity} left</span>
-                    ) : (
-                      <span className="shop-categories__stock-available">In stock</span>
-                    )
-                  ) : product.stockStatus === "out-of-stock" ? (
-                    <span className="shop-categories__stock-warning">Out of stock</span>
-                  ) : product.stockStatus === "low-stock" ? (
-                    <span className="shop-categories__stock-warning">Low stock</span>
-                  ) : (
-                    <span className="shop-categories__stock-available">Availability being updated</span>
-                  )}
                 </div>
               </div>
             </article>
