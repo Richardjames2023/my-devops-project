@@ -51,7 +51,7 @@ export default function ShopByCategory() {
     [categoryQuery],
   );
 
-  const homepageCategories = categories.slice(0, 5);
+  const homepageCategories = categories;
 
   const filteredProducts = useMemo(
     () =>
@@ -100,8 +100,7 @@ export default function ShopByCategory() {
     <section className="shop-categories" aria-labelledby="shop-categories-title">
       <div className="shop-categories__heading">
         <div>
-          <p className="shop-categories__eyebrow">SHOP WHAT YOU NEED</p>
-          <h2 id="shop-categories-title">Find it. View it. Add it.</h2>
+          <h2 id="shop-categories-title">Find it. <span className="shop-categories__heading-accent">Click it.</span> Buy it.</h2>
           <p className="shop-categories__intro">
             Choose a department to see products here, without leaving the page.
           </p>
