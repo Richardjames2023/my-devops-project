@@ -210,7 +210,7 @@ export default function ShopByCategory() {
             className="shop-categories__load-more"
             onClick={() => setVisibleProductLimit((limit) => limit + PRODUCT_BATCH_SIZE)}
           >
-            Load more products <ChevronDown size={16} aria-hidden="true" />
+            Show {Math.min(PRODUCT_BATCH_SIZE, filteredProducts.length - visibleProducts.length)} more products <ChevronDown size={16} aria-hidden="true" />
           </button>
         </div>
       ) : null}
