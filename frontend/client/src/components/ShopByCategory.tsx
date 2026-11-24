@@ -51,7 +51,7 @@ export default function ShopByCategory() {
     [categoryQuery],
   );
 
-  const homepageCategories = categories;
+  const homepageCategories = categories.slice(0, 7);
 
   const filteredProducts = useMemo(
     () =>
