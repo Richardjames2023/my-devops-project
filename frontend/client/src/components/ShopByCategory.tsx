@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowUpRight, BriefcaseBusiness, ChevronDown, ChevronRight, CookingPot, Heart, House, Lightbulb, Luggage, Package, Plus, Search, ShoppingCart, Sprout, Star, Wrench, X } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, ChevronDown, ChevronRight, CookingPot, Heart, House, ImageIcon, Lightbulb, Luggage, Package, Plus, Search, ShoppingCart, Sprout, Star, Wrench, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { categories, products } from "@/lib/catalogue";
 import useCartStore from "@/stores/cartStore";
@@ -400,22 +400,29 @@ export default function ShopByCategory() {
                   {Object.keys(quickViewProduct.images).length} {Object.keys(quickViewProduct.images).length === 1 ? "view" : "views"}
                 </span>
               </div>
-              {Object.entries(quickViewProduct.images).length > 1 ? (
-                <div className="shop-categories__gallery-thumbnails" aria-label="Product image views">
-                  {Object.entries(quickViewProduct.images).map(([imageKey, imageUrl], index) => (
-                    <button
-                      key={imageKey}
-                      type="button"
-                      className={`shop-categories__gallery-thumbnail ${activeGalleryImage === imageKey ? "is-active" : ""}`}
-                      onClick={() => setActiveGalleryImage(imageKey)}
-                      aria-label={`View product image ${index + 1}`}
-                      aria-pressed={activeGalleryImage === imageKey}
-                    >
-                      <Image src={imageUrl} alt="" fill unoptimized sizes="76px" />
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              <div className="shop-categories__gallery-thumbnails" aria-label="Product image views">
+                {Object.entries(quickViewProduct.images).map(([imageKey, imageUrl], index) => (
+                  <button
+                    key={imageKey}
+                    type="button"
+                    className={`shop-categories__gallery-thumbnail ${activeGalleryImage === imageKey ? "is-active" : ""}`}
+                    onClick={() => setActiveGalleryImage(imageKey)}
+                    aria-label={`View product image ${index + 1}`}
+                    aria-pressed={activeGalleryImage === imageKey}
+                  >
+                    <Image src={imageUrl} alt="" fill unoptimized sizes="76px" />
+                    <span className="shop-categories__thumbnail-caption">{index === 0 ? "Main" : `View ${index + 1}`}</span>
+                  </button>
+                ))}
+                {Object.keys(quickViewProduct.images).length < 4 ? (
+                  Array.from({ length: 4 - Object.keys(quickViewProduct.images).length }, (_, index) => (
+                    <div className="shop-categories__gallery-placeholder" key={`placeholder-${index}`} aria-label="Additional product image placeholder">
+                      <ImageIcon size={19} />
+                      <span>{["Side view", "Detail", "In use"][index] ?? "More views"}</span>
+                    </div>
+                  ))
+                ) : null}
+              </div>
               {quickViewProduct.reviewSummary && quickViewProduct.reviewSummary.totalReviews > 0 && quickViewProduct.reviewSummary.averageRating !== null ? (
                 <div className="shop-categories__modal-review-summary">
                   <span className="shop-categories__modal-review-score">
@@ -432,7 +439,29 @@ export default function ShopByCategory() {
               <span className="shop-categories__product-category">{quickViewProduct.categoryName}</span>
               {quickViewProduct.brand ? <span className="shop-categories__modal-brand">{quickViewProduct.brand}</span> : null}
               <h3 id="quick-view-title">{quickViewProduct.name}</h3>
-              <strong className="shop-categories__modal-price">{formatPrice(quickViewProduct.price)}</strong>
+              <div className="shop-categories__modal-price-line">
+                <strong className="shop-categories__modal-price">{formatPrice(quickViewProduct.price)}</strong>
+                {quickViewProduct.compareAtPrice && quickViewProduct.compareAtPrice > quickViewProduct.price ? (
+                  <>
+                    <del>{formatPrice(quickViewProduct.compareAtPrice)}</del>
+                    <span className="shop-categories__modal-discount">
+                      {Math.round((1 - quickViewProduct.price / quickViewProduct.compareAtPrice) * 100)}% off
+                    </span>
+                  </>
+                ) : null}
+              </div>
+              <div className="shop-categories__modal-buying-signals">
+                <span><Star size={14} fill="currentColor" /> {quickViewProduct.reviewSummary?.averageRating?.toFixed(1) ?? "New"} <small>({(quickViewProduct.reviewSummary?.totalReviews ?? 0).toLocaleString("en-NG")} reviews)</small></span>
+                <span><ShoppingCart size={13} /> {(quickViewProduct.soldCount ?? 0).toLocaleString("en-NG")} sold</span>
+                <span className={quickViewProduct.availableQuantity !== undefined && quickViewProduct.availableQuantity <= 5 ? "is-low-stock" : "is-stock"}>
+                  <Package size={13} />
+                  {quickViewProduct.stockStatus === "out-of-stock" || quickViewProduct.availableQuantity === 0
+                    ? "Out of stock"
+                    : quickViewProduct.availableQuantity !== undefined
+                      ? `${quickViewProduct.availableQuantity} available`
+                      : "Stock updating"}
+                </span>
+              </div>
               <p>{quickViewProduct.description}</p>
 
               {quickViewProduct.colors.length > 0 ? (
