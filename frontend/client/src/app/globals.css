@@ -1880,3 +1880,35 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     font-size: 11px;
   }
 }
+
+
+/* Clear, neutral fallbacks for product information not yet supplied by the API */
+.shop-categories__signal-placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #8792a4;
+  font-size: 9px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.shop-categories__stock-available {
+  color: #28784a;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.shop-categories__product-signals {
+  row-gap: 4px;
+  column-gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .shop-categories__signal-placeholder,
+  .shop-categories__stock-available,
+  .shop-categories__product-signals {
+    font-size: 9px;
+  }
+}
