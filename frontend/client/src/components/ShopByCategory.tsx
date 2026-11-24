@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, BriefcaseBusiness, ChevronDown, ChevronRight, CookingPot, Heart, House, ImageIcon, Lightbulb, Luggage, Package, Plus, Search, ShoppingCart, Sprout, Star, Wrench, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { categories, products } from "@/lib/catalogue";
@@ -37,12 +37,12 @@ export default function ShopByCategory() {
   const [visibleProductLimit, setVisibleProductLimit] = useState(INITIAL_PRODUCT_LIMIT);
   const [categoryQuery, setCategoryQuery] = useState("");
   const [isCategoryDirectoryOpen, setIsCategoryDirectoryOpen] = useState(false);
-  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);\n  const [isQuickViewClosing, setIsQuickViewClosing] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("default");
   const [activeGalleryImage, setActiveGalleryImage] = useState("default");
-  const addToCart = useCartStore((state) => state.addToCart);
+  const addToCart = useCartStore((state) => state.addToCart);\n\n  useEffect(() => {\n    if (!isQuickViewClosing) return;\n\n    const closeTimer = window.setTimeout(() => {\n      setQuickViewProduct(null);\n      setIsQuickViewClosing(false);\n    }, 280);\n\n    return () => window.clearTimeout(closeTimer);\n  }, [isQuickViewClosing]);
 
   const visibleCategories = useMemo(
     () =>
@@ -380,11 +380,11 @@ export default function ShopByCategory() {
           className="shop-categories__modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setQuickViewProduct(null);
+            if (event.target === event.currentTarget) closeQuickView();
           }}
         >
           <section
-            className="shop-categories__quick-modal"
+            className={`shop-categories__quick-modal${isQuickViewClosing ? " is-closing" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="quick-view-title"
@@ -392,7 +392,7 @@ export default function ShopByCategory() {
             <button
               type="button"
               className="shop-categories__modal-close"
-              onClick={() => setQuickViewProduct(null)}
+              onClick={closeQuickView}
               aria-label="Close quick view"
             >
               <X size={20} />
