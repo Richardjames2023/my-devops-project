@@ -1026,12 +1026,33 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 1.2 / 1;
+  aspect-ratio: 1.38 / 1;
   overflow: hidden;
   border: 0;
   padding: 0;
   background: var(--shop-search);
   cursor: pointer;
+}
+
+.shop-categories__image-category {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  max-width: calc(100% - 20px);
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--shop-navy);
+  background: rgba(255,255,255,0.92);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.055em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .shop-categories__product-image img {
@@ -1067,23 +1088,16 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 
 .shop-categories__product-copy {
   display: flex;
-  min-height: 132px;
   flex-direction: column;
-  padding: 12px;
-}
-
-.shop-categories__product-category {
-  color: var(--shop-orange-dark);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
+  gap: 8px;
+  padding: 10px 11px 11px;
 }
 
 .shop-categories__product-name {
   display: -webkit-box;
   overflow: hidden;
-  margin: 5px 0 12px;
+  min-height: 36px;
+  margin: 0;
   border: 0;
   padding: 0;
   color: var(--shop-navy);
@@ -1103,7 +1117,6 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-top: auto;
 }
 
 .shop-categories__product-bottom strong {
@@ -1361,8 +1374,16 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   }
 
   .shop-categories__product-copy {
-    min-height: 126px;
-    padding: 10px;
+    gap: 7px;
+    padding: 9px;
+  }
+
+  .shop-categories__product-image {
+    aspect-ratio: 1.18 / 1;
+  }
+
+  .shop-categories__product-name {
+    min-height: 34px;
   }
 
   .shop-categories__product-bottom strong {
