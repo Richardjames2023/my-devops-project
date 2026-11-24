@@ -173,10 +173,10 @@ export default function ShopByCategory() {
                   unoptimized
                   sizes="(max-width: 640px) 48vw, (max-width: 1024px) 30vw, 240px"
                 />
+                <span className="shop-categories__image-category">{product.categoryName}</span>
                 <span className="shop-categories__quick-view">Quick view</span>
               </button>
               <div className="shop-categories__product-copy">
-                <span className="shop-categories__product-category">{product.categoryName}</span>
                 <button type="button" className="shop-categories__product-name" onClick={() => openQuickView(product)}>
                   {product.name}
                 </button>
