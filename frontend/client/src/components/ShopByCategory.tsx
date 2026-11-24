@@ -37,12 +37,24 @@ export default function ShopByCategory() {
   const [visibleProductLimit, setVisibleProductLimit] = useState(INITIAL_PRODUCT_LIMIT);
   const [categoryQuery, setCategoryQuery] = useState("");
   const [isCategoryDirectoryOpen, setIsCategoryDirectoryOpen] = useState(false);
-  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);\n  const [isQuickViewClosing, setIsQuickViewClosing] = useState(false);
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+  const [isQuickViewClosing, setIsQuickViewClosing] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("default");
   const [activeGalleryImage, setActiveGalleryImage] = useState("default");
-  const addToCart = useCartStore((state) => state.addToCart);\n\n  useEffect(() => {\n    if (!isQuickViewClosing) return;\n\n    const closeTimer = window.setTimeout(() => {\n      setQuickViewProduct(null);\n      setIsQuickViewClosing(false);\n    }, 280);\n\n    return () => window.clearTimeout(closeTimer);\n  }, [isQuickViewClosing]);
+  const addToCart = useCartStore((state) => state.addToCart);
+
+  useEffect(() => {
+    if (!isQuickViewClosing) return;
+
+    const closeTimer = window.setTimeout(() => {
+      setQuickViewProduct(null);
+      setIsQuickViewClosing(false);
+    }, 280);
+
+    return () => window.clearTimeout(closeTimer);
+  }, [isQuickViewClosing]);
 
   const visibleCategories = useMemo(
     () =>
@@ -105,7 +117,7 @@ export default function ShopByCategory() {
       selectedColor: color,
     });
     toast.success("Product added to cart");
-    setQuickViewProduct(null);
+    closeQuickView();
   };
 
   return (
