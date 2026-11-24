@@ -2085,3 +2085,220 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   overflow-y: hidden;
   scrollbar-width: thin;
 }
+
+
+/* Branded, shopper-friendly category directory */
+.shop-categories__directory-modal {
+  width: min(100%, 820px);
+  max-height: min(88vh, 800px);
+  border: 1px solid rgba(236, 112, 46, 0.16);
+  border-radius: 22px;
+  background: var(--shop-page);
+  box-shadow: 0 28px 90px rgba(8, 28, 65, 0.32);
+}
+.shop-categories__directory-header {
+  position: relative;
+  padding: 30px 32px 20px;
+  background: linear-gradient(115deg, #fff3e9 0%, #ffffff 68%, #f4f7ff 100%);
+}
+.shop-categories__directory-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 9px;
+  color: var(--shop-orange-dark);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+.shop-categories__directory-kicker svg { color: var(--shop-orange); }
+.shop-categories__directory-header h3 {
+  max-width: 560px;
+  color: var(--shop-navy);
+  font-size: clamp(24px, 3vw, 31px);
+  letter-spacing: -0.045em;
+}
+.shop-categories__directory-header p:last-child {
+  max-width: 540px;
+  color: var(--shop-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.shop-categories__directory-modal .shop-categories__modal-close {
+  border-color: rgba(8, 28, 65, 0.1);
+  color: var(--shop-navy);
+  background: #ffffff;
+  box-shadow: 0 3px 12px rgba(8, 28, 65, 0.07);
+}
+.shop-categories__directory-search {
+  min-height: 48px;
+  margin: 18px 32px 16px;
+  border-color: #dfe5ef;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(8, 28, 65, 0.035);
+}
+.shop-categories__directory-search:focus-within {
+  border-color: var(--shop-orange);
+  box-shadow: 0 0 0 3px rgba(236, 112, 46, 0.12);
+}
+.shop-categories__directory-search > svg { color: var(--shop-blue); }
+.shop-categories__directory-search input { font-size: 13px; }
+.shop-categories__directory-list { padding: 0 32px 30px; }
+.shop-categories__directory-featured {
+  display: flex;
+  width: 100%;
+  min-height: 76px;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 13px;
+  border: 1px solid rgba(236, 112, 46, 0.24);
+  border-radius: 14px;
+  padding: 12px 15px;
+  color: #ffffff;
+  background: linear-gradient(105deg, var(--shop-navy) 0%, #12356f 100%);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+.shop-categories__directory-featured:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(8, 28, 65, 0.16);
+}
+.shop-categories__directory-featured-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  color: #ffffff;
+  background: var(--shop-orange);
+}
+.shop-categories__directory-featured .shop-categories__directory-item-copy strong {
+  color: #ffffff;
+  font-size: 14px;
+}
+.shop-categories__directory-featured .shop-categories__directory-item-copy small {
+  color: rgba(255,255,255,0.76);
+}
+.shop-categories__directory-featured > svg {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: #ffffff;
+}
+.shop-categories__directory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.shop-categories__directory-card {
+  display: flex;
+  min-width: 0;
+  min-height: 104px;
+  align-items: flex-start;
+  gap: 11px;
+  border: 1px solid #e5e9f0;
+  border-radius: 13px;
+  padding: 13px 12px;
+  color: var(--shop-navy);
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+.shop-categories__directory-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(236, 112, 46, 0.55);
+  background: #fffaf6;
+  box-shadow: 0 7px 18px rgba(8, 28, 65, 0.07);
+}
+.shop-categories__directory-card-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  color: var(--shop-orange-dark);
+  background: var(--shop-peach);
+}
+.shop-categories__directory-card:nth-child(3n + 2) .shop-categories__directory-card-icon {
+  color: var(--shop-blue);
+  background: var(--shop-blue-light);
+}
+.shop-categories__directory-card .shop-categories__directory-item-copy { gap: 4px; }
+.shop-categories__directory-card .shop-categories__directory-item-copy strong {
+  color: var(--shop-navy);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.shop-categories__directory-card .shop-categories__directory-item-copy small {
+  color: var(--shop-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.shop-categories__directory-card .shop-categories__directory-item-copy em {
+  margin-top: 3px;
+  color: var(--shop-orange-dark);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+.shop-categories__directory-card-arrow {
+  flex: 0 0 auto;
+  margin: 1px 0 0 auto;
+  color: var(--shop-blue);
+  transition: color 150ms ease, transform 150ms ease;
+}
+.shop-categories__directory-card:hover .shop-categories__directory-card-arrow {
+  transform: translate(2px, -2px);
+  color: var(--shop-orange);
+}
+.shop-categories__directory-empty {
+  border: 1px dashed #e3b79f;
+  border-radius: 12px;
+  background: #fffaf6;
+}
+.shop-categories__directory-featured:focus-visible,
+.shop-categories__directory-card:focus-visible {
+  outline: 3px solid var(--shop-orange);
+  outline-offset: 3px;
+}
+@media (max-width: 640px) {
+  .shop-categories__directory-modal {
+    max-height: 90vh;
+    border-radius: 20px 20px 0 0;
+  }
+  .shop-categories__directory-header { padding: 25px 18px 16px; }
+  .shop-categories__directory-header h3 {
+    max-width: calc(100% - 35px);
+    font-size: 24px;
+  }
+  .shop-categories__directory-header p:last-child {
+    max-width: calc(100% - 8px);
+    font-size: 12px;
+  }
+  .shop-categories__directory-search {
+    min-height: 45px;
+    margin: 14px 18px 13px;
+  }
+  .shop-categories__directory-list { padding: 0 18px 22px; }
+  .shop-categories__directory-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .shop-categories__directory-card {
+    min-height: 82px;
+    padding: 10px;
+  }
+  .shop-categories__directory-card-icon {
+    width: 38px;
+    height: 38px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-categories__directory-featured,
+  .shop-categories__directory-card,
+  .shop-categories__directory-card-arrow { transition: none; }
+}
