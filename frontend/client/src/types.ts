@@ -10,6 +10,15 @@ export type ProductType = {
   shortDescription: string;
   description: string;
   price: number;
+  /** Optional merchandising fields supplied by the public catalogue API when available. */
+  compareAtPrice?: number | null;
+  discountPercent?: number | null;
+  reviewSummary?: {
+    averageRating: number | null;
+    totalReviews: number;
+  } | null;
+  soldCount?: number | null;
+  availableQuantity?: number | null;
   sizes: string[];
   colors: string[];
   tags: string[];
