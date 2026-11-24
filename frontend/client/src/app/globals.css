@@ -2302,3 +2302,184 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .shop-categories__directory-card,
   .shop-categories__directory-card-arrow { transition: none; }
 }
+
+
+/* Product quick-view gallery inspired by marketplace product detail layouts */
+.shop-categories__quick-modal {
+  width: min(100%, 980px);
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+  border-radius: 20px;
+}
+.shop-categories__modal-gallery {
+  display: grid;
+  min-width: 0;
+  min-height: 500px;
+  grid-template-columns: 76px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 20px 0 18px 20px;
+  background: #f7f8fb;
+}
+.shop-categories__modal-gallery:not(:has(.shop-categories__gallery-thumbnails)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.shop-categories__modal-image {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid #e9edf3;
+  border-radius: 13px;
+  background: #ffffff;
+}
+.shop-categories__modal-image img {
+  object-fit: contain;
+  padding: 10px;
+}
+.shop-categories__gallery-thumbnails {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 9px;
+  overflow-y: auto;
+  padding: 1px 3px 1px 1px;
+  scrollbar-width: thin;
+}
+.shop-categories__gallery-thumbnail {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid #e0e5ed;
+  border-radius: 9px;
+  padding: 0;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.shop-categories__gallery-thumbnail img {
+  object-fit: cover;
+}
+.shop-categories__gallery-thumbnail:hover,
+.shop-categories__gallery-thumbnail.is-active {
+  border: 2px solid var(--shop-orange);
+  box-shadow: 0 0 0 2px rgba(236, 112, 46, 0.12);
+}
+.shop-categories__gallery-image-count {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  border: 1px solid rgba(8, 28, 65, 0.08);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--shop-navy);
+  background: rgba(255,255,255,0.92);
+  font-size: 10px;
+  font-weight: 750;
+}
+.shop-categories__modal-review-summary {
+  display: flex;
+  min-width: 0;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #e4e8ef;
+  padding: 12px 5px 0;
+  color: var(--shop-muted);
+  font-size: 12px;
+}
+.shop-categories__modal-review-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #b7791f;
+  font-size: 15px;
+  font-weight: 850;
+}
+.shop-categories__modal-review-summary strong {
+  color: var(--shop-navy);
+}
+.shop-categories__modal-review-summary.is-empty {
+  color: var(--shop-muted);
+  font-size: 11px;
+}
+.shop-categories__modal-brand {
+  margin-top: 5px;
+  color: var(--shop-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+.shop-categories__modal-content {
+  min-width: 0;
+  padding: 48px 34px 30px;
+}
+.shop-categories__modal-content h3 {
+  margin-top: 8px;
+}
+.shop-categories__modal-content > p {
+  line-height: 1.75;
+}
+.shop-categories__gallery-thumbnail:focus-visible {
+  outline: 3px solid var(--shop-blue);
+  outline-offset: 2px;
+}
+@media (max-width: 900px) {
+  .shop-categories__quick-modal {
+    width: min(100%, 900px);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+  }
+  .shop-categories__modal-gallery {
+    min-height: 430px;
+    grid-template-columns: 62px minmax(0, 1fr);
+    padding: 15px 0 15px 15px;
+  }
+  .shop-categories__modal-content {
+    padding: 42px 23px 24px;
+  }
+}
+@media (max-width: 640px) {
+  .shop-categories__quick-modal {
+    width: 100%;
+    max-height: 94vh;
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+  .shop-categories__modal-gallery {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 10px;
+    padding: 14px 14px 0;
+  }
+  .shop-categories__modal-image {
+    grid-column: 1;
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 1.2 / 1;
+  }
+  .shop-categories__gallery-thumbnails {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 1px 1px 4px;
+  }
+  .shop-categories__gallery-thumbnail {
+    width: 64px;
+    min-width: 64px;
+  }
+  .shop-categories__modal-review-summary {
+    grid-column: 1;
+    grid-row: 3;
+    padding-top: 9px;
+  }
+  .shop-categories__modal-content {
+    padding: 18px 20px 24px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-categories__gallery-thumbnail { transition: none; }
+}
