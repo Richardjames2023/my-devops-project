@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ArrowUpRight, ChevronDown, ChevronRight, Plus, Search, ShoppingCart, Star, X } from "lucide-react";
+import { ArrowUpRight, BriefcaseBusiness, ChevronDown, ChevronRight, CookingPot, Heart, House, Lightbulb, Luggage, Package, Plus, Search, ShoppingCart, Sprout, Star, Wrench, X } from "lucide-react";
 import { toast } from "react-toastify";
 import { categories, products } from "@/lib/catalogue";
 import useCartStore from "@/stores/cartStore";
@@ -275,9 +275,9 @@ export default function ShopByCategory() {
           >
             <div className="shop-categories__directory-header">
               <div>
-                <p className="shop-categories__eyebrow">EXPLORE THE STORE</p>
-                <h3 id="category-directory-title">All categories</h3>
-                <p>Choose a department to see its products right here.</p>
+                <span className="shop-categories__directory-kicker"><Package size={13} /> CLICKCLICKBUY DEPARTMENTS</span>
+                <h3 id="category-directory-title">Find your next favourite.</h3>
+                <p>Explore a department and discover useful things worth adding to your basket.</p>
               </div>
               <button
                 type="button"
@@ -294,7 +294,7 @@ export default function ShopByCategory() {
                 type="search"
                 value={categoryQuery}
                 onChange={(event) => setCategoryQuery(event.target.value)}
-                placeholder="Search all categories..."
+                placeholder="What are you looking for?"
                 aria-label="Search all categories"
                 autoFocus
               />
@@ -307,41 +307,56 @@ export default function ShopByCategory() {
             <div className="shop-categories__directory-list">
               <button
                 type="button"
-                className="shop-categories__directory-item"
+                className="shop-categories__directory-featured"
                 onClick={() => {
                   selectCategory("all");
                   setIsCategoryDirectoryOpen(false);
                 }}
               >
+                <span className="shop-categories__directory-featured-icon"><Package size={21} /></span>
                 <span className="shop-categories__directory-item-copy">
-                  <strong>All products</strong>
-                  <small>Browse products across every department</small>
+                  <strong>Shop all products</strong>
+                  <small>Browse the complete selection across every department</small>
                 </span>
-                <ChevronRight size={18} />
+                <ChevronRight size={19} />
               </button>
-              {visibleCategories.map((category) => {
-                const count = products.filter((product) => product.categorySlug === category.slug).length;
-                return (
-                  <button
-                    key={category.slug}
-                    type="button"
-                    className="shop-categories__directory-item"
-                    onClick={() => {
-                      selectCategory(category.slug);
-                      setIsCategoryDirectoryOpen(false);
-                    }}
-                  >
-                    <span className="shop-categories__directory-item-copy">
-                      <strong>{category.name}</strong>
-                      <small>{categoryDescriptions[category.slug] ?? "Explore this department"}</small>
-                    </span>
-                    <span className="shop-categories__directory-count">{count} {count === 1 ? "item" : "items"}</span>
-                    <ChevronRight size={18} />
-                  </button>
-                );
-              })}
+              <div className="shop-categories__directory-grid">
+                {visibleCategories.map((category) => {
+                  const count = products.filter((product) => product.categorySlug === category.slug).length;
+                  const CategoryIcon = ({
+                    "home-living": House,
+                    "garden-outdoor": Sprout,
+                    "electrical-lighting": Lightbulb,
+                    "kitchen-dining": CookingPot,
+                    "tools-hardware": Wrench,
+                    "bags-luggage": Luggage,
+                    "personal-care": Heart,
+                    "office-stationery": BriefcaseBusiness,
+                    "home-decor": House,
+                  } as Record<string, typeof House>)[category.slug] ?? Package;
+                  return (
+                    <button
+                      key={category.slug}
+                      type="button"
+                      className="shop-categories__directory-card"
+                      onClick={() => {
+                        selectCategory(category.slug);
+                        setIsCategoryDirectoryOpen(false);
+                      }}
+                    >
+                      <span className="shop-categories__directory-card-icon"><CategoryIcon size={21} /></span>
+                      <span className="shop-categories__directory-item-copy">
+                        <strong>{category.name}</strong>
+                        <small>{categoryDescriptions[category.slug] ?? "Explore this department"}</small>
+                        <em>{count} demo {count === 1 ? "item" : "items"}</em>
+                      </span>
+                      <ArrowUpRight size={16} className="shop-categories__directory-card-arrow" />
+                    </button>
+                  );
+                })}
+              </div>
               {visibleCategories.length === 0 ? (
-                <p className="shop-categories__directory-empty">No categories match your search.</p>
+                <p className="shop-categories__directory-empty">No departments match that search. Try another word.</p>
               ) : null}
             </div>
           </section>
