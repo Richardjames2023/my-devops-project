@@ -63,6 +63,16 @@ export default function ShopByCategory() {
   );
 
   const visibleProducts = filteredProducts.slice(0, visibleProductLimit);
+  const categoryCount = categories.length;
+  const galleryImageEntries = quickViewProduct ? Object.entries(quickViewProduct.images) : [];
+  const galleryViewCount = quickViewProduct ? Math.max(4, galleryImageEntries.length) : 0;
+  const activeGalleryViewNumber = quickViewProduct
+    ? Math.max(1, galleryImageEntries.findIndex(([key]) => key === activeGalleryImage) + 1 || (
+        activeGalleryImage.startsWith("placeholder-")
+          ? galleryImageEntries.length + Number(activeGalleryImage.split("-")[1]) + 1
+          : 1
+      ))
+    : 0;
 
   const selectCategory = (slug: string) => {
     setActiveCategory(slug);
@@ -144,7 +154,7 @@ export default function ShopByCategory() {
             aria-expanded={isCategoryDirectoryOpen}
           >
             All categories <ChevronDown size={15} aria-hidden="true" />
-            <span>{categories.length}</span>
+            <span>{categoryCount}</span>
           </button>
         </div>
       </div>
@@ -398,7 +408,7 @@ export default function ShopByCategory() {
                     <span>Product image placeholder</span>
                   </div>
                 )}
-                <span className="shop-categories__gallery-image-count">{Math.max(4, Object.keys(quickViewProduct.images).length)} views</span>
+                <span className="shop-categories__gallery-image-count">{activeGalleryViewNumber} of {galleryViewCount} views</span>
               </div>
               <div className="shop-categories__gallery-thumbnails" aria-label="Product image views">
                 {Object.entries(quickViewProduct.images).map(([imageKey, imageUrl], index) => (
