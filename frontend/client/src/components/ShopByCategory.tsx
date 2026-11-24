@@ -389,16 +389,16 @@ export default function ShopByCategory() {
             </button>
             <div className="shop-categories__modal-gallery">
               <div className="shop-categories__modal-image">
-                <Image
-                  src={quickViewProduct.images[activeGalleryImage] ?? quickViewProduct.images.default ?? Object.values(quickViewProduct.images)[0]}
-                  alt={quickViewProduct.name}
-                  fill
-                  unoptimized
-                  sizes="(max-width: 700px) 100vw, 520px"
-                />
-                <span className="shop-categories__gallery-image-count">
-                  {Object.keys(quickViewProduct.images).length} {Object.keys(quickViewProduct.images).length === 1 ? "view" : "views"}
-                </span>
+                {quickViewProduct.images[activeGalleryImage] ? (
+                  <Image src={quickViewProduct.images[activeGalleryImage]} alt={quickViewProduct.name} fill unoptimized sizes="(max-width: 700px) 100vw, 520px" />
+                ) : (
+                  <div className="shop-categories__selected-placeholder" role="img" aria-label={`${["Side view", "Detail", "In use"][Number(activeGalleryImage.split("-")[1])] ?? "Additional"} product photo placeholder for ${quickViewProduct.name}`}>
+                    <ImageIcon size={34} />
+                    <strong>{["Side view", "Detail", "In use"][Number(activeGalleryImage.split("-")[1])] ?? "Additional view"}</strong>
+                    <span>Product image placeholder</span>
+                  </div>
+                )}
+                <span className="shop-categories__gallery-image-count">{Math.max(4, Object.keys(quickViewProduct.images).length)} views</span>
               </div>
               <div className="shop-categories__gallery-thumbnails" aria-label="Product image views">
                 {Object.entries(quickViewProduct.images).map(([imageKey, imageUrl], index) => (
@@ -416,11 +416,17 @@ export default function ShopByCategory() {
                 ))}
                 {Object.keys(quickViewProduct.images).length < 4 ? (
                   Array.from({ length: 4 - Object.keys(quickViewProduct.images).length }, (_, index) => (
-                    <div className="shop-categories__gallery-placeholder" key={`placeholder-${index}`} aria-label="Additional product image placeholder">
+                    <button
+                      type="button"
+                      className={`shop-categories__gallery-placeholder ${activeGalleryImage === `placeholder-${index}` ? "is-active" : ""}`}
+                      key={`placeholder-${index}`}
+                      onClick={() => setActiveGalleryImage(`placeholder-${index}`)}
+                      aria-label={`Select ${["Side view", "Detail", "In use"][index] ?? "More views"} placeholder`}
+                      aria-pressed={activeGalleryImage === `placeholder-${index}`}
+                    >
                       <ImageIcon size={19} />
                       <span>{["Side view", "Detail", "In use"][index] ?? "More views"}</span>
-                      <small>Photo coming</small>
-                    </div>
+                    </button>
                   ))
                 ) : null}
               </div>
