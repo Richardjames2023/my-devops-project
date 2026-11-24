@@ -1075,15 +1075,14 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   background: rgba(255, 255, 255, 0.94);
   font-size: 10px;
   font-weight: 750;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 160ms ease, transform 160ms ease;
+  opacity: 1;
+  transform: none;
+  transition: background-color 160ms ease, border-color 160ms ease;
 }
 
-.shop-categories__product-card:hover .shop-categories__quick-view,
-.shop-categories__product-image:focus-visible .shop-categories__quick-view {
-  opacity: 1;
-  transform: translateY(0);
+.shop-categories__quick-view:hover {
+  border-color: rgba(8, 28, 65, 0.2);
+  background: #ffffff;
 }
 
 .shop-categories__product-copy {
@@ -1376,6 +1375,13 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .shop-categories__product-copy {
     gap: 7px;
     padding: 9px;
+  }
+
+  .shop-categories__quick-view {
+    right: 7px;
+    bottom: 7px;
+    padding: 5px 8px;
+    font-size: 9px;
   }
 
   .shop-categories__product-image {
