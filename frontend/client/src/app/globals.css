@@ -3047,3 +3047,97 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .homepage-collection__grid > article:hover,
   .homepage-collection__more button:hover { transform: none; }
 }
+
+
+/* Collection refinements: reclaim vertical space and prioritise products */
+.homepage-collection {
+  margin-top: 18px;
+  padding-top: 25px;
+  border-radius: 30px 30px 0 0;
+}
+.homepage-collection::before {
+  top: -18px;
+  height: 36px;
+}
+.homepage-collection__intro {
+  margin-bottom: 19px;
+}
+.homepage-collection__intro h2 {
+  max-width: 900px;
+  font-size: clamp(28px, 3.3vw, 43px);
+}
+.homepage-collection__title-accent {
+  color: var(--shop-orange);
+}
+.homepage-collection__grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+.homepage-collection__grid > article {
+  min-width: 0;
+}
+@media (max-width: 1024px) {
+  .homepage-collection__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 15px;
+  }
+}
+@media (max-width: 640px) {
+  .homepage-collection {
+    margin-top: 14px;
+    padding: 25px 16px 44px;
+    border-radius: 24px 24px 0 0;
+  }
+  .homepage-collection__intro {
+    margin-bottom: 16px;
+  }
+  .homepage-collection__intro h2 {
+    font-size: clamp(27px, 7vw, 34px);
+    line-height: 1.12;
+  }
+  .homepage-collection__intro p {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .homepage-collection__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .homepage-collection__grid .product-card__add-label {
+    display: none;
+  }
+  .homepage-collection__grid button[aria-label^="Add "] {
+    width: 38px;
+    height: 36px;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+  }
+  .homepage-collection__grid button[aria-label^="Add "] svg {
+    width: 17px;
+    height: 17px;
+  }
+  .homepage-collection__grid > article > div:last-child {
+    gap: 8px;
+    padding: 10px;
+  }
+  .homepage-collection__grid > article > div:last-child > div:last-child {
+    align-items: center;
+    gap: 6px;
+  }
+  .homepage-collection__grid > article h2 {
+    font-size: 12px;
+  }
+  .homepage-collection__grid > article p.text-xs {
+    font-size: 10px;
+  }
+}
+@media (max-width: 420px) {
+  .homepage-collection {
+    padding-inline: 12px;
+  }
+  .homepage-collection__grid {
+    gap: 8px;
+  }
+}
