@@ -2483,3 +2483,131 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .shop-categories__gallery-thumbnail { transition: none; }
 }
+
+
+/* Quick-view: useful gallery placeholders and at-a-glance buying information */
+.shop-categories__modal-gallery {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+.shop-categories__gallery-thumbnails {
+  align-content: start;
+}
+.shop-categories__gallery-thumbnail {
+  min-height: 76px;
+}
+.shop-categories__thumbnail-caption {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  left: 3px;
+  overflow: hidden;
+  border-radius: 4px;
+  padding: 3px 2px;
+  color: #ffffff;
+  background: rgba(8, 28, 65, 0.76);
+  font-size: 8px;
+  font-weight: 750;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shop-categories__gallery-placeholder {
+  display: flex;
+  min-height: 76px;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px dashed #cbd4e2;
+  border-radius: 9px;
+  color: #71809a;
+  background: linear-gradient(145deg, #ffffff, #f0f3f8);
+  text-align: center;
+}
+.shop-categories__gallery-placeholder svg {
+  color: var(--shop-orange);
+}
+.shop-categories__gallery-placeholder span {
+  max-width: 100%;
+  padding: 0 3px;
+  font-size: 8px;
+  font-weight: 700;
+}
+.shop-categories__modal-price-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 9px;
+  margin: 10px 0 14px;
+}
+.shop-categories__modal-price-line .shop-categories__modal-price {
+  margin: 0;
+}
+.shop-categories__modal-price-line del {
+  color: #8993a5;
+  font-size: 13px;
+  font-weight: 600;
+}
+.shop-categories__modal-discount {
+  border-radius: 5px;
+  padding: 4px 7px;
+  color: #a84416;
+  background: #fff0e7;
+  font-size: 11px;
+  font-weight: 850;
+}
+.shop-categories__modal-buying-signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.shop-categories__modal-buying-signals > span {
+  display: inline-flex;
+  min-height: 29px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #e8edf4;
+  border-radius: 7px;
+  padding: 5px 8px;
+  color: var(--shop-navy);
+  background: #f8f9fc;
+  font-size: 11px;
+  font-weight: 750;
+}
+.shop-categories__modal-buying-signals > span:first-child svg {
+  color: #c17a18;
+}
+.shop-categories__modal-buying-signals small {
+  color: #78849a;
+  font-size: 10px;
+  font-weight: 550;
+}
+.shop-categories__modal-buying-signals > span.is-stock svg,
+.shop-categories__modal-buying-signals > span.is-stock {
+  color: #23804b;
+}
+.shop-categories__modal-buying-signals > span.is-low-stock {
+  color: #bd4b1d;
+  border-color: #f5d8c9;
+  background: #fff7f2;
+}
+.shop-categories__modal-buying-signals > span.is-low-stock svg {
+  color: #bd4b1d;
+}
+@media (max-width: 640px) {
+  .shop-categories__gallery-thumbnails {
+    align-items: stretch;
+  }
+  .shop-categories__gallery-thumbnail,
+  .shop-categories__gallery-placeholder {
+    width: 64px;
+    min-width: 64px;
+    min-height: 64px;
+  }
+  .shop-categories__modal-buying-signals {
+    gap: 6px;
+  }
+}
