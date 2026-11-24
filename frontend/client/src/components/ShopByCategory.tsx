@@ -41,6 +41,7 @@ export default function ShopByCategory() {
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("default");
+  const [activeGalleryImage, setActiveGalleryImage] = useState("default");
   const addToCart = useCartStore((state) => state.addToCart);
 
   const visibleCategories = useMemo(
@@ -78,6 +79,7 @@ export default function ShopByCategory() {
     setQuantity(1);
     setSelectedSize(product.sizes[0] ?? "");
     setSelectedColor(product.colors[0] ?? "default");
+    setActiveGalleryImage("default");
   };
 
   const handleAddToCart = (product: Product, amount = 1, size = product.sizes[0] ?? "", color = product.colors[0] ?? "default") => {
@@ -385,17 +387,50 @@ export default function ShopByCategory() {
             >
               <X size={20} />
             </button>
-            <div className="shop-categories__modal-image">
-              <Image
-                src={quickViewProduct.images[selectedColor] ?? quickViewProduct.images.default ?? Object.values(quickViewProduct.images)[0]}
-                alt={quickViewProduct.name}
-                fill
-                unoptimized
-                sizes="(max-width: 700px) 100vw, 420px"
-              />
+            <div className="shop-categories__modal-gallery">
+              <div className="shop-categories__modal-image">
+                <Image
+                  src={quickViewProduct.images[activeGalleryImage] ?? quickViewProduct.images[selectedColor] ?? quickViewProduct.images.default ?? Object.values(quickViewProduct.images)[0]}
+                  alt={quickViewProduct.name}
+                  fill
+                  unoptimized
+                  sizes="(max-width: 700px) 100vw, 520px"
+                />
+                <span className="shop-categories__gallery-image-count">
+                  {Object.keys(quickViewProduct.images).length} {Object.keys(quickViewProduct.images).length === 1 ? "view" : "views"}
+                </span>
+              </div>
+              {Object.entries(quickViewProduct.images).length > 1 ? (
+                <div className="shop-categories__gallery-thumbnails" aria-label="Product image views">
+                  {Object.entries(quickViewProduct.images).map(([imageKey, imageUrl], index) => (
+                    <button
+                      key={imageKey}
+                      type="button"
+                      className={`shop-categories__gallery-thumbnail ${activeGalleryImage === imageKey ? "is-active" : ""}`}
+                      onClick={() => setActiveGalleryImage(imageKey)}
+                      aria-label={`View product image ${index + 1}`}
+                      aria-pressed={activeGalleryImage === imageKey}
+                    >
+                      <Image src={imageUrl} alt="" fill unoptimized sizes="76px" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              {quickViewProduct.reviewSummary && quickViewProduct.reviewSummary.totalReviews > 0 && quickViewProduct.reviewSummary.averageRating !== null ? (
+                <div className="shop-categories__modal-review-summary">
+                  <span className="shop-categories__modal-review-score">
+                    <Star size={16} fill="currentColor" />
+                    {quickViewProduct.reviewSummary.averageRating.toFixed(1)}
+                  </span>
+                  <span><strong>{quickViewProduct.reviewSummary.totalReviews.toLocaleString("en-NG")}</strong> customer reviews</span>
+                </div>
+              ) : (
+                <div className="shop-categories__modal-review-summary is-empty">Be the first to review this product</div>
+              )}
             </div>
             <div className="shop-categories__modal-content">
               <span className="shop-categories__product-category">{quickViewProduct.categoryName}</span>
+              {quickViewProduct.brand ? <span className="shop-categories__modal-brand">{quickViewProduct.brand}</span> : null}
               <h3 id="quick-view-title">{quickViewProduct.name}</h3>
               <strong className="shop-categories__modal-price">{formatPrice(quickViewProduct.price)}</strong>
               <p>{quickViewProduct.description}</p>
@@ -403,7 +438,7 @@ export default function ShopByCategory() {
               {quickViewProduct.colors.length > 0 ? (
                 <label className="shop-categories__option">
                   Colour
-                  <select value={selectedColor} onChange={(event) => setSelectedColor(event.target.value)}>
+                  <select value={selectedColor} onChange={(event) => { setSelectedColor(event.target.value); setActiveGalleryImage(event.target.value); }}>
                     {quickViewProduct.colors.map((color) => <option key={color} value={color}>{color}</option>)}
                   </select>
                 </label>
