@@ -181,17 +181,27 @@ export default function ShopByCategory() {
                   {product.name}
                 </button>
                 <div className="shop-categories__product-price-row">
-                  <strong>{formatPrice(product.price)}</strong>
-                  {product.compareAtPrice && product.compareAtPrice > product.price ? (
-                    <>
-                      <del>{formatPrice(product.compareAtPrice)}</del>
-                      <span className="shop-categories__discount">
-                        {Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)}% off
-                      </span>
-                    </>
-                  ) : product.discountPercent && product.discountPercent > 0 ? (
-                    <span className="shop-categories__discount">{product.discountPercent}% off</span>
-                  ) : null}
+                  <div className="shop-categories__price-details">
+                    <strong>{formatPrice(product.price)}</strong>
+                    {product.compareAtPrice && product.compareAtPrice > product.price ? (
+                      <>
+                        <del>{formatPrice(product.compareAtPrice)}</del>
+                        <span className="shop-categories__discount">
+                          {Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)}% off
+                        </span>
+                      </>
+                    ) : product.discountPercent && product.discountPercent > 0 ? (
+                      <span className="shop-categories__discount">{product.discountPercent}% off</span>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="shop-categories__quick-add"
+                    onClick={() => handleAddToCart(product)}
+                    disabled={product.stockStatus === "out-of-stock"}
+                  >
+                    <Plus size={15} /> Add
+                  </button>
                 </div>
                 {(product.reviewSummary?.totalReviews || product.soldCount || (product.availableQuantity !== undefined && product.availableQuantity !== null)) ? (
                   <div className="shop-categories__product-signals">
@@ -210,16 +220,6 @@ export default function ShopByCategory() {
                     ) : null}
                   </div>
                 ) : null}
-                <div className="shop-categories__product-bottom">
-                  <button
-                    type="button"
-                    className="shop-categories__quick-add"
-                    onClick={() => handleAddToCart(product)}
-                    disabled={product.stockStatus === "out-of-stock"}
-                  >
-                    <Plus size={15} /> Add
-                  </button>
-                </div>
               </div>
             </article>
           ))}
