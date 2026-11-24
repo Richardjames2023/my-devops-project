@@ -2730,3 +2730,38 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     aspect-ratio: 1 / 1;
   }
 }
+
+
+/* Selectable gallery placeholders behave like real gallery thumbnails */
+.shop-categories__gallery-placeholder {
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.shop-categories__gallery-placeholder.is-active {
+  border: 2px solid var(--shop-orange);
+  background: #fff4ed;
+  box-shadow: 0 0 0 2px rgba(242, 105, 40, 0.12);
+}
+.shop-categories__selected-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--shop-navy);
+  background: linear-gradient(145deg, #fff, #f1f4f8);
+}
+.shop-categories__selected-placeholder svg {
+  color: var(--shop-orange);
+}
+.shop-categories__selected-placeholder strong {
+  font-size: 17px;
+  font-weight: 800;
+}
+.shop-categories__selected-placeholder span {
+  color: var(--shop-muted);
+  font-size: 12px;
+}
