@@ -1,10 +1,26 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import Categories from "./Categories";
 import ProductCard from "./ProductCard";
 import Link from "next/link";
 import Filter from "./Filter";
-import { products } from "@/lib/catalogue";
+import { categories, products } from "@/lib/catalogue";
+
+const HOME_FILTERS = [
+  { label: "All finds", slug: "all" },
+  { label: "Home essentials", slug: "home-living" },
+  { label: "Outdoor living", slug: "garden-outdoor" },
+  { label: "Kitchen", slug: "kitchen-dining" },
+  { label: "Lighting", slug: "electrical-lighting" },
+];
+
+const HOMEPAGE_INITIAL_LIMIT = 8;
 
 const ProductList = ({ category, query, sort, params }: { category?: string; query?: string; sort?: string; params: "homepage" | "products" }) => {
+  const [homeFilter, setHomeFilter] = useState("all");
+  const [showAllHomeProducts, setShowAllHomeProducts] = useState(false);
+
   const normalizedCategory = category?.toLowerCase();
   const categoryFilteredProducts =
     !normalizedCategory || normalizedCategory === "all"
@@ -21,7 +37,7 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
       )
     : categoryFilteredProducts;
 
-  const visibleProducts = [...searchedProducts].sort((a, b) => {
+  const visibleProducts = useMemo(() => [...searchedProducts].sort((a, b) => {
     switch (sort) {
       case "oldest": return String(b.id).localeCompare(String(a.id));
       case "asc": return a.price - b.price;
@@ -29,31 +45,87 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
       case "newest":
       default: return 0;
     }
-  });
+  }), [searchedProducts, sort]);
+
+  const homepageProducts = useMemo(() => {
+    const filtered = homeFilter === "all"
+      ? visibleProducts
+      : visibleProducts.filter((product) => product.categorySlug === homeFilter);
+    return params === "homepage" && !showAllHomeProducts
+      ? filtered.slice(0, HOMEPAGE_INITIAL_LIMIT)
+      : filtered;
+  }, [homeFilter, params, showAllHomeProducts, visibleProducts]);
+
+  const homepageFilteredCount = homeFilter === "all"
+    ? visibleProducts.length
+    : visibleProducts.filter((product) => product.categorySlug === homeFilter).length;
 
   return (
-    <div className="w-full">
-      {params === "homepage" && (
-        <div className="mb-5 flex flex-col gap-1 sm:mb-6">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--shop-orange-dark)]">A little something for every day</p>
-          <h2 className="text-2xl font-extrabold tracking-tight text-[var(--shop-navy)] sm:text-3xl">Discover the ClickClickBuy collection</h2>
-          <p className="max-w-2xl text-sm leading-6 text-[var(--shop-muted)] sm:text-base">Explore practical finds for your home, work, everyday routines and time outdoors.</p>
+    <section className={params === "homepage" ? "homepage-collection" : "w-full"} aria-labelledby={params === "homepage" ? "homepage-collection-title" : undefined}>
+      <div className={params === "homepage" ? "homepage-collection__inner" : "w-full"}>
+        {params === "homepage" && (
+          <>
+            <div className="homepage-collection__intro">
+              <span className="homepage-collection__eyebrow">A LITTLE SOMETHING FOR EVERY DAY</span>
+              <div className="homepage-collection__intro-row">
+                <div>
+                  <h2 id="homepage-collection-title">Something useful is waiting for you.</h2>
+                  <p>From everyday essentials to little upgrades, find things that make life easier.</p>
+                </div>
+                <span className="homepage-collection__intro-note" aria-hidden="true">GOOD FINDS. EVERYDAY.</span>
+              </div>
+            </div>
+            <div className="homepage-collection__discovery-bar">
+              <div className="homepage-collection__filters" role="group" aria-label="Filter collection products">
+                {HOME_FILTERS.map((filter) => (
+                  <button
+                    key={filter.slug}
+                    type="button"
+                    className={`homepage-collection__filter ${homeFilter === filter.slug ? "is-active" : ""}`}
+                    aria-pressed={homeFilter === filter.slug}
+                    onClick={() => {
+                      setHomeFilter(filter.slug);
+                      setShowAllHomeProducts(false);
+                    }}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+              <span className="homepage-collection__count">{homepageFilteredCount} finds</span>
+            </div>
+          </>
+        )}
+        {query?.trim() && <p className="mb-4 text-sm text-[var(--shop-muted)]">Search results for <span className="font-semibold text-[var(--shop-navy)]">&ldquo;{query.trim()}&rdquo;</span> · {visibleProducts.length} {visibleProducts.length === 1 ? "product" : "products"} found</p>}
+        {params === "products" && <Categories />}
+        {params === "products" && <Filter />}
+        <div className={params === "homepage" ? "homepage-collection__grid" : "grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"}>
+          {(params === "homepage" ? homepageProducts : visibleProducts).length > 0 ? (params === "homepage" ? homepageProducts : visibleProducts).map((product) => <ProductCard key={product.id} product={product} />) : (
+            <div className="col-span-full rounded-xl border border-[var(--shop-border)] bg-white px-6 py-12 text-center">
+              <h2 className="text-lg font-semibold text-[var(--shop-navy)]">No products found</h2>
+              <p className="mt-2 text-sm text-[var(--shop-muted)]">{params === "homepage" ? "No demonstration products are in this collection yet. Try another selection." : "Try another product name or a broader search term."}</p>
+              {params === "homepage" ? (
+                <button type="button" onClick={() => setHomeFilter("all")} className="mt-4 inline-flex rounded-lg bg-[var(--shop-orange)] px-4 py-2 text-sm font-semibold text-white">See all finds</button>
+              ) : (
+                <Link href="/products" className="mt-4 inline-flex rounded-lg bg-[var(--shop-orange)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--shop-orange-dark)]">Browse all products</Link>
+              )}
+            </div>
+          )}
         </div>
-      )}
-      {query?.trim() && <p className="mb-4 text-sm text-[var(--shop-muted)]">Search results for <span className="font-semibold text-[var(--shop-navy)]">&ldquo;{query.trim()}&rdquo;</span> · {visibleProducts.length} {visibleProducts.length === 1 ? "product" : "products"} found</p>}
-      {params === "products" && <Categories />}
-      {params === "products" && <Filter />}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {visibleProducts.length > 0 ? visibleProducts.map((product) => <ProductCard key={product.id} product={product} />) : (
-          <div className="col-span-full rounded-xl border border-[var(--shop-border)] bg-white px-6 py-12 text-center">
-            <h2 className="text-lg font-semibold text-[var(--shop-navy)]">No products found</h2>
-            <p className="mt-2 text-sm text-[var(--shop-muted)]">Try another product name or a broader search term.</p>
-            <Link href="/products" className="mt-4 inline-flex rounded-lg bg-[var(--shop-orange)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--shop-orange-dark)]">Browse all products</Link>
-          </div>
+        {params === "homepage" ? (
+          homepageFilteredCount > HOMEPAGE_INITIAL_LIMIT && (
+            <div className="homepage-collection__more">
+              <button type="button" onClick={() => setShowAllHomeProducts((current) => !current)}>
+                {showAllHomeProducts ? "Show fewer finds" : "Explore more finds"}
+                <span aria-hidden="true">{showAllHomeProducts ? "↑" : "→"}</span>
+              </button>
+            </div>
+          )
+        ) : (
+          <Link href={category ? `/products/?category=${category}` : "/products"} className="mt-4 flex justify-end text-sm text-gray-500 underline">View all products</Link>
         )}
       </div>
-      <Link href={category ? `/products/?category=${category}` : "/products"} className="mt-4 flex justify-end text-sm text-gray-500 underline">View all products</Link>
-    </div>
+    </section>
   );
 };
 
