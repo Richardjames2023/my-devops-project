@@ -19,7 +19,6 @@ const HOMEPAGE_INITIAL_LIMIT = 10;
 
 const ProductList = ({ category, query, sort, params }: { category?: string; query?: string; sort?: string; params: "homepage" | "products" }) => {
   const [homeFilter, setHomeFilter] = useState("all");
-  const [showAllHomeProducts, setShowAllHomeProducts] = useState(false);
 
   const normalizedCategory = category?.toLowerCase();
   const categoryFilteredProducts =
@@ -51,10 +50,8 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
     const filtered = homeFilter === "all"
       ? visibleProducts
       : visibleProducts.filter((product) => product.categorySlug === homeFilter);
-    return params === "homepage" && !showAllHomeProducts
-      ? filtered.slice(0, HOMEPAGE_INITIAL_LIMIT)
-      : filtered;
-  }, [homeFilter, params, showAllHomeProducts, visibleProducts]);
+    return params === "homepage" ? filtered.slice(0, HOMEPAGE_INITIAL_LIMIT) : filtered;
+  }, [homeFilter, params, visibleProducts]);
 
   const homepageFilteredCount = homeFilter === "all"
     ? visibleProducts.length
@@ -84,7 +81,6 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
                     aria-pressed={homeFilter === filter.slug}
                     onClick={() => {
                       setHomeFilter(filter.slug);
-                      setShowAllHomeProducts(false);
                     }}
                   >
                     {filter.label}
@@ -112,12 +108,12 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
           )}
         </div>
         {params === "homepage" ? (
-          homepageFilteredCount > HOMEPAGE_INITIAL_LIMIT && (
+          homepageFilteredCount > 0 && (
             <div className="homepage-collection__more">
-              <button type="button" onClick={() => setShowAllHomeProducts((current) => !current)}>
-                {showAllHomeProducts ? "Show fewer finds" : "Explore more finds"}
-                <span aria-hidden="true">{showAllHomeProducts ? "↑" : "→"}</span>
-              </button>
+              <Link href={homeFilter === "all" ? "/products" : "/products?category=" + homeFilter}>
+                Explore more finds
+                <span aria-hidden="true">→</span>
+              </Link>
             </div>
           )
         ) : (
