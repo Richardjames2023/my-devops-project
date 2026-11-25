@@ -4,7 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 
 const campaigns = [
   {
-    label: "HOME REFRESH EVENT",
+    label: "FEATURED PROMOTION · HOME",
     headline: "Give your space a fresh start.",
     action: "Shop the home edit",
     href: "/products?category=home-living",
@@ -13,7 +13,7 @@ const campaigns = [
     theme: "home",
   },
   {
-    label: "EVERYDAY TECH PICKS",
+    label: "FEATURED PROMOTION · TECH",
     headline: "Small upgrades. Big difference.",
     action: "Explore tech essentials",
     href: "/products?category=electrical-lighting",
