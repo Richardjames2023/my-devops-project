@@ -8,7 +8,7 @@ const footerGroups = [
     links: [
       { label: "All products", href: "/products" },
       { label: "New arrivals", href: "/products?sort=newest" },
-      { label: "Shop by category", href: "/#shop-by-category" },
+      { label: "Browse categories", href: "/products" },
     ],
   },
   {
@@ -24,7 +24,7 @@ const footerGroups = [
     links: [
       { label: "Help centre", href: "/help" },
       { label: "Track an order", href: "/track-order" },
-      { label: "My account", href: "/account" },
+      { label: "Contact support", href: "/help" },
     ],
   },
 ];
