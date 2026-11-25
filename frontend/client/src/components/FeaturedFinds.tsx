@@ -24,7 +24,7 @@ const promotionalProductIds = [
 
 const promotionalProducts = promotionalProductIds
   .map((id) => products.find((product) => product.id === id))
-  .filter((product) => product && product.compareAtPrice && product.compareAtPrice > product.price);
+  .filter((product): product is NonNullable<typeof product> => Boolean(product && product.compareAtPrice && product.compareAtPrice > product.price));
 
 const getDiscount = (price: number, compareAtPrice: number) =>
   Math.round(((compareAtPrice - price) / compareAtPrice) * 100);
@@ -74,7 +74,7 @@ export default function FeaturedFinds() {
                   <Link
                     href={`/products/${product.id}`}
                     className="featured-finds__deal-slide"
-                    style={{ "--deal-index": index, "--deal-count": promotionalProducts.length } as React.CSSProperties}
+                    style={{ animationDelay: `${index * 4}s` }}
                     key={product.id}
                     aria-label={`${product.name}, ${discount}% off`}
                   >
