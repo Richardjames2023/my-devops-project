@@ -3522,3 +3522,122 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
  .featured-finds__product-name{font-size:9px;max-width:calc(100% - 42px)}
  .featured-finds__product-image{width:38px;min-width:38px;max-width:38px}
 }
+
+
+/* Homepage campaign strip: remove redundant product grid and tighten section rhythm */
+.homepage-collection {
+  padding-bottom: 16px;
+}
+.featured-finds {
+  padding: 10px clamp(16px, 5vw, 64px) 12px;
+  background: #fbfaf8;
+}
+.featured-finds__campaigns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+}
+.featured-finds__campaign {
+  min-height: 172px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--shop-navy);
+  isolation: isolate;
+  box-shadow: 0 5px 16px rgba(8, 28, 65, 0.10);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+.featured-finds__campaign:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(8, 28, 65, 0.16);
+}
+.featured-finds__campaign-photo {
+  z-index: -2;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 350ms ease;
+}
+.featured-finds__campaign:hover .featured-finds__campaign-photo {
+  transform: scale(1.035);
+}
+.featured-finds__campaign-shade {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(8, 28, 65, .94) 0%, rgba(8, 28, 65, .78) 42%, rgba(8, 28, 65, .08) 100%);
+}
+.featured-finds__campaign--tech .featured-finds__campaign-shade {
+  background: linear-gradient(90deg, rgba(8, 28, 65, .94) 0%, rgba(8, 28, 65, .78) 44%, rgba(8, 28, 65, .12) 100%);
+}
+.featured-finds__campaign-copy {
+  width: 68%;
+  padding: 20px 24px;
+}
+.featured-finds__campaign-copy .featured-finds__campaign-label {
+  display: inline-flex;
+  width: max-content;
+  margin: 0 0 10px;
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: 3px;
+  padding: 5px 8px;
+  color: #fff;
+  background: var(--shop-orange);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+.featured-finds__campaign-copy h2 {
+  max-width: 310px;
+  margin: 0;
+  color: #fff;
+  font-size: clamp(20px, 2vw, 28px);
+  font-weight: 850;
+  letter-spacing: -.045em;
+  line-height: 1.08;
+  text-shadow: 0 2px 12px rgba(0,0,0,.16);
+}
+.featured-finds__campaign-copy strong {
+  min-height: 34px;
+  align-items: center;
+  margin-top: 13px;
+  border: 1px solid var(--shop-orange);
+  border-radius: 5px;
+  padding: 7px 11px;
+  color: #fff;
+  background: var(--shop-orange);
+  font-size: 10px;
+  font-weight: 850;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.featured-finds__campaign:hover .featured-finds__campaign-copy strong {
+  border-color: #f58243;
+  background: #f58243;
+}
+.storefront-footer-wrap {
+  margin-top: 8px;
+}
+@media (max-width: 760px) {
+  .homepage-collection { padding-bottom: 12px; }
+  .featured-finds { padding: 8px 16px 10px; }
+  .featured-finds__campaigns { gap: 9px; }
+  .featured-finds__campaign { min-height: 142px; }
+  .featured-finds__campaign-copy { width: 75%; padding: 15px 16px; }
+  .featured-finds__campaign-copy .featured-finds__campaign-label { margin-bottom: 8px; font-size: 8px; }
+  .featured-finds__campaign-copy h2 { max-width: 245px; font-size: 20px; }
+  .featured-finds__campaign-copy strong { min-height: 31px; margin-top: 10px; padding: 6px 9px; font-size: 9px; }
+}
+@media (max-width: 640px) {
+  .featured-finds { padding: 7px 14px 8px; }
+  .featured-finds__campaigns { grid-template-columns: 1fr; }
+  .featured-finds__campaign { min-height: 128px; }
+  .featured-finds__campaign-copy { width: 78%; padding: 13px 14px; }
+  .featured-finds__campaign-copy h2 { max-width: 230px; font-size: 19px; }
+  .featured-finds__campaign-photo { object-position: center; }
+  .storefront-footer-wrap { margin-top: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .featured-finds__campaign,
+  .featured-finds__campaign-photo,
+  .featured-finds__campaign-copy strong { transition: none; }
+  .featured-finds__campaign:hover,
+  .featured-finds__campaign:hover .featured-finds__campaign-photo { transform: none; }
+}
