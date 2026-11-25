@@ -1,43 +1,31 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
-import { products } from "@/lib/catalogue";
 
 const campaigns = [
   {
-    label: "THE HOME REFRESH",
-    headline: "A fresh feel for every room",
-    action: "Shop the collection",
+    label: "HOME REFRESH EVENT",
+    headline: "Give your space a fresh start.",
+    action: "Shop the home edit",
     href: "/products?category=home-living",
-    image: products.find((product) => product.id === "demo-home-001")?.images.default,
-    imageAlt: "Woven home storage and living essentials",
+    image: "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1200&q=85",
+    imageAlt: "Warm, styled living room with carefully selected home furnishings",
     theme: "home",
   },
   {
-    label: "WORK & TECH PICKS",
-    headline: "Little upgrades. Better workdays.",
-    action: "Explore the picks",
-    href: "/products?category=office-stationery",
-    image: products.find((product) => product.id === "demo-office-001")?.images.default,
-    imageAlt: "Everyday workspace and office essentials",
-    theme: "work",
+    label: "EVERYDAY TECH PICKS",
+    headline: "Small upgrades. Big difference.",
+    action: "Explore tech essentials",
+    href: "/products?category=electrical-lighting",
+    image: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=1200&q=85",
+    imageAlt: "Modern laptop and workspace setup",
+    theme: "tech",
   },
 ];
 
-const spotlightProducts = [
-  "demo-home-001",
-  "demo-garden-001",
-  "demo-kitchen-001",
-  "demo-tools-001",
-  "demo-bags-001",
-  "demo-care-001",
-  "demo-office-001",
-  "demo-decor-001",
-].map((id) => products.find((product) => product.id === id)).filter((product) => product !== undefined);
-
 export default function FeaturedFinds() {
   return (
-    <section className="featured-finds" aria-label="Promotional banners and featured products">
+    <section className="featured-finds" aria-label="Featured promotional campaigns">
       <div className="featured-finds__inner">
         <div className="featured-finds__campaigns">
           {campaigns.map((campaign) => (
@@ -46,44 +34,22 @@ export default function FeaturedFinds() {
               className={`featured-finds__campaign featured-finds__campaign--${campaign.theme}`}
               key={campaign.label}
             >
+              <Image
+                className="featured-finds__campaign-photo"
+                src={campaign.image}
+                alt={campaign.imageAlt}
+                fill
+                unoptimized
+                sizes="(max-width: 640px) 100vw, 50vw"
+              />
+              <span className="featured-finds__campaign-shade" aria-hidden="true" />
               <div className="featured-finds__campaign-copy">
                 <span className="featured-finds__campaign-label">{campaign.label}</span>
                 <h2>{campaign.headline}</h2>
-                <strong>{campaign.action} <ArrowUpRight size={14} aria-hidden="true" /></strong>
+                <strong>{campaign.action} <ArrowUpRight size={15} aria-hidden="true" /></strong>
               </div>
-              {campaign.image ? (
-                <div className="featured-finds__campaign-image">
-                  <Image src={campaign.image} alt={campaign.imageAlt} fill unoptimized sizes="(max-width: 640px) 100vw, 50vw" />
-                </div>
-              ) : null}
             </Link>
           ))}
-        </div>
-
-        <div className="featured-finds__spotlight">
-          <div className="featured-finds__spotlight-intro">
-            <span>CLICKCLICKBUY FINDS</span>
-            <h2>Everyday essentials</h2>
-            <p>Find useful things for every day.</p>
-            <Link href="/products">Shop all <ArrowUpRight size={15} aria-hidden="true" /></Link>
-          </div>
-
-          <div className="featured-finds__products">
-            {spotlightProducts.map((product) => (
-              <Link href={`/products/${product.id}`} className="featured-finds__product" key={product.id}>
-                <span className="featured-finds__product-name">{product.name}</span>
-                <span className="featured-finds__product-image">
-                  <Image
-                    src={product.images.default}
-                    alt={product.name}
-                    fill
-                    unoptimized
-                    sizes="64px"
-                  />
-                </span>
-              </Link>
-            ))}
-          </div>
         </div>
       </div>
     </section>
