@@ -20,6 +20,7 @@ const CartPageContent = () => {
   const { cart } = useCartStore();
   const subtotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
+  const itemOffers = cart.reduce((total, item) => total + Math.max(0, (item.compareAtPrice ?? item.price) - item.price) * item.quantity, 0);
 
   if (activeStep === 1) {
     return (
@@ -89,7 +90,12 @@ const CartPageContent = () => {
               <span>{shippingForm.email}</span>
               <span>{shippingForm.phone}</span>
               <span>{shippingForm.address}</span>
-              <span>{shippingForm.city}</span>
+              {shippingForm.flatSuite && <span>{shippingForm.flatSuite}</span>}
+              <span>{shippingForm.address}</span>
+              {shippingForm.landmark && <span>Near {shippingForm.landmark}</span>}
+              <span>{shippingForm.area}, {shippingForm.city}, {shippingForm.state}</span>
+              <span>{shippingForm.deliverySpeed === "express" ? "Express delivery" : "Standard delivery"}</span>
+              {shippingForm.deliveryNote && <span>Delivery note: {shippingForm.deliveryNote}</span>}
               <button type="button" onClick={() => router.push("/cart?step=2")}>Edit delivery details</button>
             </div>
           ) : (
@@ -118,7 +124,7 @@ const CartPageContent = () => {
         </section>
 
         <aside className="checkout-panel checkout-review">
-          <h2><MapPin size={19}/> Review Your Order</h2>
+          <h2><MapPin size={19}/> Your basket</h2>
           <div className="checkout-review-items">
             {cart.map((item) => {
               const image = item.images[item.selectedColor] ?? item.images.default ?? Object.values(item.images)[0];
@@ -133,9 +139,10 @@ const CartPageContent = () => {
             })}
           </div>
           <div className="checkout-review-totals">
-            <div><span>Subtotal</span><strong>{formatNaira(subtotal)}</strong></div>
-            <div><span>Delivery</span><span className="checkout-delivery-estimate">Calculated at checkout</span></div>
-            <div className="is-total"><span>Total <small>(before delivery)</small></span><strong>{formatNaira(subtotal)}</strong></div>
+            <div><span>Items (VAT included)</span><strong>{formatNaira(subtotal)}</strong></div>
+            {itemOffers > 0 && <div className="checkout-review-offers"><span>Offers on items</span><strong>−{formatNaira(itemOffers)}</strong></div>}
+            <div><span>Delivery</span><span className="checkout-delivery-estimate">{shippingForm ? "Fee confirmed at checkout" : "Choose an address"}</span></div>
+            <div className="is-total"><span>Total to pay</span><strong>{formatNaira(subtotal)}</strong></div>
           </div>
           {activeStep >= 3 ? (
             <>
@@ -147,7 +154,7 @@ const CartPageContent = () => {
             </>
           ) : (
             <>
-              <p className="checkout-review-hint">Check your items and quantities before continuing.</p>
+              <p className="checkout-review-hint">{shippingForm ? "Delivery details saved for this checkout. Check your basket before continuing." : "Your basket total updates as you change item quantities."}</p>
               <button type="button" className="checkout-review-action" onClick={() => router.push("/cart?step=3")} disabled={!cart.length || !shippingForm}>
                 Continue to Review <ArrowRight size={17}/>
               </button>
