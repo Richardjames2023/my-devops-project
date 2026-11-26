@@ -30,8 +30,18 @@ const ProductDetailsClient = ({ product, selectedColor: initialColor, selectedSi
     ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
     : product.discountPercent ?? null;
   const recommendations = products
-    .filter((item) => item.id !== product.id && item.categorySlug === product.categorySlug)
-    .slice(0, 4);
+    .filter((item) => item.id !== product.id)
+    .map((item) => {
+      const sharedTags = item.tags.filter((tag) => product.tags.includes(tag)).length;
+      const sameDepartment = item.categorySlug === product.categorySlug;
+      return { item, score: (sameDepartment ? 100 : 0) + sharedTags * 10 };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4)
+    .map(({ item }) => item);
+  const hasOnlySameDepartmentRecommendations = recommendations.every(
+    (item) => item.categorySlug === product.categorySlug,
+  );
   const rating = product.reviewSummary?.averageRating;
   const reviews = product.reviewSummary?.totalReviews ?? 0;
   const stockLabel = product.stockStatus === "out-of-stock"
@@ -144,7 +154,7 @@ const ProductDetailsClient = ({ product, selectedColor: initialColor, selectedSi
           <div className="product-recommendations__heading">
             <div>
               <h2 id="product-recommendations-title">You might also like</h2>
-              <p>More from {product.categoryName}.</p>
+              <p>{hasOnlySameDepartmentRecommendations ? `More from ${product.categoryName}.` : "More products selected for you."}</p>
             </div>
             <Link href={`/products?category=${product.categorySlug}`}>View all <span aria-hidden="true">→</span></Link>
           </div>
