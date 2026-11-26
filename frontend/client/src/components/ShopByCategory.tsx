@@ -487,11 +487,11 @@ export default function ShopByCategory() {
               <div className="shop-categories__modal-buying-signals">
                 <span><Star size={14} fill="currentColor" /> {quickViewProduct.reviewSummary?.averageRating?.toFixed(1) ?? "New"} <small>({(quickViewProduct.reviewSummary?.totalReviews ?? 0).toLocaleString("en-NG")} reviews)</small></span>
                 <span><ShoppingCart size={13} /> {(quickViewProduct.soldCount ?? 0).toLocaleString("en-NG")} sold</span>
-                <span className={quickViewProduct.availableQuantity !== undefined && quickViewProduct.availableQuantity <= 5 ? "is-low-stock" : "is-stock"}>
+                <span className={typeof quickViewProduct.availableQuantity === "number" && quickViewProduct.availableQuantity <= 5 ? "is-low-stock" : "is-stock"}>
                   <Package size={13} />
                   {quickViewProduct.stockStatus === "out-of-stock" || quickViewProduct.availableQuantity === 0
                     ? "Out of stock"
-                    : quickViewProduct.availableQuantity !== undefined
+                    : typeof quickViewProduct.availableQuantity === "number"
                       ? `${quickViewProduct.availableQuantity} available`
                       : "Stock updating"}
                 </span>
