@@ -4755,3 +4755,55 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   font-size: 10px;
   line-height: 1.5;
 }
+
+
+/* Detailed Nigerian delivery form and basket summary */
+.checkout-delivery-form { display: flex; flex-direction: column; gap: 13px; }
+.checkout-field { display: flex; min-width: 0; flex-direction: column; gap: 5px; }
+.checkout-field > label, .checkout-delivery-speed legend { color: var(--shop-body); font-size: 11px; font-weight: 750; }
+.checkout-field input, .checkout-field select, .checkout-field textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #d5deeb;
+  border-radius: 9px;
+  padding: 9px 12px;
+  color: var(--shop-navy);
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+}
+.checkout-field textarea { min-height: 76px; resize: vertical; }
+.checkout-field input:focus, .checkout-field select:focus, .checkout-field textarea:focus {
+  border-color: var(--shop-blue); outline: 2px solid rgba(29,82,189,.1);
+}
+.checkout-field-error { margin: 0; color: #c24136; font-size: 10px; }
+.checkout-field-help { margin: -5px 0 0; color: var(--shop-muted); font-size: 10px; line-height: 1.5; }
+.checkout-form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.checkout-save-address { display: flex; flex-direction: column; gap: 11px; border: 1px solid #d8e6ff; border-radius: 11px; padding: 12px; background: #f0f5ff; }
+.checkout-checkbox { display: flex; align-items: center; gap: 9px; color: var(--shop-body); font-size: 12px; font-weight: 750; }
+.checkout-checkbox input { width: 17px; height: 17px; accent-color: var(--shop-blue); }
+.checkout-delivery-speed { min-width: 0; margin: 0; border: 0; padding: 0; }
+.checkout-delivery-speed legend { margin-bottom: 9px; }
+.checkout-delivery-speed-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.checkout-delivery-speed-options > label {
+  position: relative; display: flex; min-width: 0; flex-direction: column; gap: 9px;
+  border: 1px solid #d5deeb; border-radius: 11px; padding: 12px; cursor: pointer;
+}
+.checkout-delivery-speed-options > label.is-selected { border: 2px solid var(--shop-blue); padding: 11px; background: #f7faff; }
+.checkout-delivery-speed-options input { position: absolute; opacity: 0; pointer-events: none; }
+.checkout-speed-top { display: flex; align-items: center; gap: 8px; color: var(--shop-navy); }
+.checkout-speed-top > svg:first-child { color: var(--shop-blue); }
+.checkout-speed-top strong { font-size: 12px; }
+.checkout-speed-top > svg:last-child { margin-left: auto; color: var(--shop-blue); }
+.checkout-fastest { border-radius: 20px; padding: 3px 7px; color: #9a4c16; background: #ffeadb; font-size: 9px; font-weight: 800; }
+.checkout-delivery-speed-options label > small { min-height: 30px; color: var(--shop-muted); font-size: 10px; line-height: 1.45; }
+.checkout-speed-foot { border-top: 1px dashed #dce3ed; padding-top: 8px; color: var(--shop-muted); font-size: 9px; line-height: 1.4; }
+.checkout-review-offers { color: #07834d !important; font-weight: 750; }
+.checkout-review-offers strong { color: #07834d !important; }
+.checkout-review .checkout-review-hint { margin-top: 13px; }
+.checkout-delivery-summary { line-height: 1.5; }
+@media (max-width: 640px) {
+  .checkout-form-grid, .checkout-delivery-speed-options { grid-template-columns: minmax(0,1fr); }
+  .checkout-delivery-form { gap: 12px; }
+  .checkout-field input, .checkout-field select { min-height: 44px; }
+}
