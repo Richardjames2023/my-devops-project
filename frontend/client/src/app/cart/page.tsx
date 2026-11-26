@@ -19,13 +19,15 @@ const CartPageContent = () => {
   const [showPaymentItems, setShowPaymentItems] = useState(false);
   const [promoCode, setPromoCode] = useState("");
   const activeStep = Number(searchParams.get("step") || "1");
+  const mockStatus = searchParams.get("mockStatus");
+  const isMockResult = activeStep === 4 && (mockStatus === "success" || mockStatus === "failed");
   const { cart } = useCartStore();
   const subtotal = useMemo(() => cart.reduce((total, item) => total + item.price * item.quantity, 0), [cart]);
   const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const itemOffers = cart.reduce((total, item) => total + Math.max(0, (item.compareAtPrice ?? item.price) - item.price) * item.quantity, 0);
   const itemTotalBeforeOffers = subtotal + itemOffers;
   const isCheckout = activeStep >= 2;
-  const step = Math.min(3, Math.max(1, activeStep - 1));
+  const step = activeStep >= 3 ? 2 : 1;
 
   const renderBasketItems = (compact = false) => cart.map((item) => {
     const image = item.images[item.selectedColor] ?? item.images.default ?? Object.values(item.images)[0];
@@ -65,6 +67,30 @@ const CartPageContent = () => {
             <Link href="/products" className="cart-continue-shopping">Continue Shopping</Link>
           </section>
           <aside className="cart-order-summary" aria-label="Order summary"><h2>Order Summary</h2><div className="cart-summary-row"><span>Subtotal</span><strong>{formatNaira(subtotal)}</strong></div><div className="cart-summary-row cart-summary-delivery"><span>Delivery</span><span>Calculated at checkout</span></div><div className="cart-summary-total"><span>Total <small>(before delivery)</small></span><strong>{formatNaira(subtotal)}</strong></div><button type="button" onClick={() => router.push("/cart?step=2")} disabled={!cart.length} className="cart-checkout-button">Proceed to Checkout <ArrowRight size={18}/></button></aside>
+        </div>
+      </main>
+    );
+  }
+
+  if (isMockResult) {
+    const successful = mockStatus === "success";
+    return (
+      <main className="checkout-flow">
+        <div className={successful ? "checkout-result-card is-success" : "checkout-result-card is-failed"}>
+          <div className="checkout-result-icon">{successful ? <CheckCircle2 size={34}/> : <CreditCard size={34}/>}</div>
+          <span className="checkout-result-demo-label">DEMO PAYMENT FLOW · MOCK WEBHOOK RESULT</span>
+          <h1>{successful ? "Payment confirmed" : "Payment was not completed"}</h1>
+          <p>{successful ? "The mock Paystack gateway has returned a successful payment, and the simulated webhook has confirmed the result. This is a demonstration only; no real payment or order was created." : "The mock Paystack gateway returned a failed or cancelled payment. The simulated webhook has marked the payment as unsuccessful. No real payment was attempted."}</p>
+          <div className="checkout-result-reference"><span>Demo payment reference</span><strong>{searchParams.get("reference") || "CCB-DEMO"}</strong></div>
+          {successful ? (
+            <div className="checkout-result-next"><CheckCircle2 size={18}/><span>Payment status: SUCCESS (simulated webhook)</span></div>
+          ) : (
+            <div className="checkout-result-next is-error"><CreditCard size={18}/><span>Payment status: FAILED (simulated webhook)</span></div>
+          )}
+          <div className="checkout-result-actions">
+            {successful ? <Link href="/products">Continue shopping <ArrowRight size={16}/></Link> : <Link href="/cart?step=3">Try payment again <ArrowRight size={16}/></Link>}
+            <Link href="/cart">Return to basket</Link>
+          </div>
         </div>
       </main>
     );
@@ -124,8 +150,11 @@ const CartPageContent = () => {
               <CheckCircle2 size={18}/>
             </div>
             <div className="checkout-payment-notice"><ShieldCheck size={18}/><p>You'll complete payment on Paystack. ClickClickBuy does not collect or store your card details.</p></div>
-            <div className="checkout-payment-unavailable"><CreditCard size={17}/><p>Online payment will become available when this storefront is connected to the order and payment APIs. No payment has been taken and your order has not yet been placed.</p></div>
-            <button type="button" className="checkout-paystack-continue" disabled>Continue to Paystack <ArrowRight size={17}/></button>
+            <div className="checkout-payment-unavailable"><CreditCard size={17}/><p>Demo mode: this opens a simulated Paystack-hosted checkout so we can review the complete customer journey. No real charge will be made.</p></div>
+            <Link
+              href={`/mock-paystack?amount=${encodeURIComponent(String(subtotal))}&email=${encodeURIComponent(shippingForm?.email ?? "")}&reference=CCB-DEMO-${Date.now()}`}
+              className="checkout-paystack-continue"
+            >Continue to Paystack <ArrowRight size={17}/></Link>
             <button type="button" className="checkout-cancel-payment" onClick={() => router.push("/cart?step=2")}>Back to delivery details</button>
           </section>
           <aside className="checkout-flow-card checkout-payment-summary"><h2>Order summary</h2><div className="checkout-flow-totals"><div><span>Items (VAT included)</span><strong>{formatNaira(itemTotalBeforeOffers)}</strong></div>{itemOffers > 0 && <div className="checkout-offer-row"><span>Offers on items</span><strong>− {formatNaira(itemOffers)}</strong></div>}<div><span>Delivery</span><span className="checkout-flow-muted">Calculated from your address</span></div><div className="checkout-flow-total"><strong>Total to pay</strong><strong>{formatNaira(subtotal)}</strong></div></div><div className="checkout-payment-summary-address"><strong>Delivering to</strong>{shippingForm ? <><span>{shippingForm.name}</span><span>{shippingForm.address}{shippingForm.flatSuite ? `, ${shippingForm.flatSuite}` : ""}</span><span>{shippingForm.area}, {shippingForm.city}, {shippingForm.state}</span><button type="button" onClick={() => router.push("/cart?step=2")}>Edit delivery details</button></> : <span>Delivery details have not been saved in this session.</span>}</div></aside>
