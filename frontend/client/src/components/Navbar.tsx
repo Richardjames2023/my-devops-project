@@ -26,6 +26,7 @@ import {
 import SearchBar from "./SearchBar";
 import ShoppingCartIcon from "./ShoppingCartIcon";
 import AnnouncementBar from "./AnnouncementBar";
+import { products as demoProducts } from "@/lib/catalogue";
 import { apiRequest, getAccessToken } from "@/lib/api/client";
 
 const navigation = [
@@ -160,13 +161,20 @@ const Navbar = () => {
   const topRatedProduct = ratedProducts[0] ?? null;
   const previewProducts = catalogProducts.length > 0
     ? catalogProducts
-    : activeCategory.products.map((product, index) => ({
-        id: `fallback-${activeCategory.slug}-${index}`,
-        name: product.name,
-        slug: activeCategory.slug,
-        images: [{ url: product.image, isPrimary: true, sortOrder: index }],
-        reviewSummary: { averageRating: null, totalReviews: 0 },
-      }));
+    : activeCategory.products.flatMap((product, index) => {
+        const demoProduct = demoProducts.find((item) => item.name === product.name);
+        if (!demoProduct) return [];
+        return [{
+          id: String(demoProduct.id),
+          name: demoProduct.name,
+          slug: String(demoProduct.id),
+          images: [{ url: product.image, isPrimary: true, sortOrder: index }],
+          reviewSummary: {
+            averageRating: demoProduct.reviewSummary?.averageRating ?? null,
+            totalReviews: demoProduct.reviewSummary?.totalReviews ?? 0,
+          },
+        }];
+      });
 
   return (
     <>
