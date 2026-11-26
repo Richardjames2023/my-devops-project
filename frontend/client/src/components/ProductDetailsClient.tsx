@@ -7,6 +7,8 @@ import { Heart, Minus, Plus, ShoppingCart, ShieldCheck, Truck, RotateCcw, Packag
 import { toast } from "react-toastify";
 import type { ProductType } from "@/types";
 import useCartStore from "@/stores/cartStore";
+import ProductCard from "@/components/ProductCard";
+import { products } from "@/lib/catalogue";
 
 type Props = { product: ProductType; selectedColor: string; selectedSize: string };
 
@@ -27,6 +29,9 @@ const ProductDetailsClient = ({ product, selectedColor: initialColor, selectedSi
   const discount = product.compareAtPrice && product.compareAtPrice > product.price
     ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
     : product.discountPercent ?? null;
+  const recommendations = products
+    .filter((item) => item.id !== product.id && item.categorySlug === product.categorySlug)
+    .slice(0, 4);
   const rating = product.reviewSummary?.averageRating;
   const reviews = product.reviewSummary?.totalReviews ?? 0;
   const stockLabel = product.stockStatus === "out-of-stock"
@@ -133,6 +138,23 @@ const ProductDetailsClient = ({ product, selectedColor: initialColor, selectedSi
           {activeTab === "reviews" && <><h2>Customer reviews</h2>{rating != null ? <div className="product-detail__review-summary"><strong>★ {rating.toFixed(1)} / 5</strong><span>Based on {reviews.toLocaleString("en-NG")} review records in this demonstration catalogue.</span></div> : <p>Customer reviews will appear here when available.</p>}<p className="product-detail__demo-note">Individual review comments are not yet available for this demonstration product.</p></>}
         </div>
       </div>
+
+      {recommendations.length > 0 && (
+        <section className="product-recommendations" aria-labelledby="product-recommendations-title">
+          <div className="product-recommendations__heading">
+            <div>
+              <h2 id="product-recommendations-title">You might also like</h2>
+              <p>More from {product.categoryName}.</p>
+            </div>
+            <Link href={`/products?category=${product.categorySlug}`}>View all <span aria-hidden="true">→</span></Link>
+          </div>
+          <div className="product-recommendations__grid">
+            {recommendations.map((recommendedProduct) => (
+              <ProductCard key={recommendedProduct.id} product={recommendedProduct} variant="catalogue" />
+            ))}
+          </div>
+        </section>
+      )}
     </section>
   );
 };
