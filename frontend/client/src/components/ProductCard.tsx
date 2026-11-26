@@ -34,7 +34,7 @@ const ProductCard = ({ product, variant = "default" }: { product: ProductType; v
       <article className="catalogue-card">
         <Link href={`/products/${product.id}`} className="catalogue-card__image-link">
           <div className="catalogue-card__image">
-            <Image src={imageSrc} alt={product.name} fill sizes="(max-width: 640px) 50vw, (max-width: 1100px) 33vw, 25vw" className="object-contain transition-transform duration-300 hover:scale-105"/>
+            <Image src={imageSrc} alt={product.name} fill loading="lazy" sizes="(max-width: 640px) 50vw, (max-width: 1100px) 33vw, 25vw" className="object-contain transition-transform duration-300 hover:scale-105"/>
           </div>
         </Link>
         {discount !== null && discount > 0 && <span className="catalogue-card__discount">{discount}% off</span>}
