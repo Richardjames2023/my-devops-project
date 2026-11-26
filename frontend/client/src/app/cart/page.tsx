@@ -78,14 +78,14 @@ const CartPageContent = () => {
       <main className="checkout-flow">
         <div className={successful ? "checkout-result-card is-success" : "checkout-result-card is-failed"}>
           <div className="checkout-result-icon">{successful ? <CheckCircle2 size={34}/> : <CreditCard size={34}/>}</div>
-          <span className="checkout-result-demo-label">DEMO PAYMENT FLOW · MOCK WEBHOOK RESULT</span>
+          <span className="checkout-result-demo-label">DEMO PAYMENT FLOW · SIMULATED GATEWAY RESULT</span>
           <h1>{successful ? "Payment confirmed" : "Payment was not completed"}</h1>
-          <p>{successful ? "The mock Paystack gateway has returned a successful payment, and the simulated webhook has confirmed the result. This is a demonstration only; no real payment or order was created." : "The mock Paystack gateway returned a failed or cancelled payment. The simulated webhook has marked the payment as unsuccessful. No real payment was attempted."}</p>
+          <p>{successful ? "The mock gateway is showing the successful outcome that would follow a verified Paystack webhook. This is a demonstration only; no real payment, webhook or order was created." : "The mock gateway is showing a failed or cancelled outcome as if confirmed by the backend after a Paystack notification. No real payment or webhook was attempted."}</p>
           <div className="checkout-result-reference"><span>Demo payment reference</span><strong>{searchParams.get("reference") || "CCB-DEMO"}</strong></div>
           {successful ? (
-            <div className="checkout-result-next"><CheckCircle2 size={18}/><span>Payment status: SUCCESS (simulated webhook)</span></div>
+            <div className="checkout-result-next"><CheckCircle2 size={18}/><span>Payment status: SUCCESS (mock confirmation)</span></div>
           ) : (
-            <div className="checkout-result-next is-error"><CreditCard size={18}/><span>Payment status: FAILED (simulated webhook)</span></div>
+            <div className="checkout-result-next is-error"><CreditCard size={18}/><span>Payment status: FAILED (mock confirmation)</span></div>
           )}
           <div className="checkout-result-actions">
             {successful ? <Link href="/products">Continue shopping <ArrowRight size={16}/></Link> : <Link href="/cart?step=3">Try payment again <ArrowRight size={16}/></Link>}
@@ -152,7 +152,7 @@ const CartPageContent = () => {
             <div className="checkout-payment-notice"><ShieldCheck size={18}/><p>You'll complete payment on Paystack. ClickClickBuy does not collect or store your card details.</p></div>
             <div className="checkout-payment-unavailable"><CreditCard size={17}/><p>Demo mode: this opens a simulated Paystack-hosted checkout so we can review the complete customer journey. No real charge will be made.</p></div>
             <Link
-              href={`/mock-paystack?amount=${encodeURIComponent(String(subtotal))}&email=${encodeURIComponent(shippingForm?.email ?? "")}&reference=CCB-DEMO-${Date.now()}`}
+              href={`/mock-paystack?amount=${encodeURIComponent(String(subtotal))}&reference=CCB-DEMO-${Date.now()}`}
               className="checkout-paystack-continue"
             >Continue to Paystack <ArrowRight size={17}/></Link>
             <button type="button" className="checkout-cancel-payment" onClick={() => router.push("/cart?step=2")}>Back to delivery details</button>
