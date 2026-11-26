@@ -4537,3 +4537,16 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .cart-progress-steps { gap: 12px; }
   .cart-progress-step { font-size: 10px; }
 }
+
+
+/* Cart refinements: remove redundant step banner and keep order summary in view */
+.cart-page { margin-top: 28px; }
+.cart-order-summary {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+}
+@media (max-width: 640px) {
+  .cart-page { margin-top: 18px; }
+  .cart-order-summary { position: static; }
+}
