@@ -61,16 +61,16 @@ const ShippingForm = ({ setShippingForm, initialValues }: { setShippingForm: (da
           <label className={selectedSpeed === "standard" ? "is-selected" : ""}>
             <input type="radio" value="standard" {...register("deliverySpeed")}/>
             <span className="checkout-speed-top"><Truck size={17}/><strong>Standard</strong><Check size={17}/></span>
-            <small>ARRIVES · 2 to 4 working days</small>
-            <strong className="checkout-speed-arrival">2 to 4 working days</strong>
-            <span className="checkout-speed-foot">From ₦1,500</span>
+            <small>DELIVERY ESTIMATE</small>
+            <strong className="checkout-speed-arrival">Estimate confirmed for your area</strong>
+            <span className="checkout-speed-foot">Fee confirmed for your address</span>
           </label>
           <label className={selectedSpeed === "express" ? "is-selected" : ""}>
             <input type="radio" value="express" {...register("deliverySpeed")}/>
             <span className="checkout-speed-top"><Clock3 size={17}/><strong>Express</strong><span className="checkout-fastest">Faster option</span></span>
-            <small>ARRIVES · Next working day</small>
-            <strong className="checkout-speed-arrival">Next working day</strong>
-            <span className="checkout-speed-foot">From ₦3,500</span>
+            <small>DELIVERY ESTIMATE</small>
+            <strong className="checkout-speed-arrival">Express availability confirmed for your area</strong>
+            <span className="checkout-speed-foot">Express fee confirmed for your address</span>
           </label>
         </div>
         <p className="checkout-field-help">Fees depend on your area and the size of your order. Sundays are not delivery days. Final delivery fee is confirmed for your address.</p>
