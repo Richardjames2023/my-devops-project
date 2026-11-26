@@ -4550,3 +4550,14 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .cart-page { margin-top: 18px; }
   .cart-order-summary { position: static; }
 }
+
+
+/* Align the order summary with the cart-items panel, below its heading */
+.cart-content-grid--items > .cart-order-summary {
+  margin-top: 48px;
+}
+@media (max-width: 640px) {
+  .cart-content-grid--items > .cart-order-summary {
+    margin-top: 0;
+  }
+}
