@@ -69,7 +69,7 @@ const CartPageContent = () => {
     <main className="cart-page">
       {activeStep === 1 ? (
         <>
-          <div className="cart-content-grid">
+          <div className="cart-content-grid cart-content-grid--items">
             <section className="cart-items-section" aria-labelledby="cart-heading">
               <div className="cart-section-heading">
                 <h2 id="cart-heading">{activeStep === 1 ? "Your Shopping Bag" : steps.find((step) => step.id === activeStep)?.title ?? "Your Shopping Bag"}</h2>
