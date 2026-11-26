@@ -4225,3 +4225,117 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .product-detail__tab-panel { min-height: 80px; padding: 14px 0; }
   .product-recommendations { margin-top: 28px; }
 }
+
+
+/* Mobile product detail: switch to a true single-column shopping flow.
+   This override intentionally follows the tablet rules above. */
+@media (max-width: 640px) {
+  .product-detail {
+    width: calc(100% - 28px);
+    max-width: 520px;
+    margin: 12px auto 28px;
+  }
+  .product-detail__breadcrumb {
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 10px;
+    line-height: 1.4;
+  }
+  .product-detail__main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 17px;
+  }
+  .product-detail__gallery {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 9px;
+  }
+  .product-detail__hero-image {
+    order: 0;
+    width: 100%;
+    aspect-ratio: 1.12 / 1;
+    max-height: none;
+    border-radius: 13px;
+  }
+  .product-detail__thumbs {
+    order: 1;
+    display: flex;
+    width: 100%;
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 1px 6px;
+    scrollbar-width: none;
+  }
+  .product-detail__thumbs::-webkit-scrollbar { display: none; }
+  .product-detail__thumbs button {
+    width: 58px;
+    min-width: 58px;
+    height: 58px;
+    aspect-ratio: 1;
+    border-radius: 9px;
+  }
+  .product-detail__summary {
+    width: 100%;
+    min-width: 0;
+  }
+  .product-detail__category { padding: 6px 10px; font-size: 9px; }
+  .product-detail__brand { margin: 8px 0 4px; font-size: 11px; }
+  .product-detail__summary h1 {
+    max-width: 100%;
+    font-size: clamp(25px, 7vw, 31px);
+    line-height: 1.12;
+    overflow-wrap: anywhere;
+  }
+  .product-detail__rating { margin-top: 9px; font-size: 12px; }
+  .product-detail__rating > span { font-size: 18px; }
+  .product-detail__price-row { gap: 8px; margin-top: 12px; }
+  .product-detail__price-row > strong { font-size: 29px; }
+  .product-detail__price-row del { font-size: 13px; }
+  .product-detail__price-row > span { padding: 5px 8px; font-size: 10px; }
+  .product-detail__description { margin-top: 9px; font-size: 13px; line-height: 1.55; }
+  .product-detail__buying-points { gap: 8px; margin-top: 11px; font-size: 11px; }
+  .product-detail__buying-points > div { gap: 7px; }
+  .product-detail__buying-points a { display: inline-block; margin-left: 3px; }
+  .product-detail__options { width: 100%; margin-top: 14px; }
+  .product-detail__options legend,
+  .product-detail__size-list > span { font-size: 12px; }
+  .product-detail__swatches { gap: 9px; }
+  .product-detail__swatches button { min-width: 40px; min-height: 40px; }
+  .product-detail__size-list { margin-top: 13px; }
+  .product-detail__stock-row {
+    width: 100%;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .product-detail__quantity > span { font-size: 12px; }
+  .product-detail__quantity > div { min-height: 42px; }
+  .product-detail__quantity button { width: 40px; height: 40px; }
+  .product-detail__stock { padding: 9px 11px; font-size: 11px; }
+  .product-detail__actions { width: 100%; gap: 9px; margin-top: 13px; }
+  .product-detail__add { min-height: 52px; border-radius: 10px; font-size: 14px; }
+  .product-detail__wishlist { width: 52px; flex-basis: 52px; }
+  .product-detail__assurances {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px 0;
+  }
+  .product-detail__assurances div { font-size: 10px; }
+  .product-detail__assurances > span { font-size: 9px; }
+  .product-detail__demo-note { font-size: 9px; }
+  .product-detail__information { margin-top: 18px; }
+  .product-detail__tabs { gap: 18px; }
+  .product-detail__tabs button { min-height: 44px; font-size: 11px; }
+  .product-detail__tab-panel { min-height: 70px; padding: 12px 0; }
+  .product-detail__tab-panel h2 { font-size: 16px; }
+  .product-detail__tab-panel p { font-size: 12px; }
+  .product-recommendations { margin-top: 25px; }
+  .product-recommendations__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
