@@ -50,6 +50,7 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [selectedTag, setSelectedTag] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -71,8 +72,9 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
     const max = maxPrice === "" ? Number.POSITIVE_INFINITY : Number(maxPrice);
     return product.price >= min && product.price <= max
       && (selectedBrands.length === 0 || selectedBrands.includes(product.brand))
-      && (!inStockOnly || product.stockStatus !== "out-of-stock");
-  }), [searchedProducts, minPrice, maxPrice, selectedBrands, inStockOnly]);
+      && (!inStockOnly || product.stockStatus !== "out-of-stock")
+      && (!selectedTag || product.tags.includes(selectedTag));
+  }), [searchedProducts, minPrice, maxPrice, selectedBrands, inStockOnly, selectedTag]);
 
   const visibleProducts = useMemo(() => [...filteredProducts].sort((a, b) => {
     switch (sort) {
@@ -94,7 +96,8 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
   const categoryName = categoryFilteredProducts[0]?.categoryName ?? categories.find((item) => item.slug === normalizedCategory)?.name ?? "All products";
   const brands = [...new Set(categoryFilteredProducts.map((product) => product.brand))].sort();
   const maxCataloguePrice = Math.max(...categoryFilteredProducts.map((product) => product.price), 100000);
-  const activeFilterCount = selectedBrands.length + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0) + (inStockOnly ? 1 : 0);
+  const activeFilterCount = selectedBrands.length + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0) + (inStockOnly ? 1 : 0) + (selectedTag ? 1 : 0);
+  const subcategoryTags = [...new Set(categoryFilteredProducts.flatMap((product) => product.tags))].slice(0, 3);
 
   const updateSort = (value: string) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -102,7 +105,7 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
     else next.set("sort", value);
     router.push(`/products?${next.toString()}`, { scroll: false });
   };
-  const clearFilters = () => { setMinPrice(""); setMaxPrice(""); setSelectedBrands([]); setInStockOnly(false); };
+  const clearFilters = () => { setMinPrice(""); setMaxPrice(""); setSelectedBrands([]); setInStockOnly(false); setSelectedTag(""); };
 
   if (params === "products") {
     return (
@@ -134,9 +137,9 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
             </div>
           </div>
 
-          {categoryInfo?.subcategories && (
-            <div className="category-shop__subcategories" aria-label="Popular subcategories">
-              {categoryInfo.subcategories.map((item) => <button type="button" key={item} onClick={() => router.push(`/products?category=${normalizedCategory}&q=${encodeURIComponent(item.split(" ")[0])}`)}>{item}</button>)}
+          {subcategoryTags.length > 0 && (
+            <div className="category-shop__subcategories" aria-label="Popular product tags">
+              {subcategoryTags.map((tag) => <button type="button" key={tag} className={selectedTag === tag ? "is-active" : ""} aria-pressed={selectedTag === tag} onClick={() => setSelectedTag((current) => current === tag ? "" : tag)}>{tag.replace(/\b\w/g, (letter) => letter.toUpperCase())}</button>)}
             </div>
           )}
 
