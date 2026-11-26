@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ProductCard from "./ProductCard";
 import Link from "next/link";
 import { products, categories } from "@/lib/catalogue";
@@ -50,7 +50,11 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [selectedTag, setSelectedTag] = useState("");
+  const [visibleCount, setVisibleCount] = useState(9);
+  const [isDraggingCategories, setIsDraggingCategories] = useState(false);
+  const categoryFlowRef = useRef<HTMLDivElement>(null);
+  const categoryDragRef = useRef({ active: false, startX: 0, scrollLeft: 0, moved: false });
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -72,9 +76,8 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
     const max = maxPrice === "" ? Number.POSITIVE_INFINITY : Number(maxPrice);
     return product.price >= min && product.price <= max
       && (selectedBrands.length === 0 || selectedBrands.includes(product.brand))
-      && (!inStockOnly || product.stockStatus !== "out-of-stock")
-      && (!selectedTag || product.tags.includes(selectedTag));
-  }), [searchedProducts, minPrice, maxPrice, selectedBrands, inStockOnly, selectedTag]);
+      && (!inStockOnly || product.stockStatus !== "out-of-stock");
+  }), [searchedProducts, minPrice, maxPrice, selectedBrands, inStockOnly]);
 
   const visibleProducts = useMemo(() => [...filteredProducts].sort((a, b) => {
     switch (sort) {
@@ -97,7 +100,44 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
   const brands = [...new Set(categoryFilteredProducts.map((product) => product.brand))].sort();
   const maxCataloguePrice = Math.max(...categoryFilteredProducts.map((product) => product.price), 100000);
   const activeFilterCount = selectedBrands.length + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0) + (inStockOnly ? 1 : 0) + (selectedTag ? 1 : 0);
-  const subcategoryTags = [...new Set(categoryFilteredProducts.flatMap((product) => product.tags))].slice(0, 3);
+  const displayedProducts = visibleProducts.slice(0, visibleCount);
+  const hasMoreProducts = displayedProducts.length < visibleProducts.length;
+
+  useEffect(() => {
+    setVisibleCount(9);
+  }, [normalizedCategory, normalizedQuery, minPrice, maxPrice, selectedBrands, inStockOnly, sort]);
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current;
+    if (!sentinel || !hasMoreProducts) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisibleCount((count) => Math.min(count + 9, visibleProducts.length));
+      }
+    }, { rootMargin: "240px 0px" });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreProducts, visibleProducts.length]);
+
+  const handleCategoryPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const element = categoryFlowRef.current;
+    if (!element || event.pointerType === "touch") return;
+    categoryDragRef.current = { active: true, startX: event.clientX, scrollLeft: element.scrollLeft, moved: false };
+    setIsDraggingCategories(true);
+    element.setPointerCapture(event.pointerId);
+  };
+  const handleCategoryPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const element = categoryFlowRef.current;
+    const drag = categoryDragRef.current;
+    if (!element || !drag.active) return;
+    const distance = event.clientX - drag.startX;
+    if (Math.abs(distance) > 4) drag.moved = true;
+    element.scrollLeft = drag.scrollLeft - distance;
+  };
+  const stopCategoryDrag = () => {
+    categoryDragRef.current.active = false;
+    setIsDraggingCategories(false);
+  };
 
   const updateSort = (value: string) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -137,11 +177,33 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
             </div>
           </div>
 
-          {subcategoryTags.length > 0 && (
-            <div className="category-shop__subcategories" aria-label="Popular product tags">
-              {subcategoryTags.map((tag) => <button type="button" key={tag} className={selectedTag === tag ? "is-active" : ""} aria-pressed={selectedTag === tag} onClick={() => setSelectedTag((current) => current === tag ? "" : tag)}>{tag.replace(/\b\w/g, (letter) => letter.toUpperCase())}</button>)}
-            </div>
-          )}
+          <div
+            className={`category-shop__subcategories ${isDraggingCategories ? "is-dragging" : ""}`}
+            aria-label="Browse departments"
+            ref={categoryFlowRef}
+            onPointerDown={handleCategoryPointerDown}
+            onPointerMove={handleCategoryPointerMove}
+            onPointerUp={stopCategoryDrag}
+            onPointerCancel={stopCategoryDrag}
+            onLostPointerCapture={stopCategoryDrag}
+          >
+            <Link href="/products" aria-current={!normalizedCategory || normalizedCategory === "all" ? "page" : undefined}>Everything</Link>
+            {categories.map((item) => (
+              <Link
+                href={`/products?category=${item.slug}`}
+                key={item.slug}
+                aria-current={normalizedCategory === item.slug ? "page" : undefined}
+                onClick={(event) => {
+                  if (categoryDragRef.current.moved) {
+                    event.preventDefault();
+                    categoryDragRef.current.moved = false;
+                  }
+                }}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
 
           <div className="category-shop__toolbar">
             <button type="button" className="category-shop__filter-toggle" onClick={() => setFiltersOpen((open) => !open)}><SlidersHorizontal size={15}/> Filters {activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
@@ -174,7 +236,11 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
 
             <div className="category-shop__results">
               {visibleProducts.length > 0 ? (
-                <div className="category-shop__grid">{visibleProducts.map((product) => <ProductCard key={product.id} product={product} variant="catalogue"/>)}</div>
+                <>
+                  <div className="category-shop__grid">{displayedProducts.map((product) => <ProductCard key={product.id} product={product} variant="catalogue"/>)}</div>
+                  {hasMoreProducts && <div className="category-shop__load-more" ref={loadMoreRef} aria-live="polite">Loading more products…</div>}
+                  {!hasMoreProducts && visibleProducts.length > 9 && <p className="category-shop__end-message">You've reached the end of the catalogue.</p>}
+                </>
               ) : <div className="category-shop__empty"><h2>No products match these filters</h2><p>Try adjusting your filters or browsing the full catalogue.</p><button type="button" onClick={clearFilters}>Clear filters</button></div>}
             </div>
           </div>
