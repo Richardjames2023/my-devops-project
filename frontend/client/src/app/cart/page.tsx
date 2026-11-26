@@ -28,18 +28,13 @@ const CartPageContent = () => {
   const router = useRouter();
   const [shippingForm, setShippingForm] = useState<ShippingFormInputs>();
   const activeStep = Number(searchParams.get("step") || "1");
-  const { cart, addToCart, removeFromCart } = useCartStore();
+  const { cart, updateQuantity, removeFromCart } = useCartStore();
 
   const subtotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
 
   const changeQuantity = (item: (typeof cart)[number], quantity: number) => {
-    if (quantity < 1) {
-      removeFromCart(item);
-      return;
-    }
-    removeFromCart(item);
-    addToCart({ ...item, quantity });
+    updateQuantity(item, quantity);
   };
 
   const summary = (
@@ -72,17 +67,12 @@ const CartPageContent = () => {
 
   return (
     <main className="cart-page">
-      <div className="cart-step-banner">
-        <span>{activeStep}</span>
-        <h1>{steps.find((step) => step.id === activeStep)?.title ?? "Shopping Cart"}</h1>
-      </div>
-
       {activeStep === 1 ? (
         <>
           <div className="cart-content-grid">
             <section className="cart-items-section" aria-labelledby="cart-heading">
               <div className="cart-section-heading">
-                <h2 id="cart-heading">Your Shopping Bag</h2>
+                <h2 id="cart-heading">{activeStep === 1 ? "Your Shopping Bag" : steps.find((step) => step.id === activeStep)?.title ?? "Your Shopping Bag"}</h2>
                 <span>({itemCount} {itemCount === 1 ? "item" : "items"})</span>
               </div>
 
