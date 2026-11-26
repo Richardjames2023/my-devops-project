@@ -138,9 +138,20 @@ const CartPageContent = () => {
             <div className="is-total"><span>Total <small>(before delivery)</small></span><strong>{formatNaira(subtotal)}</strong></div>
           </div>
           {activeStep >= 3 ? (
-            <div className="checkout-review-note">Your order is ready for payment initiation. Paystack checkout will be connected to the order-creation flow.</div>
+            <>
+              <p className="checkout-review-hint">Review your delivery details and order before placing it.</p>
+              <button type="button" className="checkout-review-action" disabled aria-disabled="true">
+                Place Order <ArrowRight size={17}/>
+              </button>
+              <p className="checkout-review-note">Order placement will be enabled when Paystack initialization is connected.</p>
+            </>
           ) : (
-            <p className="checkout-review-hint">Check your items and quantities before continuing.</p>
+            <>
+              <p className="checkout-review-hint">Check your items and quantities before continuing.</p>
+              <button type="button" className="checkout-review-action" onClick={() => router.push("/cart?step=3")} disabled={!cart.length || !shippingForm}>
+                Continue to Review <ArrowRight size={17}/>
+              </button>
+            </>
           )}
         </aside>
       </div>
