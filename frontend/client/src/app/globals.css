@@ -4807,3 +4807,23 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .checkout-delivery-form { gap: 12px; }
   .checkout-field input, .checkout-field select { min-height: 44px; }
 }
+
+
+.checkout-speed-arrival {
+  color: #087d49;
+  font-size: 15px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+.checkout-delivery-speed-options label > small {
+  min-height: 0;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+.checkout-delivery-speed-options .checkout-speed-foot {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 750;
+}
