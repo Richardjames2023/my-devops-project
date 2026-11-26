@@ -14,7 +14,6 @@ function MockPaystackContent() {
   const rawAmount = Number(params.get("amount") ?? 0);
   const amount = Number.isFinite(rawAmount) && rawAmount > 0 ? rawAmount : 0;
   const reference = params.get("reference") || "CCB-DEMO";
-  const email = params.get("email") || "";
 
   const finish = (status: "success" | "failed") => {
     const query = new URLSearchParams({ step: "4", mockStatus: status, reference });
@@ -34,7 +33,6 @@ function MockPaystackContent() {
           <div className="mock-paystack-merchant"><span className="mock-paystack-merchant-mark">C</span><div><strong>ClickClickBuy</strong><small>Payment checkout</small></div></div>
           <div className="mock-paystack-amount"><span>You're paying</span><strong>{formatNaira(amount)}</strong><small>NGN · Nigerian Naira</small></div>
           <div className="mock-paystack-reference"><span>Payment reference</span><strong>{reference}</strong></div>
-          {email && <div className="mock-paystack-reference"><span>Receipt email</span><strong>{email}</strong></div>}
           <div className="mock-paystack-method"><CreditCard size={19}/><div><strong>Card payment</strong><small>Simulated card payment option</small></div><span>DEMO</span></div>
           <div className="mock-paystack-simulate">
             <h2>Simulate the payment outcome</h2>
