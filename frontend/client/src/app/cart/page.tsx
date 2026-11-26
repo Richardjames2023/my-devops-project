@@ -23,6 +23,7 @@ const CartPageContent = () => {
   const subtotal = useMemo(() => cart.reduce((total, item) => total + item.price * item.quantity, 0), [cart]);
   const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const itemOffers = cart.reduce((total, item) => total + Math.max(0, (item.compareAtPrice ?? item.price) - item.price) * item.quantity, 0);
+  const itemTotalBeforeOffers = subtotal + itemOffers;
   const isCheckout = activeStep >= 2;
   const step = Math.min(3, Math.max(1, activeStep - 1));
 
@@ -98,14 +99,14 @@ const CartPageContent = () => {
             <h2>Your basket</h2>
             <div className="checkout-basket-list">{renderBasketItems(true)}</div>
             <div className="checkout-flow-totals">
-              <div><span>Items (VAT included)</span><strong>{formatNaira(subtotal)}</strong></div>
+              <div><span>Items (VAT included)</span><strong>{formatNaira(itemTotalBeforeOffers)}</strong></div>
               {itemOffers > 0 && <div className="checkout-offer-row"><span>Offers on items</span><strong>− {formatNaira(itemOffers)}</strong></div>}
               <div><span>Delivery</span><span className="checkout-flow-muted">Choose an address</span></div>
               <div className="checkout-flow-total"><strong>Total to pay</strong><strong>{formatNaira(subtotal)}</strong></div>
             </div>
             <label className="checkout-promo-label" htmlFor="checkout-promo">Have a promo code?</label>
-            <div className="checkout-promo-row"><input id="checkout-promo" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} placeholder="e.g. WELCOME10"/><button type="button" disabled={!promoCode.trim()}>Apply</button></div>
-            <p className="checkout-basket-footnote">{itemCount} {itemCount === 1 ? "item" : "items"}. Stock is checked again when payment starts.</p>
+            <div className="checkout-promo-row"><input id="checkout-promo" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} placeholder="e.g. WELCOME10"/><button type="button" disabled title="Coupon validation will be enabled with the checkout API">Apply</button></div>
+            <p className="checkout-basket-footnote">{itemCount} {itemCount === 1 ? "item" : "items"}. Stock is checked again when payment starts. Promo-code validation will be connected with the checkout API.</p>
           </aside>
         </div>
       ) : (
@@ -127,7 +128,7 @@ const CartPageContent = () => {
             <button type="button" className="checkout-paystack-continue" disabled>Continue to Paystack <ArrowRight size={17}/></button>
             <button type="button" className="checkout-cancel-payment" onClick={() => router.push("/cart?step=2")}>Back to delivery details</button>
           </section>
-          <aside className="checkout-flow-card checkout-payment-summary"><h2>Order summary</h2><div className="checkout-flow-totals"><div><span>Items (VAT included)</span><strong>{formatNaira(subtotal)}</strong></div>{itemOffers > 0 && <div className="checkout-offer-row"><span>Offers on items</span><strong>− {formatNaira(itemOffers)}</strong></div>}<div><span>Delivery</span><span className="checkout-flow-muted">Confirmed for your address</span></div><div className="checkout-flow-total"><strong>Total to pay</strong><strong>{formatNaira(subtotal)}</strong></div></div><div className="checkout-payment-summary-address"><strong>Delivering to</strong>{shippingForm ? <><span>{shippingForm.name}</span><span>{shippingForm.address}{shippingForm.flatSuite ? `, ${shippingForm.flatSuite}` : ""}</span><span>{shippingForm.area}, {shippingForm.city}, {shippingForm.state}</span><button type="button" onClick={() => router.push("/cart?step=2")}>Edit delivery details</button></> : <span>Delivery details have not been saved in this session.</span>}</div></aside>
+          <aside className="checkout-flow-card checkout-payment-summary"><h2>Order summary</h2><div className="checkout-flow-totals"><div><span>Items (VAT included)</span><strong>{formatNaira(itemTotalBeforeOffers)}</strong></div>{itemOffers > 0 && <div className="checkout-offer-row"><span>Offers on items</span><strong>− {formatNaira(itemOffers)}</strong></div>}<div><span>Delivery</span><span className="checkout-flow-muted">Calculated from your address</span></div><div className="checkout-flow-total"><strong>Total to pay</strong><strong>{formatNaira(subtotal)}</strong></div></div><div className="checkout-payment-summary-address"><strong>Delivering to</strong>{shippingForm ? <><span>{shippingForm.name}</span><span>{shippingForm.address}{shippingForm.flatSuite ? `, ${shippingForm.flatSuite}` : ""}</span><span>{shippingForm.area}, {shippingForm.city}, {shippingForm.state}</span><button type="button" onClick={() => router.push("/cart?step=2")}>Edit delivery details</button></> : <span>Delivery details have not been saved in this session.</span>}</div></aside>
         </div>
       )}
     </main>
