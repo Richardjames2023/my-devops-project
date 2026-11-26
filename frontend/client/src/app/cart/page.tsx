@@ -1,154 +1,153 @@
 "use client";
 
-import PaymentForm from "@/components/PaymentForm";
 import ShippingForm from "@/components/ShippingForm";
 import useCartStore from "@/stores/cartStore";
 import { ShippingFormInputs } from "@/types";
-import { ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, CreditCard, MapPin, ShieldCheck, Truck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
-const steps = [
-  { id: 1, title: "Shopping Cart" },
-  { id: 2, title: "Shipping Address" },
-  { id: 3, title: "Payment Method" },
-];
-
 const formatNaira = (amount: number) =>
-  new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    maximumFractionDigits: 0,
-  }).format(amount);
+  new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(amount);
 
 const CartPageContent = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [shippingForm, setShippingForm] = useState<ShippingFormInputs>();
   const activeStep = Number(searchParams.get("step") || "1");
-  const { cart, updateQuantity, removeFromCart } = useCartStore();
-
+  const { cart } = useCartStore();
   const subtotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
   const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
 
-  const changeQuantity = (item: (typeof cart)[number], quantity: number) => {
-    updateQuantity(item, quantity);
-  };
-
-  const summary = (
-    <aside className="cart-order-summary" aria-label="Order summary">
-      <h2>Order Summary</h2>
-      <div className="cart-summary-row">
-        <span>Subtotal</span>
-        <strong>{formatNaira(subtotal)}</strong>
-      </div>
-      <div className="cart-summary-row cart-summary-delivery">
-        <span>Delivery</span>
-        <span>Calculated at checkout</span>
-      </div>
-      <div className="cart-summary-total">
-        <span>Total <small>(before delivery)</small></span>
-        <strong>{formatNaira(subtotal)}</strong>
-      </div>
-      {activeStep === 1 && (
-        <button
-          type="button"
-          onClick={() => router.push("/cart?step=2", { scroll: false })}
-          disabled={cart.length === 0}
-          className="cart-checkout-button"
-        >
-          Proceed to Checkout <ArrowRight size={18} />
-        </button>
-      )}
-    </aside>
-  );
+  if (activeStep === 1) {
+    return (
+      <main className="cart-page">
+        <div className="cart-content-grid cart-content-grid--items">
+          <section className="cart-items-section" aria-labelledby="cart-heading">
+            <div className="cart-section-heading">
+              <h1 id="cart-heading">Your Shopping Bag</h1>
+              <span>({itemCount} {itemCount === 1 ? "item" : "items"})</span>
+            </div>
+            {cart.length ? (
+              <div className="cart-items-list">
+                {cart.map((item) => {
+                  const image = item.images[item.selectedColor] ?? item.images.default ?? Object.values(item.images)[0];
+                  return (
+                    <article className="cart-item" key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}>
+                      <Link className="cart-item-image" href={`/products/${item.id}`} aria-label={`View ${item.name}`}>
+                        {image ? <Image src={image} alt={item.name} fill sizes="92px" /> : null}
+                      </Link>
+                      <div className="cart-item-info">
+                        <Link href={`/products/${item.id}`} className="cart-item-name">{item.name}</Link>
+                        {(item.selectedColor !== "default" || item.selectedSize) && <p className="cart-item-variant">{[item.selectedColor !== "default" ? item.selectedColor : "", item.selectedSize].filter(Boolean).join(" · ")}</p>}
+                        <strong className="cart-item-unit-price">{formatNaira(item.price)}</strong>
+                      </div>
+                      <div className="cart-quantity-control"><span>{item.quantity}</span></div>
+                      <strong className="cart-item-line-total">{formatNaira(item.price * item.quantity)}</strong>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="cart-empty"><h3>Your shopping bag is empty</h3><p>Find something useful for your home, work and everyday life.</p><Link href="/products">Explore products <ArrowRight size={16}/></Link></div>
+            )}
+            <Link href="/products" className="cart-continue-shopping">Continue Shopping</Link>
+          </section>
+          <aside className="cart-order-summary" aria-label="Order summary">
+            <h2>Order Summary</h2>
+            <div className="cart-summary-row"><span>Subtotal</span><strong>{formatNaira(subtotal)}</strong></div>
+            <div className="cart-summary-row cart-summary-delivery"><span>Delivery</span><span>Calculated at checkout</span></div>
+            <div className="cart-summary-total"><span>Total <small>(before delivery)</small></span><strong>{formatNaira(subtotal)}</strong></div>
+            <button type="button" onClick={() => router.push("/cart?step=2")} disabled={!cart.length} className="cart-checkout-button">Proceed to Checkout <ArrowRight size={18}/></button>
+          </aside>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="cart-page">
-      {activeStep === 1 ? (
-        <>
-          <div className="cart-content-grid cart-content-grid--items">
-            <section className="cart-items-section" aria-labelledby="cart-heading">
-              <div className="cart-section-heading">
-                <h2 id="cart-heading">{activeStep === 1 ? "Your Shopping Bag" : steps.find((step) => step.id === activeStep)?.title ?? "Your Shopping Bag"}</h2>
-                <span>({itemCount} {itemCount === 1 ? "item" : "items"})</span>
-              </div>
+    <main className="checkout-page">
+      <header className="checkout-page__header">
+        <h1>Checkout <span>(3 Steps)</span></h1>
+      </header>
+      <nav className="checkout-progress" aria-label="Checkout progress">
+        <div className="is-active"><span>1</span><strong>Delivery</strong></div>
+        <i />
+        <div className={activeStep >= 3 ? "is-active" : ""}><span>2</span><strong>Payment</strong></div>
+        <i />
+        <div className={activeStep >= 3 ? "is-active" : ""}><span>3</span><strong>Review</strong></div>
+      </nav>
 
-              {cart.length > 0 ? (
-                <div className="cart-items-list">
-                  {cart.map((item) => {
-                    const image = item.images[item.selectedColor] ?? item.images.default ?? Object.values(item.images)[0];
-                    return (
-                      <article className="cart-item" key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}>
-                        <Link className="cart-item-image" href={`/products/${item.id}`} aria-label={`View ${item.name}`}>
-                          {image ? <Image src={image} alt={item.name} fill sizes="92px" /> : <ShoppingBag size={28} />}
-                        </Link>
-                        <div className="cart-item-info">
-                          <Link href={`/products/${item.id}`} className="cart-item-name">{item.name}</Link>
-                          {(item.selectedColor && item.selectedColor !== "default") || item.selectedSize ? (
-                            <p className="cart-item-variant">
-                              {[item.selectedColor !== "default" ? item.selectedColor : "", item.selectedSize].filter(Boolean).join(" · ")}
-                            </p>
-                          ) : null}
-                          <strong className="cart-item-unit-price">{formatNaira(item.price)}</strong>
-                        </div>
-                        <div className="cart-quantity-control" aria-label={`Quantity for ${item.name}`}>
-                          <button type="button" aria-label="Decrease quantity" onClick={() => changeQuantity(item, item.quantity - 1)}><Minus size={15}/></button>
-                          <span aria-live="polite">{item.quantity}</span>
-                          <button type="button" aria-label="Increase quantity" onClick={() => changeQuantity(item, item.quantity + 1)}><Plus size={15}/></button>
-                        </div>
-                        <strong className="cart-item-line-total">{formatNaira(item.price * item.quantity)}</strong>
-                        <button type="button" className="cart-item-remove" onClick={() => removeFromCart(item)} aria-label={`Remove ${item.name} from cart`}><Trash2 size={16}/></button>
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="cart-empty">
-                  <ShoppingBag size={34}/>
-                  <h3>Your shopping bag is empty</h3>
-                  <p>Find something useful for your home, work and everyday life.</p>
-                  <Link href="/products">Explore products <ArrowRight size={16}/></Link>
-                </div>
-              )}
-
-              <Link href="/products" className="cart-continue-shopping">Continue Shopping</Link>
-            </section>
-            {summary}
-          </div>
-        </>
-      ) : (
-        <div className="cart-checkout-layout">
-          <section className="cart-checkout-panel">
-            <div className="cart-progress-steps">
-              {steps.map((step) => (
-                <div key={step.id} className={`cart-progress-step ${step.id === activeStep ? "is-active" : step.id < activeStep ? "is-complete" : ""}`}>
-                  <span>{step.id}</span><strong>{step.title}</strong>
-                </div>
-              ))}
+      <div className="checkout-columns">
+        <section className="checkout-panel checkout-delivery">
+          <h2><Truck size={19}/> Delivery Information</h2>
+          {shippingForm && activeStep >= 3 ? (
+            <div className="checkout-delivery-summary">
+              <strong>{shippingForm.name}</strong>
+              <span>{shippingForm.email}</span>
+              <span>{shippingForm.phone}</span>
+              <span>{shippingForm.address}</span>
+              <span>{shippingForm.city}</span>
+              <button type="button" onClick={() => router.push("/cart?step=2")}>Edit delivery details</button>
             </div>
-            {activeStep === 2 ? (
-              <ShippingForm setShippingForm={setShippingForm} />
-            ) : activeStep === 3 && shippingForm ? (
-              <PaymentForm />
-            ) : (
-              <p className="text-sm text-gray-500">Please complete the shipping details to continue.</p>
-            )}
-            <button type="button" className="cart-back-button" onClick={() => router.push(activeStep === 3 ? "/cart?step=2" : "/cart", { scroll: false })}>Back</button>
-          </section>
-          {summary}
-        </div>
-      )}
+          ) : (
+            <ShippingForm setShippingForm={setShippingForm}/>
+          )}
+        </section>
+
+        <section className="checkout-panel checkout-payment">
+          <h2><CreditCard size={19}/> Payment Method</h2>
+          <div className="checkout-paystack-option">
+            <span className="checkout-radio is-selected"><span/></span>
+            <div>
+              <strong>Pay with Paystack</strong>
+              <p>Pay securely using the payment methods available through Paystack at checkout.</p>
+            </div>
+            <span className="checkout-paystack-wordmark">paystack</span>
+          </div>
+          <div className="checkout-payment-assurance"><ShieldCheck size={17}/><span>Your payment is processed through Paystack. Card details are entered on Paystack's secure payment page.</span></div>
+          {activeStep === 2 ? (
+            <button type="button" className="checkout-primary-action" onClick={() => router.push("/cart?step=3")} disabled={!shippingForm}>
+              Continue to Review <ArrowRight size={17}/>
+            </button>
+          ) : (
+            <div className="checkout-payment-status"><CheckCircle2 size={17}/> Paystack selected</div>
+          )}
+        </section>
+
+        <aside className="checkout-panel checkout-review">
+          <h2><MapPin size={19}/> Review Your Order</h2>
+          <div className="checkout-review-items">
+            {cart.map((item) => {
+              const image = item.images[item.selectedColor] ?? item.images.default ?? Object.values(item.images)[0];
+              return (
+                <div className="checkout-review-item" key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}>
+                  <div className="checkout-review-image">{image ? <Image src={image} alt={item.name} fill sizes="54px"/> : null}</div>
+                  <div className="checkout-review-name"><strong>{item.name}</strong><span>{item.selectedColor !== "default" ? item.selectedColor : item.selectedSize || ""}</span></div>
+                  <span className="checkout-review-quantity">×{item.quantity}</span>
+                  <strong className="checkout-review-price">{formatNaira(item.price * item.quantity)}</strong>
+                </div>
+              );
+            })}
+          </div>
+          <div className="checkout-review-totals">
+            <div><span>Subtotal</span><strong>{formatNaira(subtotal)}</strong></div>
+            <div><span>Delivery</span><span className="checkout-delivery-estimate">Calculated at checkout</span></div>
+            <div className="is-total"><span>Total <small>(before delivery)</small></span><strong>{formatNaira(subtotal)}</strong></div>
+          </div>
+          {activeStep >= 3 ? (
+            <div className="checkout-review-note">Your order is ready for payment initiation. Paystack checkout will be connected to the order-creation flow.</div>
+          ) : (
+            <p className="checkout-review-hint">Check your items and quantities before continuing.</p>
+          )}
+        </aside>
+      </div>
+      <Link href="/cart" className="checkout-back-to-cart">← Back to shopping bag</Link>
     </main>
   );
 };
 
-const CartPage = () => (
-  <Suspense fallback={<div className="cart-loading">Loading your shopping bag…</div>}>
-    <CartPageContent />
-  </Suspense>
-);
-
+const CartPage = () => <Suspense fallback={<div className="cart-loading">Loading checkout…</div>}><CartPageContent/></Suspense>;
 export default CartPage;
