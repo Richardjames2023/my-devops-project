@@ -99,7 +99,7 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
   const categoryName = categoryFilteredProducts[0]?.categoryName ?? categories.find((item) => item.slug === normalizedCategory)?.name ?? "All products";
   const brands = [...new Set(categoryFilteredProducts.map((product) => product.brand))].sort();
   const maxCataloguePrice = Math.max(...categoryFilteredProducts.map((product) => product.price), 100000);
-  const activeFilterCount = selectedBrands.length + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0) + (inStockOnly ? 1 : 0) + (selectedTag ? 1 : 0);
+  const activeFilterCount = selectedBrands.length + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0) + (inStockOnly ? 1 : 0);
   const displayedProducts = visibleProducts.slice(0, visibleCount);
   const hasMoreProducts = displayedProducts.length < visibleProducts.length;
 
