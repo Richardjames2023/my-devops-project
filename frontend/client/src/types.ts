@@ -46,7 +46,7 @@ export const shippingFormSchema = z.object({
   area: z.string().min(2, "Choose or enter your area."),
   city: z.string().min(2, "Town or city is required."),
   state: z.string().min(2, "Select your state."),
-  saveAddress: z.boolean().default(true),
+  saveAddress: z.boolean().optional(),
   addressLabel: z.string().optional(),
   deliverySpeed: z.enum(["standard", "express"]),
   deliveryNote: z.string().optional(),
