@@ -3834,3 +3834,49 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
  .catalogue-card__discount{top:7px;left:7px;font-size:8px}
  .catalogue-card__save{width:26px;height:26px}
 }
+
+
+/* Category navigation, legible desktop filters and progressive catalogue loading */
+.category-shop__subcategories{
+  display:flex;align-items:center;gap:8px;overflow-x:auto;overscroll-behavior-x:contain;
+  margin:0 0 16px;padding:3px 1px 8px;scrollbar-width:thin;scrollbar-color:#c8d0dc transparent;
+  cursor:grab;user-select:none;-webkit-overflow-scrolling:touch
+}
+.category-shop__subcategories.is-dragging{cursor:grabbing;scroll-behavior:auto}
+.category-shop__subcategories a{
+  flex:0 0 auto;border:1px solid #d9dee7;border-radius:18px;padding:8px 13px;
+  color:#263854;background:#fff;font-size:11px;font-weight:700;white-space:nowrap;
+  transition:border-color .15s,background .15s,color .15s
+}
+.category-shop__subcategories a:hover,
+.category-shop__subcategories a[aria-current="page"]{
+  border-color:var(--shop-orange);color:var(--shop-navy);background:#fff2e9
+}
+.category-shop__sidebar-head{font-size:14px}
+.category-shop__sidebar-head>button:not(.category-shop__close-filters){font-size:12px}
+.category-shop__filter-group{padding:14px 0}
+.category-shop__filter-group h2{font-size:13px;margin-bottom:10px}
+.category-shop__price-values{gap:7px;font-size:11px}
+.category-shop__price-values label{padding:7px;font-size:11px}
+.category-shop__price-values input{font-size:12px}
+.category-shop__quick-prices{gap:6px}
+.category-shop__quick-prices button{padding:5px 8px;font-size:10px}
+.category-shop__check{gap:8px;margin:9px 0;font-size:12px}
+.category-shop__check input{width:15px;height:15px}
+.category-shop__check small{font-size:10px}
+.category-shop__filter-note{font-size:11px}
+.category-shop__load-more{display:flex;min-height:54px;align-items:center;justify-content:center;color:#68758b;font-size:12px;font-weight:650}
+.category-shop__end-message{padding:20px 8px;text-align:center;color:#8791a2;font-size:11px}
+@media(max-width:900px){
+  .category-shop__sidebar-head{font-size:13px}
+  .category-shop__filter-group h2{font-size:12px}
+  .category-shop__check{font-size:11px}
+}
+@media(max-width:680px){
+  .category-shop__subcategories{margin-bottom:10px;cursor:auto}
+  .category-shop__subcategories a{padding:7px 11px;font-size:10px}
+  .category-shop__sidebar-head{font-size:15px}
+  .category-shop__filter-group h2{font-size:13px}
+  .category-shop__check{font-size:12px}
+  .category-shop__price-values input{font-size:12px}
+}
