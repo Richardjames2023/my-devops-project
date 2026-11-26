@@ -3,7 +3,7 @@
 import ShippingForm from "@/components/ShippingForm";
 import useCartStore from "@/stores/cartStore";
 import { ShippingFormInputs } from "@/types";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, MapPin, PackageCheck, ShieldCheck, Truck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, PackageCheck, ShieldCheck, Truck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
