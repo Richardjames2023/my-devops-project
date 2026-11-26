@@ -155,7 +155,17 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
               <div className="category-shop__filter-group">
                 <h2>Price</h2><div className="category-shop__price-values"><label>₦<input aria-label="Minimum price" inputMode="numeric" value={minPrice} onChange={(e) => setMinPrice(e.target.value.replace(/[^0-9]/g, ""))} placeholder="Min"/></label><span>to</span><label>₦<input aria-label="Maximum price" inputMode="numeric" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value.replace(/[^0-9]/g, ""))} placeholder={String(maxCataloguePrice)}/></label></div>
                 <input className="category-shop__range" type="range" min="0" max={maxCataloguePrice} step="500" value={Math.min(Number(maxPrice || maxCataloguePrice), maxCataloguePrice)} onChange={(e) => setMaxPrice(e.target.value)} aria-label="Maximum price range"/>
-                <div className="category-shop__quick-prices"><button onClick={() => {setMinPrice("");setMaxPrice("20000");}} type="button}>Under ₦20,000</button><button onClick={() => {setMinPrice("20000");setMaxPrice("50000");}} type="button}>₦20k–₦50k</button><button onClick={() => {setMinPrice("50000");setMaxPrice("");}} type="button}>Over ₦50,000</button></div>
+                <div className="category-shop__quick-prices">
+                  <button type="button" onClick={() => { setMinPrice(""); setMaxPrice("20000"); }}>
+                    Under ₦20,000
+                  </button>
+                  <button type="button" onClick={() => { setMinPrice("20000"); setMaxPrice("50000"); }}>
+                    ₦20k–₦50k
+                  </button>
+                  <button type="button" onClick={() => { setMinPrice("50000"); setMaxPrice(""); }}>
+                    Over ₦50,000
+                  </button>
+                </div>
               </div>
               <div className="category-shop__filter-group"><h2>Availability</h2><label className="category-shop__check"><input type="checkbox" checked={inStockOnly} onChange={(e) => setInStockOnly(e.target.checked)}/> In stock only <small>{categoryFilteredProducts.filter((p) => p.stockStatus !== "out-of-stock").length}</small></label></div>
               <div className="category-shop__filter-group"><h2>Brand</h2>{brands.map((brand) => <label className="category-shop__check" key={brand}><input type="checkbox" checked={selectedBrands.includes(brand)} onChange={(e) => setSelectedBrands((current) => e.target.checked ? [...current, brand] : current.filter((item) => item !== brand))}/>{brand}<small>{categoryFilteredProducts.filter((p) => p.brand === brand).length}</small></label>)}</div>
