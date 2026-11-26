@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Heart, Minus, Plus, ShoppingCart, ShieldCheck, Truck, RotateCcw, PackageCheck } from "lucide-react";
+import { Heart, Minus, Plus, ShoppingCart, ShieldCheck, Truck, RotateCcw, PackageCheck, ImageIcon, CheckCircle2 } from "lucide-react";
 import { toast } from "react-toastify";
 import type { ProductType } from "@/types";
 import useCartStore from "@/stores/cartStore";
@@ -23,7 +23,11 @@ const ProductDetailsClient = ({ product, selectedColor: initialColor, selectedSi
   const gallery = useMemo(() => {
     const unique = [...new Set(Object.values(product.images).filter(Boolean))];
     const chosen = product.images[selectedColor] ?? product.images.default ?? unique[0];
-    return chosen ? [chosen, ...unique.filter((image) => image !== chosen)] : [];
+    const available = chosen ? [chosen, ...unique.filter((image) => image !== chosen)] : [];
+    return [
+      ...available.slice(0, 4),
+      ...Array.from({ length: Math.max(0, 4 - available.length) }, () => null),
+    ];
   }, [product.images, selectedColor]);
 
   const discount = product.compareAtPrice && product.compareAtPrice > product.price
@@ -75,13 +79,13 @@ const ProductDetailsClient = ({ product, selectedColor: initialColor, selectedSi
         <div className="product-detail__gallery">
           <div className="product-detail__thumbs" aria-label="Product images">
             {gallery.map((src, index) => (
-              <button key={src} type="button" className={activeImage === index ? "is-active" : ""} onClick={() => setActiveImage(index)} aria-label={`View product image ${index + 1}`} aria-pressed={activeImage === index}>
-                <Image src={src} alt="" fill sizes="76px" />
+              <button key={src ?? `photo-placeholder-${index}`} type="button" className={activeImage === index ? "is-active" : ""} onClick={() => setActiveImage(index)} aria-label={src ? `View product image ${index + 1}` : `More product photos coming soon, image slot ${index + 1}`} aria-pressed={activeImage === index}>
+                {src ? <Image src={src} alt="" fill sizes="76px" /> : <span className="product-detail__thumb-placeholder"><ImageIcon size={19}/><small>Photo</small></span>}
               </button>
             ))}
           </div>
           <div className="product-detail__hero-image">
-            {gallery[activeImage] ? <Image src={gallery[activeImage]} alt={product.name} fill priority sizes="(max-width: 800px) 100vw, 48vw" className="object-contain" /> : <div className="product-detail__no-image">Image coming soon</div>}
+            {gallery[activeImage] ? <Image src={gallery[activeImage]} alt={product.name} fill priority sizes="(max-width: 800px) 100vw, 48vw" className="object-contain" /> : <div className="product-detail__no-image"><ImageIcon size={38}/><strong>More product photos coming soon</strong><span>We’ll add additional product views when they are available.</span></div>}
             {discount != null && discount > 0 && <span className="product-detail__discount">-{discount}%</span>}
           </div>
         </div>
@@ -97,6 +101,11 @@ const ProductDetailsClient = ({ product, selectedColor: initialColor, selectedSi
             {discount != null && discount > 0 && <span>{discount}% off</span>}
           </div>
           <p className="product-detail__description">{product.shortDescription || product.description}</p>
+          <div className="product-detail__buying-points">
+            <div><CheckCircle2 size={16}/><span>{product.stockStatus === "in-stock" ? "Available to add to your basket" : product.stockStatus === "low-stock" ? "Limited availability" : "Currently unavailable"}</span></div>
+            <div><Truck size={16}/><span>Delivery available across Nigeria <Link href="/delivery-information">View delivery information</Link></span></div>
+            <div><RotateCcw size={16}/><span>7-day returns policy <Link href="/returns-policy">See return conditions</Link></span></div>
+          </div>
 
           {product.colors.length > 0 && (
             <fieldset className="product-detail__options">
