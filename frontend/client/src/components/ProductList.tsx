@@ -1,10 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Categories from "./Categories";
 import ProductCard from "./ProductCard";
 import Link from "next/link";
-import Filter from "./Filter";
 import { products, categories } from "@/lib/catalogue";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronRight, SlidersHorizontal, X } from "lucide-react";
