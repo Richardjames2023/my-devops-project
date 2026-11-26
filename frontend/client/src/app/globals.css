@@ -4722,3 +4722,36 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .checkout-review-item { grid-template-columns: 48px minmax(0,1fr) auto auto; gap: 8px; }
   .checkout-review-image { width: 48px; height: 48px; }
 }
+
+
+.checkout-review-action {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 18px;
+  border: 0;
+  border-radius: 9px;
+  color: #fff;
+  background: var(--shop-orange);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background .18s ease, transform .18s ease;
+}
+.checkout-review-action:hover:not(:disabled) {
+  background: var(--shop-orange-dark);
+  transform: translateY(-1px);
+}
+.checkout-review-action:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.checkout-review .checkout-review-note {
+  margin: 10px 0 0;
+  color: var(--shop-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
