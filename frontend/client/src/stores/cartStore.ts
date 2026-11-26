@@ -2,6 +2,14 @@ import { CartStoreActionsType, CartStoreStateType } from "@/types";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+const isSameCartLine = (
+  current: { id: string | number; selectedSize: string; selectedColor: string },
+  target: { id: string | number; selectedSize: string; selectedColor: string }
+) =>
+  String(current.id) === String(target.id) &&
+  current.selectedSize === target.selectedSize &&
+  current.selectedColor === target.selectedColor;
+
 const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
   persist(
     (set) => ({
@@ -9,17 +17,17 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
       hasHydrated: false,
       addToCart: (product) =>
         set((state) => {
-          const existingIndex = state.cart.findIndex(
-            (p) =>
-              p.id === product.id &&
-              p.selectedSize === product.selectedSize &&
-              p.selectedColor === product.selectedColor
-          );
+          const quantityToAdd = Math.max(1, product.quantity || 1);
+          const existingIndex = state.cart.findIndex((item) => isSameCartLine(item, product));
 
           if (existingIndex !== -1) {
-            const updatedCart = [...state.cart];
-            updatedCart[existingIndex].quantity += product.quantity || 1;
-            return { cart: updatedCart };
+            return {
+              cart: state.cart.map((item, index) =>
+                index === existingIndex
+                  ? { ...item, quantity: item.quantity + quantityToAdd }
+                  : item
+              ),
+            };
           }
 
           return {
@@ -27,23 +35,25 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
               ...state.cart,
               {
                 ...product,
-                quantity: product.quantity || 1,
+                quantity: quantityToAdd,
                 selectedSize: product.selectedSize,
                 selectedColor: product.selectedColor,
               },
             ],
           };
         }),
+      updateQuantity: (product, quantity) =>
+        set((state) => ({
+          cart:
+            quantity < 1
+              ? state.cart.filter((item) => !isSameCartLine(item, product))
+              : state.cart.map((item) =>
+                  isSameCartLine(item, product) ? { ...item, quantity } : item
+                ),
+        })),
       removeFromCart: (product) =>
         set((state) => ({
-          cart: state.cart.filter(
-            (p) =>
-              !(
-                p.id === product.id &&
-                p.selectedSize === product.selectedSize &&
-                p.selectedColor === product.selectedColor
-              )
-          ),
+          cart: state.cart.filter((item) => !isSameCartLine(item, product)),
         })),
       clearCart: () => set({ cart: [] }),
     }),
@@ -51,9 +61,7 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
       name: "cart",
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.hasHydrated = true;
-        }
+        if (state) state.hasHydrated = true;
       },
     }
   )
