@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import ProductCard from "./ProductCard";
 import Link from "next/link";
 import { products, categories } from "@/lib/catalogue";
@@ -119,7 +119,7 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
     return () => observer.disconnect();
   }, [hasMoreProducts, visibleProducts.length]);
 
-  const handleCategoryPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+  const handleCategoryPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     const element = categoryFlowRef.current;
     if (!element || event.pointerType === "touch") return;
     categoryDragRef.current = { active: true, startX: event.clientX, scrollLeft: element.scrollLeft, moved: false };
