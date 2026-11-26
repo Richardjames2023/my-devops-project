@@ -4,225 +4,159 @@ import PaymentForm from "@/components/PaymentForm";
 import ShippingForm from "@/components/ShippingForm";
 import useCartStore from "@/stores/cartStore";
 import { ShippingFormInputs } from "@/types";
-import { ArrowRight, Trash2 } from "lucide-react";
+import { ArrowRight, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 const steps = [
-  {
-    id: 1,
-    title: "Shopping Cart",
-  },
-  {
-    id: 2,
-    title: "Shipping Address",
-  },
-  {
-    id: 3,
-    title: "Payment Method",
-  },
+  { id: 1, title: "Shopping Cart" },
+  { id: 2, title: "Shipping Address" },
+  { id: 3, title: "Payment Method" },
 ];
 
-// TEMPORARY
-// const cartItems: CartItemsType = [
-//   {
-//     id: 1,
-//     name: "Adidas CoreFit T-Shirt",
-//     shortDescription:
-//       "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-//     description:
-//       "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-//     price: 39.9,
-//     sizes: ["s", "m", "l", "xl", "xxl"],
-//     colors: ["gray", "purple", "green"],
-//     images: {
-//       gray: "/products/1g.png",
-//       purple: "/products/1p.png",
-//       green: "/products/1gr.png",
-//     },
-//     quantity: 1,
-//     selectedSize: "m",
-//     selectedColor: "gray",
-//   },
-//   {
-//     id: 2,
-//     name: "Puma Ultra Warm Zip",
-//     shortDescription:
-//       "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-//     description:
-//       "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-//     price: 59.9,
-//     sizes: ["s", "m", "l", "xl"],
-//     colors: ["gray", "green"],
-//     images: { gray: "/products/2g.png", green: "/products/2gr.png" },
-//     quantity: 1,
-//     selectedSize: "l",
-//     selectedColor: "gray",
-//   },
-//   {
-//     id: 3,
-//     name: "Nike Air Essentials Pullover",
-//     shortDescription:
-//       "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-//     description:
-//       "Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit. Lorem ipsum dolor sit amet consect adipisicing elit lorem ipsum dolor sit.",
-//     price: 69.9,
-//     sizes: ["s", "m", "l"],
-//     colors: ["green", "blue", "black"],
-//     images: {
-//       green: "/products/3gr.png",
-//       blue: "/products/3b.png",
-//       black: "/products/3bl.png",
-//     },
-//     quantity: 1,
-//     selectedSize: "l",
-//     selectedColor: "black",
-//   },
-// ];
+const formatNaira = (amount: number) =>
+  new Intl.NumberFormat("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0,
+  }).format(amount);
 
 const CartPageContent = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [shippingForm, setShippingForm] = useState<ShippingFormInputs>();
+  const activeStep = Number(searchParams.get("step") || "1");
+  const { cart, addToCart, removeFromCart } = useCartStore();
 
-  const activeStep = parseInt(searchParams.get("step") || "1");
+  const subtotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
+  const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
 
-  const { cart, removeFromCart } = useCartStore();
+  const changeQuantity = (item: (typeof cart)[number], quantity: number) => {
+    if (quantity < 1) {
+      removeFromCart(item);
+      return;
+    }
+    removeFromCart(item);
+    addToCart({ ...item, quantity });
+  };
+
+  const summary = (
+    <aside className="cart-order-summary" aria-label="Order summary">
+      <h2>Order Summary</h2>
+      <div className="cart-summary-row">
+        <span>Subtotal</span>
+        <strong>{formatNaira(subtotal)}</strong>
+      </div>
+      <div className="cart-summary-row cart-summary-delivery">
+        <span>Delivery</span>
+        <span>Calculated at checkout</span>
+      </div>
+      <div className="cart-summary-total">
+        <span>Total <small>(before delivery)</small></span>
+        <strong>{formatNaira(subtotal)}</strong>
+      </div>
+      {activeStep === 1 && (
+        <button
+          type="button"
+          onClick={() => router.push("/cart?step=2", { scroll: false })}
+          disabled={cart.length === 0}
+          className="cart-checkout-button"
+        >
+          Proceed to Checkout <ArrowRight size={18} />
+        </button>
+      )}
+    </aside>
+  );
+
   return (
-    <div className="flex flex-col gap-8 items-center justify-center mt-12">
-      {/* TITLE */}
-      <h1 className="text-2xl font-medium">Your Shopping Cart</h1>
-      {/* STEPS */}
-      <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
-        {steps.map((step) => (
-          <div
-            className={`flex items-center gap-2 border-b-2 pb-4 ${
-              step.id === activeStep ? "border-gray-800" : "border-gray-200"
-            }`}
-            key={step.id}
-          >
-            <div
-              className={`w-6 h-6 rounded-full text-white p-4 flex items-center justify-center ${
-                step.id === activeStep ? "bg-gray-800" : "bg-gray-400"
-              }`}
-            >
-              {step.id}
-            </div>
-            <p
-              className={`text-sm font-medium ${
-                step.id === activeStep ? "text-gray-800" : "text-gray-400"
-              }`}
-            >
-              {step.title}
-            </p>
-          </div>
-        ))}
+    <main className="cart-page">
+      <div className="cart-step-banner">
+        <span>{activeStep}</span>
+        <h1>{steps.find((step) => step.id === activeStep)?.title ?? "Shopping Cart"}</h1>
       </div>
-      {/* STEPS & DETAILS */}
-      <div className="w-full flex flex-col lg:flex-row gap-16">
-        {/* STEPS */}
-        <div className="w-full lg:w-7/12 shadow-lg border-1 border-gray-100 p-8 rounded-lg flex flex-col gap-8">
-          {activeStep === 1 ? (
-            cart.map((item) => (
-              // SINGLE CART ITEM
-              <div
-                className="flex items-center justify-between"
-                key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}
-              >
-                {/* IMAGE AND DETAILS */}
-                <div className="flex gap-8">
-                  {/* IMAGE */}
-                  <div className="relative w-32 h-32 bg-gray-50 rounded-lg overflow-hidden">
-                    <Image
-                      src={item.images[item.selectedColor] ?? item.images.default ?? Object.values(item.images)[0]}
-                      alt={item.name}
-                      fill
-                      className="object-contain"
-                    />
-                  </div>
-                  {/* ITEM DETAILS */}
-                  <div className="flex flex-col justify-between">
-                    <div className="flex flex-col gap-1">
-                      <p className="text-sm font-medium">{item.name}</p>
-                      <p className="text-xs text-gray-500">
-                        Quantity: {item.quantity}
-                      </p>
-                      {item.selectedSize && <p className="text-xs text-gray-500">Size: {item.selectedSize}</p>}
-                      {item.selectedColor && item.selectedColor !== "default" && <p className="text-xs text-gray-500">Color: {item.selectedColor}</p>}
-                      {!item.selectedSize && (!item.selectedColor || item.selectedColor === "default") && <p className="text-xs text-gray-500">Standard item</p>}
-                    </div>
-                    <p className="font-medium">${item.price.toFixed(2)}</p>
-                  </div>
-                </div>
-                {/* DELETE BUTTON */}
-                <button
-                  onClick={() => removeFromCart(item)}
-                  className="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 transition-all duration-300 text-red-400 flex items-center justify-center cursor-pointer"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+
+      {activeStep === 1 ? (
+        <>
+          <div className="cart-content-grid">
+            <section className="cart-items-section" aria-labelledby="cart-heading">
+              <div className="cart-section-heading">
+                <h2 id="cart-heading">Your Shopping Bag</h2>
+                <span>({itemCount} {itemCount === 1 ? "item" : "items"})</span>
               </div>
-            ))
-          ) : activeStep === 2 ? (
-            <ShippingForm setShippingForm={setShippingForm} />
-          ) : activeStep === 3 && shippingForm ? (
-            <PaymentForm />
-          ) : (
-            <p className="text-sm text-gray-500">
-              Please fill in the shipping form to continue.
-            </p>
-          )}
-        </div>
-        {/* DETAILS */}
-        <div className="w-full lg:w-5/12 shadow-lg border-1 border-gray-100 p-8 rounded-lg flex flex-col gap-8 h-max">
-          <h2 className="font-semibold">Cart Details</h2>
-          <div className="flex flex-col gap-4">
-            <div className="flex justify-between text-sm">
-              <p className="text-gray-500">Subtotal</p>
-              <p className="font-medium">
-                $
-                {cart
-                  .reduce((acc, item) => acc + item.price * item.quantity, 0)
-                  .toFixed(2)}
-              </p>
-            </div>
-            <div className="flex justify-between text-sm">
-              <p className="text-gray-500">Discount(10%)</p>
-              <p className="font-medium">$ 10</p>
-            </div>
-            <div className="flex justify-between text-sm">
-              <p className="text-gray-500">Shipping Fee</p>
-              <p className="font-medium">$10</p>
-            </div>
-            <hr className="border-gray-200" />
-            <div className="flex justify-between">
-              <p className="text-gray-800 font-semibold">Total</p>
-              <p className="font-medium">
-                $
-                {cart
-                  .reduce((acc, item) => acc + item.price * item.quantity, 0)
-                  .toFixed(2)}
-              </p>
-            </div>
+
+              {cart.length > 0 ? (
+                <div className="cart-items-list">
+                  {cart.map((item) => {
+                    const image = item.images[item.selectedColor] ?? item.images.default ?? Object.values(item.images)[0];
+                    return (
+                      <article className="cart-item" key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}>
+                        <Link className="cart-item-image" href={`/products/${item.id}`} aria-label={`View ${item.name}`}>
+                          {image ? <Image src={image} alt={item.name} fill sizes="92px" /> : <ShoppingBag size={28} />}
+                        </Link>
+                        <div className="cart-item-info">
+                          <Link href={`/products/${item.id}`} className="cart-item-name">{item.name}</Link>
+                          {(item.selectedColor && item.selectedColor !== "default") || item.selectedSize ? (
+                            <p className="cart-item-variant">
+                              {[item.selectedColor !== "default" ? item.selectedColor : "", item.selectedSize].filter(Boolean).join(" · ")}
+                            </p>
+                          ) : null}
+                          <strong className="cart-item-unit-price">{formatNaira(item.price)}</strong>
+                        </div>
+                        <div className="cart-quantity-control" aria-label={`Quantity for ${item.name}`}>
+                          <button type="button" aria-label="Decrease quantity" onClick={() => changeQuantity(item, item.quantity - 1)}><Minus size={15}/></button>
+                          <span aria-live="polite">{item.quantity}</span>
+                          <button type="button" aria-label="Increase quantity" onClick={() => changeQuantity(item, item.quantity + 1)}><Plus size={15}/></button>
+                        </div>
+                        <strong className="cart-item-line-total">{formatNaira(item.price * item.quantity)}</strong>
+                        <button type="button" className="cart-item-remove" onClick={() => removeFromCart(item)} aria-label={`Remove ${item.name} from cart`}><Trash2 size={16}/></button>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="cart-empty">
+                  <ShoppingBag size={34}/>
+                  <h3>Your shopping bag is empty</h3>
+                  <p>Find something useful for your home, work and everyday life.</p>
+                  <Link href="/products">Explore products <ArrowRight size={16}/></Link>
+                </div>
+              )}
+
+              <Link href="/products" className="cart-continue-shopping">Continue Shopping</Link>
+            </section>
+            {summary}
           </div>
-          {activeStep === 1 && (
-            <button
-              onClick={() => router.push("/cart?step=2", { scroll: false })}
-              className="w-full bg-gray-800 hover:bg-gray-900 transition-all duration-300 text-white p-2 rounded-lg cursor-pointer flex items-center justify-center gap-2"
-            >
-              Continue
-              <ArrowRight className="w-3 h-3" />
-            </button>
-          )}
+        </>
+      ) : (
+        <div className="cart-checkout-layout">
+          <section className="cart-checkout-panel">
+            <div className="cart-progress-steps">
+              {steps.map((step) => (
+                <div key={step.id} className={`cart-progress-step ${step.id === activeStep ? "is-active" : step.id < activeStep ? "is-complete" : ""}`}>
+                  <span>{step.id}</span><strong>{step.title}</strong>
+                </div>
+              ))}
+            </div>
+            {activeStep === 2 ? (
+              <ShippingForm setShippingForm={setShippingForm} />
+            ) : activeStep === 3 && shippingForm ? (
+              <PaymentForm />
+            ) : (
+              <p className="text-sm text-gray-500">Please complete the shipping details to continue.</p>
+            )}
+            <button type="button" className="cart-back-button" onClick={() => router.push(activeStep === 3 ? "/cart?step=2" : "/cart", { scroll: false })}>Back</button>
+          </section>
+          {summary}
         </div>
-      </div>
-    </div>
+      )}
+    </main>
   );
 };
 
 const CartPage = () => (
-  <Suspense fallback={<div>Loading cart...</div>}>
+  <Suspense fallback={<div className="cart-loading">Loading your shopping bag…</div>}>
     <CartPageContent />
   </Suspense>
 );
