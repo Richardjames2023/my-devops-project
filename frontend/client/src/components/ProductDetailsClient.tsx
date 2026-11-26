@@ -137,9 +137,8 @@ const ProductDetailsClient = ({ product, selectedColor: initialColor, selectedSi
             <button type="button" className={`product-detail__wishlist ${saved ? "is-saved" : ""}`} onClick={() => setSaved((value) => !value)} aria-label={saved ? "Remove from wishlist" : "Add to wishlist"} aria-pressed={saved}><Heart size={21} fill={saved ? "currentColor" : "none"}/></button>
           </div>
           <div className="product-detail__assurances">
-            <div><Truck/><span>Delivery across Nigeria</span></div>
-            <div><RotateCcw/><span>7-day easy returns</span></div>
             <div><ShieldCheck/><span>Secure checkout</span></div>
+            <span>Payment options are shown securely at checkout.</span>
           </div>
           <p className="product-detail__demo-note">Demonstration catalogue item. Product availability, pricing and checkout are sample storefront content until the catalogue is connected to the backend.</p>
         </div>
