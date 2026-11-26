@@ -145,7 +145,7 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
     else next.set("sort", value);
     router.push(`/products?${next.toString()}`, { scroll: false });
   };
-  const clearFilters = () => { setMinPrice(""); setMaxPrice(""); setSelectedBrands([]); setInStockOnly(false); setSelectedTag(""); };
+  const clearFilters = () => { setMinPrice(""); setMaxPrice(""); setSelectedBrands([]); setInStockOnly(false); };
 
   if (params === "products") {
     return (
