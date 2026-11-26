@@ -9,10 +9,10 @@ const states = [
   "Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno","Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","Federal Capital Territory","Gombe","Imo","Jigawa","Kaduna","Kano","Katsina","Kebbi","Kogi","Kwara","Lagos","Nasarawa","Niger","Ogun","Ondo","Osun","Oyo","Plateau","Rivers","Sokoto","Taraba","Yobe","Zamfara",
 ];
 
-const ShippingForm = ({ setShippingForm }: { setShippingForm: (data: ShippingFormInputs) => void }) => {
+const ShippingForm = ({ setShippingForm, initialValues }: { setShippingForm: (data: ShippingFormInputs) => void; initialValues?: Partial<ShippingFormInputs> }) => {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<ShippingFormInputs>({
     resolver: zodResolver(shippingFormSchema),
-    defaultValues: { saveAddress: true, deliverySpeed: "standard", state: "Federal Capital Territory" },
+    defaultValues: { saveAddress: true, deliverySpeed: "standard", state: "Federal Capital Territory", ...initialValues },
   });
   const saveAddress = watch("saveAddress");
   const selectedSpeed = watch("deliverySpeed");
