@@ -124,7 +124,6 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
     if (!element || event.pointerType === "touch") return;
     categoryDragRef.current = { active: true, startX: event.clientX, scrollLeft: element.scrollLeft, moved: false };
     setIsDraggingCategories(true);
-    element.setPointerCapture(event.pointerId);
   };
   const handleCategoryPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     const element = categoryFlowRef.current;
