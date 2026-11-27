@@ -6,8 +6,8 @@ import { mergeGuestCartIntoUserCart } from "../cart/cart.service";
 import { GUEST_SESSION_COOKIE, clearGuestSessionCookie } from "../guest-session/guest-session.cookie";
 import { getValidGuestSession, revokeGuestSession } from "../guest-session/guest-session.service";
 
-const googleSchema = z.object({ credential: z.string().min(20).max(10_000) });
-const facebookSchema = z.object({ accessToken: z.string().min(20).max(10_000) });
+export const googleCredentialSchema = z.object({ credential: z.string().min(20).max(10_000) });
+export const facebookAccessTokenSchema = z.object({ accessToken: z.string().min(20).max(10_000) });
 
 async function mergeGuestCart(req: Request, res: Response, userId: string) {
   const token = req.cookies?.[GUEST_SESSION_COOKIE];
@@ -20,7 +20,7 @@ async function mergeGuestCart(req: Request, res: Response, userId: string) {
 }
 
 export async function googleSignIn(req: Request, res: Response): Promise<void> {
-  const parsed = googleSchema.safeParse(req.body);
+  const parsed = googleCredentialSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ message: "A valid Google credential is required" }); return; }
   const result = await authenticateWithGoogle(parsed.data.credential);
   await mergeGuestCart(req, res, result.user.id);
@@ -28,7 +28,7 @@ export async function googleSignIn(req: Request, res: Response): Promise<void> {
 }
 
 export async function facebookSignIn(req: Request, res: Response): Promise<void> {
-  const parsed = facebookSchema.safeParse(req.body);
+  const parsed = facebookAccessTokenSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ message: "A valid Facebook access token is required" }); return; }
   const result = await authenticateWithFacebook(parsed.data.accessToken);
   await mergeGuestCart(req, res, result.user.id);
@@ -36,7 +36,7 @@ export async function facebookSignIn(req: Request, res: Response): Promise<void>
 }
 
 export async function linkGoogle(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const parsed = googleSchema.safeParse(req.body);
+  const parsed = googleCredentialSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ message: "A valid Google credential is required" }); return; }
   if (!req.user) { res.status(401).json({ message: "Authentication required" }); return; }
   await linkGoogleIdentity(req.user.id, parsed.data.credential);
@@ -44,7 +44,7 @@ export async function linkGoogle(req: AuthenticatedRequest, res: Response): Prom
 }
 
 export async function linkFacebook(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const parsed = facebookSchema.safeParse(req.body);
+  const parsed = facebookAccessTokenSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ message: "A valid Facebook access token is required" }); return; }
   if (!req.user) { res.status(401).json({ message: "Authentication required" }); return; }
   await linkFacebookIdentity(req.user.id, parsed.data.accessToken);
