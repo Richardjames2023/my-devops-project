@@ -79,7 +79,7 @@ async function verifyFacebookCredential(accessToken: string): Promise<Profile> {
     firstName: profile.first_name ?? fallbackNames[0] ?? "Customer",
     lastName: profile.last_name ?? fallbackNames.slice(1).join(" "),
     // Meta's email field is returned only when the email permission is granted.
-    emailVerified: true,
+    emailVerified: false,
   };
 }
 
@@ -125,7 +125,7 @@ async function authenticateProvider(profile: Profile) {
 
   const existingEmail = await prisma.user.findUnique({ where: { email: profile.email }, select: { id: true } });
   if (existingEmail) {
-    throw new AppError("An account already exists with this email. Sign in with your password first, then connect this provider from your account security settings.", 409);
+    throw new AppError("An account already exists with this email. Sign in using your existing method. For security, social sign-in will not merge accounts automatically.", 409);
   }
   const role = await prisma.role.findUnique({ where: { name: "CUSTOMER" }, select: { id: true } });
   if (!role) throw new AppError("Customer role is not configured", 500, false);
