@@ -37,6 +37,10 @@ export function setAuthTokens(tokens: { accessToken: string; refreshToken: strin
   refreshToken = tokens.refreshToken;
 }
 
+export function getRefreshToken(): string | null {
+  return refreshToken;
+}
+
 export function clearAuthTokens(): void {
   accessToken = null;
   refreshToken = null;
