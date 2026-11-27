@@ -1,5 +1,3 @@
-"use client";
-
 import type { ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
 
 type BrandTypographyVariant = "display" | "heading" | "body" | "label" | "caption";
