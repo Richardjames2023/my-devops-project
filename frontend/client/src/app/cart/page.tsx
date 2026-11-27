@@ -149,7 +149,7 @@ const CartPageContent = () => {
               <span><strong>Pay with Paystack</strong><small>Debit or credit card and other payment methods enabled by Paystack</small></span>
               <CheckCircle2 size={18}/>
             </div>
-            <div className="checkout-payment-notice"><ShieldCheck size={18}/><p>You'll complete payment on Paystack. ClickClickBuy does not collect or store your card details.</p></div>
+            <div className="checkout-payment-notice"><ShieldCheck size={18}/><p>You&apos;ll complete payment on Paystack. ClickClickBuy does not collect or store your card details.</p></div>
             <div className="checkout-payment-unavailable"><CreditCard size={17}/><p>Demo mode: this opens a simulated Paystack-hosted checkout so we can review the complete customer journey. No real charge will be made.</p></div>
             <Link
               href={`/mock-paystack?amount=${encodeURIComponent(String(subtotal))}&reference=CCB-DEMO-${Date.now()}`}
