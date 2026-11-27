@@ -5557,3 +5557,29 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .account-alert-preferences label { display:flex; align-items:center; gap:8px; color:#58677d; font-size:11px; }
 .account-alert-preferences input { width:15px; height:15px; accent-color:var(--shop-orange); }
 .account-address-top>button:not(:last-child) { width:auto; padding:0 8px; color:var(--shop-orange-dark); background:var(--shop-peach); font-size:9px; font-weight:800; }
+
+
+/* Mobile account navigation: replace the cramped horizontal tab strip with a section picker */
+.account-mobile-menu-trigger { display:none; }
+@media(max-width:760px) {
+ .account-sidebar { gap:10px; }
+ .account-mobile-menu-trigger {
+  display:flex; width:100%; min-height:56px; align-items:center; justify-content:space-between;
+  border:1px solid #f0d8c9; border-radius:10px; padding:9px 13px;
+  color:var(--shop-navy); background:#fffaf6; text-align:left; cursor:pointer;
+ }
+ .account-mobile-menu-trigger>span { display:grid; gap:3px; }
+ .account-mobile-menu-current { color:var(--shop-orange-dark); font-size:8px; font-weight:900; letter-spacing:.12em; }
+ .account-mobile-menu-trigger strong { font-size:13px; font-weight:850; }
+ .account-mobile-menu-trigger>svg { color:var(--shop-orange-dark); transition:transform .18s ease; }
+ .account-mobile-menu-trigger>svg.is-open { transform:rotate(90deg); }
+ .account-sidebar nav {
+  display:none; flex-direction:column; gap:4px; overflow:visible;
+  border:1px solid #edf0f4; border-radius:10px; padding:7px;
+  background:#fff;
+ }
+ .account-sidebar nav.is-mobile-open { display:flex; }
+ .account-sidebar__link { width:100%; min-height:43px; justify-content:flex-start; gap:11px; border-radius:7px; padding:9px 11px; font-size:12px; }
+ .account-sidebar__link span { flex:1; }
+ .account-sidebar__signout { display:flex; margin-top:0; border:1px solid #f0e7e1; }
+}
