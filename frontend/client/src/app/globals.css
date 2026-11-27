@@ -5272,3 +5272,41 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
  .account-overview-panel { padding:13px; }
  .customer-auth-two-col { grid-template-columns:1fr; gap:0; }
 }
+
+
+/* Frontend-only demo account surfaces */
+.customer-demo-notice { display:grid; gap:4px; margin:0 0 14px; border:1px solid #d9e9fb; border-radius:9px; padding:11px 12px; color:#48617f; background:#f1f7ff; }
+.customer-demo-notice strong { color:#1e5f9f; font-size:11px; font-weight:850; }
+.customer-demo-notice span { font-size:10px; line-height:1.55; }
+.account-demo-tag { margin-left:auto; border-radius:20px; padding:6px 10px; color:#286aa8!important; background:#eaf3ff; font-size:10px!important; font-weight:800; white-space:nowrap; }
+.account-demo-caption { margin:12px 0 0; color:#8a96a7; font-size:10px; line-height:1.6; }
+.account-feature-page { min-height:340px; }
+.account-feature-page>h2 { margin:0; color:#172b49; font-size:24px; font-weight:850; }
+.account-feature-page>p { margin:6px 0 18px; color:#77869a; font-size:12px; }
+.account-feature-card { display:flex; align-items:center; justify-content:space-between; gap:15px; border:1px solid #e8edf4; border-radius:11px; padding:17px; }
+.account-feature-card>div { display:grid; gap:6px; }
+.account-feature-card strong { color:#263b58; font-size:13px; }
+.account-feature-card span { color:#74839a; font-size:11px; }
+.account-feature-card>b { border-radius:20px; padding:6px 9px; color:#16834f; background:#e5f7ed; font-size:10px; white-space:nowrap; }
+.account-feature-empty { display:grid; min-height:220px; align-content:center; justify-items:center; gap:9px; border:1px dashed #dce4ee; border-radius:12px; color:#7d91aa; text-align:center; }
+.account-feature-empty strong { color:#263b58; font-size:13px; }
+.account-feature-empty span { color:#8290a3; font-size:11px; }
+.account-saved-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.account-saved-card { display:grid; gap:7px; min-width:0; border:1px solid #e8edf4; border-radius:11px; padding:10px; }
+.account-saved-art { display:grid; aspect-ratio:1.2; place-items:center; border-radius:8px; color:#4986c5; background:linear-gradient(135deg,#eff6ff,#f8f3ed); }
+.account-saved-card strong { color:#263b58; font-size:11px; }
+.account-saved-card span { color:#172b49; font-size:12px; font-weight:850; }
+.account-saved-card a { color:#1769c2; font-size:10px; font-weight:750; }
+.account-notification-row { display:flex; gap:12px; border-top:1px solid #edf0f4; padding:17px 4px; }
+.account-notification-dot { width:8px; height:8px; flex:0 0 8px; margin-top:5px; border-radius:50%; background:#f0782c; }
+.account-notification-row strong { color:#263b58; font-size:12px; }
+.account-notification-row p { margin:5px 0; color:#74839a; font-size:11px; }
+.account-notification-row small { color:#929eae; font-size:10px; }
+.account-settings-list { display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:650px; }
+.account-settings-list label { display:grid; gap:6px; color:#53647c; font-size:11px; font-weight:750; }
+.account-settings-list input { min-height:42px; border:1px solid #e1e7ef; border-radius:8px; padding:0 11px; color:#34445d; background:#f8fafc; font-size:12px; }
+@media(max-width:620px) {
+ .account-saved-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .account-settings-list { grid-template-columns:1fr; }
+ .account-feature-card { align-items:flex-start; }
+}
