@@ -325,9 +325,9 @@ const Navbar = () => {
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
                     Welcome to ClickClickBuy
                   </div>
-                  <div className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
-                    Sign In <ComingSoon>Coming soon</ComingSoon>
-                  </div>
+                  <Link href="/login" onClick={() => setActiveMenu(null)} className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
+                    Sign In
+                  </Link>
                 </div>
                 <div className="py-1">
                   <Link href="/account" onClick={() => setActiveMenu(null)} className={activeClass}>
@@ -336,9 +336,9 @@ const Navbar = () => {
                   <Link href="/account?section=orders" onClick={() => setActiveMenu(null)} className={activeClass}>
                     <Package size={19} /> Orders <CountBadge count={accountCounts.orders} />
                   </Link>
-                  <div className={placeholderClass}>
-                    <Heart size={19} /> Wishlist <CountBadge count={accountCounts.wishlist} /> <ComingSoon>Coming soon</ComingSoon>
-                  </div>
+                  <Link href="/account?section=saved" onClick={() => setActiveMenu(null)} className={activeClass}>
+                    <Heart size={19} /> Wishlist <CountBadge count={accountCounts.wishlist} />
+                  </Link>
                 </div>
               </div>
             </div>
