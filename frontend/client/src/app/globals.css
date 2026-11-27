@@ -5954,3 +5954,138 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .customer-auth-socials { grid-template-columns:1fr; }
   .customer-auth-socials button { min-height:43px; }
 }
+
+ 
+/* Registration page: keep the complete desktop form comfortably in view */
+.customer-auth-page {
+  min-height: calc(100dvh - 132px);
+  align-content: center;
+  padding: 18px;
+}
+
+.customer-auth-card {
+  width: min(100%, 760px);
+  padding: 24px 30px;
+}
+
+.customer-auth-brand {
+  margin-bottom: 13px;
+}
+
+.customer-auth-intro {
+  margin: 5px 0 13px;
+}
+
+.customer-auth-socials {
+  margin-bottom: 10px;
+}
+
+.customer-auth-divider {
+  margin-bottom: 10px;
+}
+
+.customer-auth-form {
+  display: block;
+}
+
+.customer-auth-form-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px 16px;
+}
+
+.customer-auth-field {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 6px;
+}
+
+.customer-auth-form .customer-auth-field label {
+  margin: 0;
+}
+
+.customer-auth-form .customer-auth-field input {
+  min-height: 42px;
+}
+
+.customer-auth-password-hint {
+  margin: -1px 0 0;
+  line-height: 1.35;
+}
+
+.customer-auth-submit {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 12px;
+}
+
+.customer-auth-card .customer-demo-notice {
+  margin-top: 12px;
+  margin-bottom: 0;
+  padding: 8px 11px;
+}
+
+.customer-auth-footnote {
+  margin-top: 11px;
+}
+
+@media (max-width: 700px) {
+  .customer-auth-page {
+    min-height: 0;
+    padding: 22px 14px 32px;
+  }
+
+  .customer-auth-card {
+    width: min(100%, 520px);
+    padding: 23px 20px;
+  }
+
+  .customer-auth-form-fields {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+@media (max-height: 760px) and (min-width: 701px) {
+  .customer-auth-page {
+    padding-block: 10px;
+  }
+
+  .customer-auth-card {
+    padding-block: 18px;
+  }
+
+  .customer-auth-brand {
+    margin-bottom: 9px;
+  }
+
+  .customer-auth-card h1 {
+    font-size: 27px;
+  }
+
+  .customer-auth-intro {
+    margin-bottom: 9px;
+  }
+
+  .customer-auth-form-fields {
+    gap: 8px 14px;
+  }
+
+  .customer-auth-form .customer-auth-field input {
+    min-height: 39px;
+  }
+
+  .customer-auth-submit {
+    min-height: 41px;
+    margin-top: 9px;
+  }
+
+  .customer-auth-card .customer-demo-notice {
+    margin-top: 9px;
+  }
+
+  .customer-auth-footnote {
+    margin-top: 8px;
+  }
+}
