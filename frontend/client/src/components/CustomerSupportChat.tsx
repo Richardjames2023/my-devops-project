@@ -263,7 +263,7 @@ export default function CustomerSupportChat() {
               </form>
               <div className="ccb-chat-footer">
                 {conversation.status === "BOT_ACTIVE" ? <button type="button" onClick={() => void requestAgent()} disabled={busy}><Headphones size={14}/> Talk to a human agent</button> : <span>{conversation.status === "WAITING_FOR_AGENT" ? "An agent will be with you shortly" : conversation.status === "HUMAN_ACTIVE" ? "You are speaking with customer care" : "Need more help? Start a new chat soon"}</span>}
-                <small>AI support may make mistakes. Please don't share passwords or payment details.</small>
+                <small>AI support may make mistakes. Please do not share passwords or payment details.</small>
               </div>
             </>
           )}
