@@ -71,6 +71,13 @@ export default function AccountPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    const requestedSection = new URLSearchParams(window.location.search).get("section");
+    if (requestedSection && sections.some((section) => section.id === requestedSection)) {
+      setActiveSection(requestedSection);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!getAccessToken()) {
       setLoading(false);
       return;
