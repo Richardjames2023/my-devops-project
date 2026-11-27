@@ -6089,3 +6089,68 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     margin-top: 8px;
   }
 }
+
+
+/* Registration password visibility controls and desktop readability */
+.customer-auth-password-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.customer-auth-form .customer-auth-password-control input {
+  width: 100%;
+  padding-right: 52px;
+}
+
+.customer-auth-password-toggle {
+  position: absolute;
+  right: 5px;
+  display: grid;
+  width: 42px;
+  height: 38px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: #526783;
+  background: transparent;
+  cursor: pointer;
+  transition: color .15s ease, background-color .15s ease;
+}
+
+.customer-auth-password-toggle:hover {
+  color: var(--shop-orange-dark);
+  background: var(--shop-peach-tint);
+}
+
+.customer-auth-password-toggle:focus-visible {
+  outline: 2px solid var(--shop-blue);
+  outline-offset: 1px;
+}
+
+@media (min-width: 701px) {
+  .customer-auth-card {
+    width: min(100%, 820px);
+    padding: 27px 34px;
+  }
+
+  .customer-auth-brand { font-size: 23px; }
+  .customer-auth-eyebrow { font-size: 11px; }
+  .customer-auth-card h1 { font-size: 34px; }
+  .customer-auth-intro { font-size: 15px; }
+  .customer-auth-socials button { min-height: 48px; font-size: 13px; }
+  .customer-auth-divider { font-size: 10px; }
+  .customer-auth-form .customer-auth-field label { font-size: 13px; }
+  .customer-auth-form .customer-auth-field input { min-height: 45px; font-size: 14px; }
+  .customer-auth-password-hint { font-size: 11px; }
+  .customer-auth-submit { min-height: 48px; font-size: 14px; }
+  .customer-demo-notice strong { font-size: 12px; }
+  .customer-demo-notice span { font-size: 11px; }
+  .customer-auth-footnote { font-size: 13px; }
+}
+
+@media (max-height: 760px) and (min-width: 701px) {
+  .customer-auth-card { padding-block: 18px; }
+  .customer-auth-card h1 { font-size: 30px; }
+  .customer-auth-form .customer-auth-field input { min-height: 41px; }
+}
