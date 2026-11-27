@@ -456,6 +456,7 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
               },
             },
           },
+          socialAccounts: { select: { id: true } },
         },
       },
     },
@@ -482,7 +483,7 @@ export async function refreshAccessToken(input: RefreshTokenInput) {
 
   const user = storedToken.user;
   if (!user.isActive) throw new AppError("Account is inactive", 403);
-  if (!user.emailVerified)
+  if (!user.emailVerified && user.socialAccounts.length === 0)
     throw new AppError(
       "Please verify your email address before logging in",
       403,

@@ -57,6 +57,7 @@ model User {
   notifications                           Notification[]
   notificationPreferences                 NotificationPreference[]
   chatConversations                       ChatConversation[]
+  socialAccounts                          SocialAccount[]
 
   @@index([email])
   @@index([phone])
@@ -1522,4 +1523,24 @@ enum ChatEventType {
   AGENT_ASSIGNED
   AGENT_ACCEPTED
   CONVERSATION_CLOSED
+}
+
+
+enum SocialAuthProvider {
+  GOOGLE
+  FACEBOOK
+}
+
+model SocialAccount {
+  id             String             @id @default(uuid()) @db.Uuid
+  userId         String             @db.Uuid
+  provider       SocialAuthProvider
+  providerUserId String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@map("social_accounts")
 }

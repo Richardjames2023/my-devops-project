@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { googleSignIn, facebookSignIn, linkGoogle, linkFacebook } from "./social-auth.controller";
 import {
   register,
   login,
@@ -27,6 +28,10 @@ router.post("/verify-email/resend", registrationLimiter, resendVerificationEmail
 router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
 router.post("/reset-password", resetPasswordLimiter, resetPassword);
 router.post("/login", loginLimiter, login);
+router.post("/google", loginLimiter, googleSignIn);
+router.post("/facebook", loginLimiter, facebookSignIn);
+router.post("/google/link", authenticate, requireCustomer, loginLimiter, linkGoogle);
+router.post("/facebook/link", authenticate, requireCustomer, loginLimiter, linkFacebook);
 router.post("/refresh", refreshLimiter, refresh);
 
 router.get("/me", authenticate, requireCustomer, getMe);
