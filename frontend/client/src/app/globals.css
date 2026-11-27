@@ -5356,6 +5356,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .customer-auth-success { color:#16754b; background:#eaf8f0; }
 .customer-auth-footnote { margin:20px 0 0; color:#78869a; text-align:center; font-size:12px; }
 .customer-auth-footnote a { color:#1769c2; font-weight:800; }
+.customer-auth-password-hint { margin:-5px 0 1px; color:#7b899d; font-size:10px; line-height:1.5; }
 .customer-auth-two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .customer-auth-two-col>div { display:grid; gap:8px; }
 
