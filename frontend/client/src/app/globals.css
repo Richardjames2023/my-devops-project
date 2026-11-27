@@ -5550,3 +5550,10 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
  .account-sidebar { padding:12px; }
  .account-sidebar__link { min-height:39px; }
 }
+
+
+.account-alert-preferences { display:grid; gap:10px; margin-top:18px; border:1px solid #f0dfd4; border-radius:9px; padding:14px; background:#fffaf6; }
+.account-alert-preferences>strong { color:var(--shop-navy); font-size:12px; }
+.account-alert-preferences label { display:flex; align-items:center; gap:8px; color:#58677d; font-size:11px; }
+.account-alert-preferences input { width:15px; height:15px; accent-color:var(--shop-orange); }
+.account-address-top>button:not(:last-child) { width:auto; padding:0 8px; color:var(--shop-orange-dark); background:var(--shop-peach); font-size:9px; font-weight:800; }
