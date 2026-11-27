@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Bell, BriefcaseBusiness, ChevronRight, CircleUserRound, ClipboardList, Headset,
   Heart, LogOut, MapPin, Package, RotateCcw, ShieldCheck, ShoppingBag,
-  ShoppingBasket, Truck, UserRound, CreditCard, Settings, CheckCircle2,
+  ShoppingBasket, Truck, UserRound,
 } from "lucide-react";
 import { DemoCustomer, getDemoCustomer, getDemoOrders, getDemoUnreadCount, getDemoWishlistCount, logoutDemoCustomer } from "@/lib/demo-account";
 
