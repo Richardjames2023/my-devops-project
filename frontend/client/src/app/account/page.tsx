@@ -7,7 +7,7 @@ import {
   Heart, LogOut, MapPin, Package, RotateCcw, ShieldCheck, ShoppingBag,
   ShoppingBasket, Truck, UserRound,
 } from "lucide-react";
-import { ApiError, apiRequest, clearAuthTokens, getAccessToken, hasAuthSession } from "@/lib/api/client";
+import { ApiError, apiRequest, clearAuthTokens, hasAuthSession } from "@/lib/api/client";
 
 type OrderStatus = "PENDING" | "CONFIRMED" | "PROCESSING" | "PARTIALLY_FULFILLED" | "FULFILLED" | "CANCELLED" | "COMPLETED";
 type OrderItem = { id: string; productName: string; variantName: string; quantity: number };
