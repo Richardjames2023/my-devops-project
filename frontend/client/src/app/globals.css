@@ -5917,3 +5917,16 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .cart-item-remove:active {
   color: #a52d25;
 }
+
+/* Catalogue department navigation: keep horizontal scrolling but hide its scrollbar */
+.category-shop__subcategories {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-bottom: 4px;
+}
+
+.category-shop__subcategories::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
