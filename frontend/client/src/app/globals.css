@@ -5628,3 +5628,57 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
  .account-form-card input,.account-form-card select,.account-form-card textarea { font-size:12px; }
  .account-demo-caption { font-size:11px; }
 }
+
+
+/* ClickClickBuy AI-first customer support widget */
+.ccb-support-chat { position:fixed; z-index:90; right:24px; bottom:24px; display:flex; align-items:flex-end; flex-direction:column; gap:12px; font-family:inherit; }
+.ccb-chat-launcher { display:flex; min-height:52px; align-items:center; justify-content:center; gap:9px; border:0; border-radius:999px; padding:0 20px; color:#fff; background:var(--shop-orange); box-shadow:0 8px 28px rgba(16,43,80,.22); font-size:13px; font-weight:850; cursor:pointer; transition:transform .18s ease,background .18s ease; }
+.ccb-chat-launcher:hover { transform:translateY(-2px); background:var(--shop-orange-dark); }
+.ccb-chat-panel { display:flex; width:min(390px,calc(100vw - 32px)); height:min(590px,calc(100dvh - 112px)); min-height:380px; flex-direction:column; overflow:hidden; border:1px solid #e8e4e0; border-radius:17px; background:#fff; box-shadow:0 18px 60px rgba(8,28,65,.2); }
+.ccb-chat-header { display:flex; min-height:72px; align-items:center; gap:10px; padding:12px 14px; color:white; background:var(--shop-navy); }
+.ccb-chat-avatar { display:grid; width:39px; height:39px; flex:0 0 39px; place-items:center; border-radius:50%; color:var(--shop-orange-dark); background:#fff; }
+.ccb-chat-heading { display:grid; flex:1; gap:4px; min-width:0; }
+.ccb-chat-heading strong { font-size:13px; font-weight:850; }
+.ccb-chat-heading span { color:#d5dfef; font-size:10px; }
+.ccb-chat-header>button { display:grid; width:29px; height:29px; place-items:center; border:0; border-radius:6px; color:#fff; background:transparent; cursor:pointer; }
+.ccb-chat-header>button:hover { background:rgba(255,255,255,.12); }
+.ccb-chat-connection { width:8px; height:8px; flex:0 0 8px; border-radius:50%; background:#d59b44; }
+.ccb-chat-connection--connected { background:#4bd39a; }
+.ccb-chat-connection--offline { background:#e7a16d; }
+.ccb-chat-start { display:flex; flex:1; align-items:center; justify-content:center; flex-direction:column; padding:28px 25px; text-align:center; }
+.ccb-chat-welcome-icon { display:grid; width:58px; height:58px; place-items:center; border:1px solid #f1d8c8; border-radius:18px; color:var(--shop-orange-dark); background:#fff7f1; }
+.ccb-chat-start h3 { margin:17px 0 8px; color:var(--shop-navy); font-size:20px; font-weight:900; }
+.ccb-chat-start>p { max-width:290px; margin:0; color:#748096; font-size:12px; line-height:1.7; }
+.ccb-chat-start>button { min-height:43px; margin-top:20px; border:0; border-radius:8px; padding:0 20px; color:white; background:var(--shop-orange); font-size:12px; font-weight:850; cursor:pointer; }
+.ccb-chat-start>button:disabled { opacity:.6; cursor:wait; }
+.ccb-chat-start>small { display:flex; align-items:center; gap:6px; margin-top:17px; color:#8490a0; font-size:9px; }
+.ccb-chat-transcript { display:flex; flex:1; flex-direction:column; gap:11px; overflow-y:auto; padding:16px 13px; background:#fbfaf8; }
+.ccb-chat-intro-note { align-self:center; max-width:260px; margin:0 0 4px; color:#8993a2; font-size:10px; line-height:1.5; text-align:center; }
+.ccb-chat-message { display:flex; max-width:85%; flex-direction:column; gap:4px; border:1px solid #ece9e5; border-radius:12px 12px 12px 3px; padding:9px 11px; background:#fff; }
+.ccb-chat-message p { margin:0; color:#34445d; font-size:12px; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+.ccb-chat-message time { align-self:flex-end; color:#9aa3af; font-size:9px; }
+.ccb-chat-message--customer { align-self:flex-end; border-color:#f2d4c2; border-radius:12px 12px 3px 12px; background:#fff1e8; }
+.ccb-chat-message--system { align-self:center; max-width:95%; border-style:dashed; background:#f7f7f6; }
+.ccb-chat-message--system p { color:#68758a; font-size:10px; text-align:center; }
+.ccb-chat-message--agent { border-color:#dce8df; background:#f7fcf8; }
+.ccb-chat-sender { color:#28734e; font-size:9px; font-weight:850; }
+.ccb-chat-queue-note { align-self:center; max-width:95%; border:1px solid #f0ddc8; border-radius:8px; padding:9px 11px; color:#89502b; background:#fff7ef; font-size:10px; line-height:1.5; text-align:center; }
+.ccb-chat-compose { display:flex; gap:8px; border-top:1px solid #eceff3; padding:11px 12px; background:#fff; }
+.ccb-chat-compose input { width:100%; min-width:0; min-height:41px; border:1px solid #e0e5eb; border-radius:9px; padding:0 12px; outline:none; color:var(--shop-navy); font:inherit; font-size:12px; }
+.ccb-chat-compose input:focus { border-color:var(--shop-orange); box-shadow:0 0 0 2px #fdf0e8; }
+.ccb-chat-compose button { display:grid; width:42px; height:41px; flex:0 0 42px; place-items:center; border:0; border-radius:9px; color:#fff; background:var(--shop-orange); cursor:pointer; }
+.ccb-chat-compose button:disabled { opacity:.45; cursor:not-allowed; }
+.ccb-chat-footer { display:flex; align-items:flex-start; flex-direction:column; gap:7px; border-top:1px solid #f0f1f3; padding:9px 13px 11px; }
+.ccb-chat-footer>button { display:inline-flex; align-items:center; gap:6px; border:0; padding:2px 0; color:var(--shop-orange-dark); background:transparent; font-size:11px; font-weight:850; cursor:pointer; }
+.ccb-chat-footer>button:disabled { opacity:.5; cursor:wait; }
+.ccb-chat-footer>span { color:#52647d; font-size:10px; font-weight:750; }
+.ccb-chat-footer>small { color:#939ba7; font-size:9px; line-height:1.4; }
+.ccb-chat-error { margin:12px 0 0!important; color:#b13b2d!important; font-size:11px!important; line-height:1.5; }
+.ccb-chat-inline-error { margin:0!important; padding:7px 12px; background:#fff4f1; }
+@media(max-width:620px) {
+ .ccb-support-chat { right:14px; bottom:14px; }
+ .ccb-chat-launcher { min-height:48px; padding-inline:16px; font-size:12px; }
+ .ccb-chat-panel { width:calc(100vw - 20px); height:min(620px,calc(100dvh - 84px)); min-height:360px; border-radius:15px; }
+ .ccb-chat-header { min-height:65px; }
+}
+@media(prefers-reduced-motion:reduce) { .ccb-chat-launcher { transition:none; } }
