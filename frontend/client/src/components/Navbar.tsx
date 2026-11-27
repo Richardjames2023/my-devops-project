@@ -330,12 +330,12 @@ const Navbar = () => {
                   </div>
                 </div>
                 <div className="py-1">
-                  <div className={placeholderClass}>
-                    <UserRound size={19} /> My Account <ComingSoon>Coming soon</ComingSoon>
-                  </div>
-                  <div className={placeholderClass}>
-                    <Package size={19} /> Orders <CountBadge count={accountCounts.orders} /> <ComingSoon>Coming soon</ComingSoon>
-                  </div>
+                  <Link href="/account" onClick={() => setActiveMenu(null)} className={activeClass}>
+                    <UserRound size={19} /> My Account
+                  </Link>
+                  <Link href="/account?section=orders" onClick={() => setActiveMenu(null)} className={activeClass}>
+                    <Package size={19} /> Orders <CountBadge count={accountCounts.orders} />
+                  </Link>
                   <div className={placeholderClass}>
                     <Heart size={19} /> Wishlist <CountBadge count={accountCounts.wishlist} /> <ComingSoon>Coming soon</ComingSoon>
                   </div>
