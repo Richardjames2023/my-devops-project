@@ -1,6 +1,6 @@
 "use client";
 
-const API_BASE_URL = (
+export const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   (process.env.NODE_ENV === "production" ? "" : "http://localhost:5000/api/v1")
 ).replace(/\/+$/, "");
@@ -139,4 +139,9 @@ export async function apiRequest<T>(
   }
 
   return payload as T;
+}
+
+export function getApiOrigin(): string {
+  if (!API_BASE_URL) throw new ApiError("The API base URL is not configured for this environment.", 500);
+  return new URL(API_BASE_URL).origin;
 }
