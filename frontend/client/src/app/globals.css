@@ -1,5 +1,110 @@
 @import "tailwindcss";
 
+/* ClickClickBuy brand typography: self-hosted client-supplied font families */
+@font-face {
+  font-family: "Aftika";
+  src: url("/fonts/aftika/aftika-extralight.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika";
+  src: url("/fonts/aftika/aftika-light.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika";
+  src: url("/fonts/aftika/aftika-regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika";
+  src: url("/fonts/aftika/aftika-semibold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika";
+  src: url("/fonts/aftika/aftika-bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika";
+  src: url("/fonts/aftika/aftika-extrabold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika";
+  src: url("/fonts/aftika/aftika-black.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika Soft";
+  src: url("/fonts/aftika-soft/aftika-soft-extralight.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika Soft";
+  src: url("/fonts/aftika-soft/aftika-soft-light.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika Soft";
+  src: url("/fonts/aftika-soft/aftika-soft-regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika Soft";
+  src: url("/fonts/aftika-soft/aftika-soft-semibold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika Soft";
+  src: url("/fonts/aftika-soft/aftika-soft-bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika Soft";
+  src: url("/fonts/aftika-soft/aftika-soft-extrabold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Aftika Soft";
+  src: url("/fonts/aftika-soft/aftika-soft-black.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+}
+
+:root {
+  --font-aftika: "Aftika";
+  --font-aftika-soft: "Aftika Soft";
+}
+
 :root {
   color-scheme: light;
   --shop-page: #fbf9f6;
@@ -33,7 +138,8 @@
   --color-shop-orange-dark: var(--shop-orange-dark);
   --color-shop-success: var(--shop-success);
   --color-shop-body: var(--shop-body);
-  --font-sans: var(--font-inter), Arial, sans-serif;
+  --font-sans: var(--font-aftika), Arial, sans-serif;
+  --font-display: var(--font-aftika-soft), Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -47,13 +153,17 @@ body {
   margin: 0;
   background: var(--shop-page);
   color: var(--shop-body);
-  font-family: var(--font-inter), Arial, sans-serif;
+  font-family: var(--font-aftika), Arial, sans-serif;
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-h1, h2, h3, h4, h5, h6 { color: var(--shop-navy); }
+h1, h2, h3, h4, h5, h6 {
+  color: var(--shop-navy);
+  font-family: var(--font-aftika-soft), Arial, sans-serif;
+  font-weight: 700;
+}
 
 button, input, select, textarea { font: inherit; }
 
