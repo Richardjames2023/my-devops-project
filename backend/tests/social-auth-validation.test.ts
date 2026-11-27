@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { facebookAccessTokenSchema, googleCredentialSchema } from "../src/modules/auth/social-auth.controller";
+import { facebookAccessTokenSchema, googleCredentialSchema } from "../src/modules/auth/social-auth.validation";
 
 describe("social authentication credential validation", () => {
   it("accepts a Google ID token-shaped credential", () => {
