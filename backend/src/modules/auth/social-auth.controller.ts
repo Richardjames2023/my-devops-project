@@ -1,13 +1,11 @@
 import type { Request, Response } from "express";
-import { z } from "zod";
+import { googleCredentialSchema, facebookAccessTokenSchema } from "./social-auth.validation";
 import { authenticateWithFacebook, authenticateWithGoogle, linkFacebookIdentity, linkGoogleIdentity } from "./social-auth.service";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
 import { mergeGuestCartIntoUserCart } from "../cart/cart.service";
 import { GUEST_SESSION_COOKIE, clearGuestSessionCookie } from "../guest-session/guest-session.cookie";
 import { getValidGuestSession, revokeGuestSession } from "../guest-session/guest-session.service";
 
-export const googleCredentialSchema = z.object({ credential: z.string().min(20).max(10_000) });
-export const facebookAccessTokenSchema = z.object({ accessToken: z.string().min(20).max(10_000) });
 
 async function mergeGuestCart(req: Request, res: Response, userId: string) {
   const token = req.cookies?.[GUEST_SESSION_COOKIE];
