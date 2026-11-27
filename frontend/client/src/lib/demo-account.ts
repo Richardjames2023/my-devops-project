@@ -80,3 +80,10 @@ export function loginDemoCustomerByPhone(phone:string):DemoCustomer {
  localStorage.setItem(SESSION_KEY,"active");
  return customer;
 }
+
+export function registerDemoCustomerByPhone(input:{firstName:string;lastName:string;phone:string}):DemoCustomer {
+ const customer:DemoCustomer={id:`demo-phone-${Date.now()}`,firstName:input.firstName.trim(),lastName:input.lastName.trim(),email:"",phone:input.phone.replace(/\\s+/g,"").trim(),createdAt:new Date().toISOString()};
+ localStorage.setItem(CUSTOMER_KEY,JSON.stringify(customer));localStorage.setItem(SESSION_KEY,"active");
+ localStorage.setItem(ADDRESS_KEY,JSON.stringify(defaultAddresses.map(a=>({...a,recipient:`${customer.firstName} ${customer.lastName}`,phone:customer.phone}))));
+ return customer;
+}
