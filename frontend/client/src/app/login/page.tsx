@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, LockKeyhole, Mail, ShoppingBag } from "lucide-react";
 import { ApiError, apiRequest, setAuthTokens } from "@/lib/api/client";
 
@@ -14,7 +15,6 @@ type LoginResponse = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -31,7 +31,7 @@ export default function LoginPage() {
         body: { email: email.trim().toLowerCase(), password },
       });
       setAuthTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
-      router.replace(searchParams.get("next")?.startsWith("/") ? searchParams.get("next")! : "/account");
+      router.replace(new URLSearchParams(window.location.search).get("next")?.startsWith("/") ? new URLSearchParams(window.location.search).get("next")! : "/account");
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : "We couldn't sign you in. Please try again.");
     } finally {
