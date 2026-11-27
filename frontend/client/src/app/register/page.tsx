@@ -27,7 +27,7 @@ export default function RegisterPage() {
 
   function requestPhoneCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const digits = form.phone.replace(/\\D/g, "");
+    const digits = form.phone.replace(/\D/g, "");
     if (!form.firstName.trim() || !form.lastName.trim()) { setError("Enter your first and last name."); return; }
     if (digits.length < 10 || digits.length > 15) { setError("Enter a valid phone number, including your country code."); return; }
     setError("");
@@ -36,7 +36,7 @@ export default function RegisterPage() {
 
   function verifyPhoneCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!/^\\d{6}$/.test(otp)) { setError("Enter the 6-digit verification code."); return; }
+    if (!/^\d{6}$/.test(otp)) { setError("Enter the 6-digit verification code."); return; }
     registerDemoCustomerByPhone({ firstName: form.firstName, lastName: form.lastName, phone: form.phone });
     router.replace("/account");
   }
@@ -76,7 +76,7 @@ export default function RegisterPage() {
           </> : <>
             <button type="button" className="customer-auth-back" onClick={() => {setOtpRequested(false);setOtp("");setError("");}}>Change details</button>
             <p className="customer-auth-otp-copy">Enter the 6-digit code for <strong>{form.phone}</strong>.</p>
-            <label htmlFor="register-otp">Verification code</label><input id="register-otp" className="customer-auth-otp-input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={otp} onChange={e=>setOtp(e.target.value.replace(/\\D/g,"").slice(0,6))} placeholder="000000"/>
+            <label htmlFor="register-otp">Verification code</label><input id="register-otp" className="customer-auth-otp-input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="000000"/>
           </>}
           {error && <p className="customer-auth-error" role="alert">{error}</p>}
           <button className="customer-auth-submit" type="submit">{otpRequested ? "Verify and Create Account" : "Continue with Phone"}</button>
