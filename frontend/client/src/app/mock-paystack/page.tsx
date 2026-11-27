@@ -31,7 +31,7 @@ function MockPaystackContent() {
         <div className="mock-paystack-demo-alert"><ShieldCheck size={17}/><span>This is a mock payment page for storefront testing. No real payment details should be entered and no money will be charged.</span></div>
         <section className="mock-paystack-panel">
           <div className="mock-paystack-merchant"><span className="mock-paystack-merchant-mark">C</span><div><strong>ClickClickBuy</strong><small>Payment checkout</small></div></div>
-          <div className="mock-paystack-amount"><span>You're paying</span><strong>{formatNaira(amount)}</strong><small>NGN · Nigerian Naira</small></div>
+          <div className="mock-paystack-amount"><span>You&apos;re paying</span><strong>{formatNaira(amount)}</strong><small>NGN · Nigerian Naira</small></div>
           <div className="mock-paystack-reference"><span>Payment reference</span><strong>{reference}</strong></div>
           <div className="mock-paystack-method"><CreditCard size={19}/><div><strong>Card payment</strong><small>Simulated card payment option</small></div><span>DEMO</span></div>
           <div className="mock-paystack-simulate">
