@@ -68,7 +68,7 @@ export default function LoginPage() {
       {method === "email" ? (
         <form onSubmit={handleEmailSubmit} className="customer-auth-form">
           <label htmlFor="login-email">Email address</label><div className="customer-auth-input"><Mail size={18}/><input id="login-email" type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></div>
-          <div className="customer-auth-password-heading"><label htmlFor="login-password">Password</label><Link href="/forgot-password">Forgot password?</Link></div>
+          <label htmlFor="login-password">Password</label>
           <div className="customer-auth-input"><LockKeyhole size={18}/><input id="login-password" type={showPassword?"text":"password"} autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter your password"/><button type="button" aria-label={showPassword?"Hide password":"Show password"} onClick={()=>setShowPassword(v=>!v)}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></div>
           {error && <p className="customer-auth-error" role="alert">{error}</p>}
           <button className="customer-auth-submit" type="submit">Sign In</button>
