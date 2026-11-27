@@ -9,7 +9,7 @@ import { useState } from "react";
 import { toast } from "react-toastify";
 
 const ProductCard = ({ product, variant = "default" }: { product: ProductType; variant?: "default" | "catalogue" }) => {
-  const [productTypes, setProductTypes] = useState({
+  const [productTypes] = useState({
     size: product.sizes[0] ?? "",
     color: product.colors[0] ?? "default",
   });
