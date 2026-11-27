@@ -1,16 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+
 import { ArrowLeft, CheckCircle2, MapPin, PackageSearch, Truck } from "lucide-react";
 import { getDemoCustomer, getDemoOrder } from "@/lib/demo-account";
 
 export default function TrackOrderPage(){
- const params=useSearchParams();
- const orderNumber=params.get("order")||"";
- const order=useMemo(()=>orderNumber?getDemoOrder(orderNumber):undefined,[orderNumber]);
- const signedIn=typeof window!=="undefined"&&!!getDemoCustomer();
+ const [orderNumber,setOrderNumber]=useState("");
+ const [ready,setReady]=useState(false);
+ useEffect(()=>{setOrderNumber(new URLSearchParams(window.location.search).get("order")||"");setReady(true)},[]);
+ const order=orderNumber?getDemoOrder(orderNumber):undefined;
+ const signedIn=ready&&!!getDemoCustomer();
+ if(!ready)return <section className="mx-auto min-h-[55vh] p-12 text-center text-sm text-[var(--shop-muted)]">Loading order preview…</section>;
  if(!order)return <section className="mx-auto flex min-h-[55vh] max-w-3xl flex-col items-center justify-center px-4 py-16 text-center"><PackageSearch size={38} className="mb-5 text-[var(--shop-orange-dark)]"/><h1 className="text-3xl font-bold text-[var(--shop-navy)]">Track your order</h1><p className="mt-3 max-w-lg text-sm leading-6 text-[var(--shop-muted)]">Enter tracking through your account order history. This frontend preview recognises the sample order references only.</p><Link href={signedIn?"/account?section=orders":"/login"} className="mt-6 rounded-lg bg-[var(--shop-orange)] px-5 py-3 text-sm font-bold text-white">{signedIn?"View my orders":"Sign in to your account"}</Link><Link href="/" className="mt-4 text-sm font-semibold text-[var(--shop-navy)]">Back to shopping</Link></section>;
  return <section className="mx-auto min-h-[55vh] max-w-4xl px-4 py-12"><Link href="/account?section=orders" className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--shop-orange-dark)]"><ArrowLeft size={16}/>Back to my orders</Link><div className="mt-6 rounded-2xl border border-[var(--shop-border)] bg-white p-6 shadow-sm"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest text-[var(--shop-orange-dark)]">DEMO ORDER TRACKING</p><h1 className="mt-2 text-2xl font-extrabold text-[var(--shop-navy)]">{order.orderNumber}</h1><p className="mt-1 text-sm text-[var(--shop-muted)]">Placed {new Intl.DateTimeFormat("en-NG",{day:"numeric",month:"long",year:"numeric"}).format(new Date(order.createdAt))}</p></div><span className="rounded-full bg-[var(--shop-peach)] px-3 py-2 text-xs font-bold text-[var(--shop-orange-dark)]">{order.status==="COMPLETED"?"Delivered":order.status==="CANCELLED"?"Cancelled":order.status==="FULFILLED"?"Shipped":"Processing"}</span></div><div className="mt-6 grid gap-3 border-y border-[var(--shop-border)] py-5 sm:grid-cols-2"><div><span className="text-xs text-[var(--shop-muted)]">Delivery to</span><p className="mt-1 flex items-start gap-2 text-sm font-semibold text-[var(--shop-navy)]"><MapPin size={16} className="text-[var(--shop-orange)]"/>{order.deliveryAddress}</p></div><div><span className="text-xs text-[var(--shop-muted)]">Delivery estimate</span><p className="mt-1 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]"><Truck size={16} className="text-[var(--shop-orange)]"/>{order.deliveryEstimate}</p></div></div><h2 className="mt-6 text-base font-bold text-[var(--shop-navy)]">Order progress</h2><div className="mt-4 grid gap-0">{order.trackingEvents.map((event,i)=><div className="flex gap-3" key={event.label}><div className="flex flex-col items-center"><span className={`grid h-8 w-8 place-items-center rounded-full ${event.complete?"bg-[var(--shop-orange)] text-white":"border border-[var(--shop-border)] bg-white text-[var(--shop-muted)]"}`}>{event.complete?<CheckCircle2 size={16}/>:i+1}</span>{i<order.trackingEvents.length-1&&<span className={`my-1 min-h-8 w-0.5 ${event.complete?"bg-[var(--shop-orange)]":"bg-[var(--shop-border)]"}`}/>}</div><div className="pb-6"><strong className="text-sm text-[var(--shop-navy)]">{event.label}</strong><p className="mt-1 text-xs text-[var(--shop-muted)]">{event.date}</p></div></div>)}</div><p className="rounded-lg bg-[var(--shop-peach-tint)] p-3 text-xs leading-5 text-[var(--shop-orange-dark)]">Prototype preview: these tracking events are sample data, not live courier updates.</p></div></section>;
 }
