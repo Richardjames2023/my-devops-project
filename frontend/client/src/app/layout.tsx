@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import CustomerSupportChat from "@/components/CustomerSupportChat";
 import { ToastContainer } from "react-toastify";
 
 const inter = Inter({
@@ -31,6 +32,7 @@ export default function RootLayout({
             <Footer />
           </div>
         </div>
+        <CustomerSupportChat />
         <ToastContainer position="bottom-right" />
       </body>
     </html>
