@@ -5583,3 +5583,48 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
  .account-sidebar__link span { flex:1; }
  .account-sidebar__signout { display:flex; margin-top:0; border:1px solid #f0e7e1; }
 }
+
+
+/* Account hub desktop typography refinement across every account section */
+@media(min-width:761px) {
+ .account-sidebar__heading { font-size:16px; }
+ .account-sidebar__link { min-height:44px; font-size:13px; }
+ .account-content { font-size:14px; }
+ .account-welcome__eyebrow { font-size:10px; }
+ .account-welcome h2 { font-size:29px; }
+ .account-welcome p:not(.account-welcome__eyebrow) { font-size:13px; }
+ .account-welcome-actions button,.account-welcome-actions a { min-height:36px; font-size:11px; }
+ .account-profile-strip { font-size:11px; }
+ .account-profile-strip strong { font-size:11px; }
+ .account-summary-card>span:nth-child(2) { font-size:13px; }
+ .account-summary-card>strong { font-size:29px; }
+ .account-summary-card>small { font-size:12px; }
+ .account-tracking-heading h3 { font-size:17px; }
+ .account-tracking-heading p,.account-tracking-footer>span { font-size:12px; }
+ .account-tracking-steps>div>b { font-size:11px; }
+ .account-tracking-steps>div>small { font-size:10px; }
+ .account-panel-heading h3 { font-size:16px; }
+ .account-panel-heading p { font-size:12px; }
+ .account-panel-heading>button,.account-panel-heading>a { font-size:11px; }
+ .account-recent-order__product strong { font-size:12px; }
+ .account-recent-order__product>div>span { font-size:11px; }
+ .account-recent-order__meta>strong { font-size:12px; }
+ .account-recent-order__meta>a { font-size:11px; }
+ .account-quick-links>button,.account-quick-links>a { min-height:49px; font-size:13px; }
+ .account-recommendation-card>span { font-size:10px; }
+ .account-recommendation-card>strong { font-size:12px; }
+ .account-recommendation-card>b { font-size:13px; }
+ .account-reassurance strong { font-size:12px; }
+ .account-reassurance span,.account-reassurance button { font-size:11px; }
+ .account-feature-page>h2,.account-content__heading h2 { font-size:25px; }
+ .account-feature-page>p,.account-content__heading p { font-size:13px; }
+ .account-order-tabs button { font-size:12px; }
+ .account-order-card--full { font-size:12px; }
+ .account-data-table { font-size:12px; }
+ .account-data-table th,.account-data-table td { padding:13px; }
+ .account-address-card>strong,.account-address-card>b { font-size:13px; }
+ .account-address-card>span { font-size:12px; }
+ .account-form-card label { font-size:11px; }
+ .account-form-card input,.account-form-card select,.account-form-card textarea { font-size:12px; }
+ .account-demo-caption { font-size:11px; }
+}
