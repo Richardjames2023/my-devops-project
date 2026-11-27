@@ -43,10 +43,9 @@ export default function AccountPage() {
   const signOut=()=>{logoutDemoCustomer();window.location.assign("/login");};
 
   if(!ready) return <div className="account-page"><div className="account-state"><span className="account-spinner"/><p>Opening your demo account…</p></div></div>;
-  if(!customer) return <div className="account-page"><div className="account-page__banner"><span><ShoppingBag size={19}/></span><h1>My Account</h1></div><div className="account-auth-required"><CircleUserRound size={42}/><h2>Welcome to your ClickClickBuy account</h2><p>Sign in or create a demo account to explore your customer dashboard.</p><Link href="/login">Sign In</Link><small>New to ClickClickBuy? <Link href="/register">Create an account</Link></small></div></div>;
+  if(!customer) return <div className="account-page"><div className="account-auth-required"><CircleUserRound size={42}/><h2>Welcome to your ClickClickBuy account</h2><p>Sign in or create a demo account to explore your customer dashboard.</p><Link href="/login">Sign In</Link><small>New to ClickClickBuy? <Link href="/register">Create an account</Link></small></div></div>;
 
   return <div className="account-page">
-    <div className="account-page__banner"><span><ShoppingBag size={19}/></span><h1>My Account</h1></div>
     <div className="account-page__layout">
       <aside className="account-sidebar" aria-label="Account navigation">
         <div className="account-sidebar__heading"><ShoppingBag size={19}/><strong>My Account</strong></div>
