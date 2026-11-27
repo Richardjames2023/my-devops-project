@@ -5877,3 +5877,43 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .shop-categories__all-categories {
   flex-grow: 1;
 }
+
+/* Cart quantity controls, stock guidance and remove action */
+.cart-quantity-control button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.cart-quantity-control button:disabled {
+  color: #b8c1ce;
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.cart-item-stock-note {
+  color: var(--shop-success);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cart-item-stock-note.is-unavailable {
+  color: #b13b2d;
+}
+
+.cart-item-remove {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cart-item-remove:focus-visible,
+.cart-quantity-control button:focus-visible {
+  outline: 2px solid var(--shop-blue);
+  outline-offset: 2px;
+}
+
+.cart-item-remove:active {
+  color: #a52d25;
+}
