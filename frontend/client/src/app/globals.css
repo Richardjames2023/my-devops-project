@@ -5310,3 +5310,41 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
  .account-settings-list { grid-template-columns:1fr; }
  .account-feature-card { align-items:flex-start; }
 }
+
+
+/* ClickClickBuy account palette refinement */
+.account-page { margin-top: 24px; }
+.account-page__layout { border-top:1px solid var(--shop-border); border-radius:14px; }
+.account-sidebar__link.is-active { color:var(--shop-orange-dark); background:var(--shop-peach); }
+.account-sidebar__link.is-active svg { color:var(--shop-orange); }
+.account-sidebar__link:hover { color:var(--shop-orange-dark); background:var(--shop-peach-tint); }
+.account-welcome { border:1px solid #f4d9c8; background:linear-gradient(112deg,var(--shop-peach) 0%,#fffaf6 72%,#fff 100%); }
+.account-welcome__eyebrow { color:var(--shop-orange-dark)!important; }
+.account-welcome__avatar { border-color:#f3d5c2; color:var(--shop-orange); background:#fff; }
+.account-profile-strip { border-color:#eee5df; background:#fffdfa; }
+.account-demo-tag { color:var(--shop-orange-dark)!important; background:var(--shop-peach)!important; }
+.account-summary-card { border-color:#eee5df; background:#fff; }
+.account-summary-card:hover { border-color:#edb995; box-shadow:0 8px 20px rgba(8,28,65,.07); }
+.account-summary-icon.is-blue,.account-summary-icon.is-amber,.account-summary-icon.is-green,.account-summary-icon.is-rose { color:var(--shop-orange-dark); background:var(--shop-peach); }
+.account-summary-card>small,.account-panel-heading>button,.account-quick-links>button svg:first-child,.account-quick-links>a svg:first-child { color:var(--shop-orange-dark); }
+.account-overview-panel { border-color:#eee5df; }
+.account-status--processing { color:#9e4a1b; background:#fdf0e8; }
+.account-status--shipped { color:#fff; background:var(--shop-navy); }
+.account-status--delivered { color:#fff; background:#314568; }
+.account-status--cancelled { color:#9e4a1b; background:#f7e3d8; }
+.account-order-tabs button[aria-selected="true"] { color:var(--shop-orange-dark); }
+.account-order-tabs button[aria-selected="true"]::after { background:var(--shop-orange); }
+.account-order-card__total a,.account-state>a,.account-panel-empty a,.account-saved-card a { color:var(--shop-orange-dark); }
+.account-nav-count,.account-quick-links>button b { color:#fff; background:var(--shop-orange); }
+.account-auth-required { color:var(--shop-orange); }
+.account-auth-required>a { background:var(--shop-orange); }
+.account-auth-required small a { color:var(--shop-orange-dark); }
+.account-feature-card> b { color:var(--shop-orange-dark); background:var(--shop-peach); }
+.account-feature-empty { color:var(--shop-orange-dark); border-color:#edcbb7; }
+.account-notification-dot { background:var(--shop-orange); }
+.account-saved-art { color:var(--shop-orange-dark); background:linear-gradient(135deg,var(--shop-peach),#fffaf6); }
+.account-order-count { color:var(--shop-orange-dark); background:var(--shop-peach); }
+.account-order-tabs button { color:#778096; }
+.account-content__heading h2,.account-section-placeholder h2,.account-feature-page>h2 { color:var(--shop-navy); }
+.account-welcome h2,.account-summary-card>strong,.account-panel-heading h3,.account-recent-order strong { color:var(--shop-navy); }
+.account-demo-caption { color:#82766f; }
