@@ -57,8 +57,6 @@ type CatalogPreviewProduct = {
 };
 
 type CatalogPreviewResponse = { items: CatalogPreviewProduct[] };
-type CustomerOrderCountResponse = { pagination?: { total?: number } };
-type WishlistCountResponse = { wishlist?: { itemCount?: number } };
 
 function CountBadge({ count }: { count: number }) {
   if (count < 1) return null;
