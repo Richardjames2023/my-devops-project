@@ -31,7 +31,7 @@ async function verifyGoogleCredential(credential: string): Promise<Profile> {
     email: payload.email.toLowerCase(),
     firstName: payload.given_name ?? names[0] ?? "Customer",
     lastName: payload.family_name ?? names.slice(1).join(" ") ?? "",
-    emailVerified: true,
+    emailVerified: payload.email.endsWith("@gmail.com") || Boolean(payload.hd),
   };
 }
 
@@ -155,6 +155,9 @@ async function authenticateProvider(profile: Profile) {
       select: { userId: true },
     });
     if (racedIdentity) return issueCustomerSession(racedIdentity.userId);
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+      throw new AppError("An account already exists with this email. Sign in using your existing method; social identities are not merged automatically.", 409);
+    }
     throw error;
   }
   return issueCustomerSession(userId);
