@@ -238,7 +238,7 @@ const ProductList = ({ category, query, sort, params }: { category?: string; que
                 <>
                   <div className="category-shop__grid">{displayedProducts.map((product) => <ProductCard key={product.id} product={product} variant="catalogue"/>)}</div>
                   {hasMoreProducts && <div className="category-shop__load-more" ref={loadMoreRef} aria-live="polite">Loading more products…</div>}
-                  {!hasMoreProducts && visibleProducts.length > 9 && <p className="category-shop__end-message">You've reached the end of the catalogue.</p>}
+                  {!hasMoreProducts && visibleProducts.length > 9 && <p className="category-shop__end-message">You&apos;ve reached the end of the catalogue.</p>}
                 </>
               ) : <div className="category-shop__empty"><h2>No products match these filters</h2><p>Try adjusting your filters or browsing the full catalogue.</p><button type="button" onClick={clearFilters}>Clear filters</button></div>}
             </div>
