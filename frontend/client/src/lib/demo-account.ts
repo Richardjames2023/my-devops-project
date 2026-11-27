@@ -63,3 +63,8 @@ export function getDemoReviews(){try{return JSON.parse(localStorage.getItem(REVI
 export function saveDemoReview(review:{orderNumber:string;rating:number;comment:string}){localStorage.setItem(REVIEW_KEY,JSON.stringify([...getDemoReviews(),review]))}
 export function getDemoTransactions(){return demoOrders.map(o=>({id:o.transactionReference,orderNumber:o.orderNumber,amount:o.totalAmount,status:o.paymentStatus,method:o.paymentMethod,date:o.createdAt}))}
 export const getDemoRewards=()=>({points:240,tier:"Everyday Member",nextTier:"Insider",pointsToNextTier:260});
+
+const ALERT_KEY="ccb-demo-wishlist-alerts", VIEWED_KEY="ccb-demo-recently-viewed";
+export function getDemoWishlistAlerts(){try{return JSON.parse(localStorage.getItem(ALERT_KEY)||'{"priceDrops":true,"backInStock":true}') as {priceDrops:boolean;backInStock:boolean}}catch{return {priceDrops:true,backInStock:true}}}
+export function saveDemoWishlistAlerts(value:{priceDrops:boolean;backInStock:boolean}){localStorage.setItem(ALERT_KEY,JSON.stringify(value))}
+export function getDemoRecentlyViewed(){try{const ids=JSON.parse(localStorage.getItem(VIEWED_KEY)||'["p3","p1","p4"]') as string[];return ids.map(id=>demoProducts.find(p=>p.id===id)).filter((p):p is (typeof demoProducts)[number]=>Boolean(p))}catch{return demoProducts.slice(0,3)}}
