@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShoppingBag } from "lucide-react";
+import { Eye, EyeOff, ShoppingBag } from "lucide-react";
 import { registerDemoCustomer } from "@/lib/demo-account";
 
 export default function RegisterPage() {
@@ -19,6 +19,8 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   function submitRegistration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -146,16 +148,27 @@ export default function RegisterPage() {
 
             <div className="customer-auth-field">
               <label htmlFor="reg-password">Password *</label>
-              <input
-                id="reg-password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={12}
-                maxLength={128}
-                value={form.password}
-                onChange={(event) => updateField("password", event.target.value)}
-              />
+              <div className="customer-auth-password-control">
+                <input
+                  id="reg-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  required
+                  minLength={12}
+                  maxLength={128}
+                  value={form.password}
+                  onChange={(event) => updateField("password", event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="customer-auth-password-toggle"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <EyeOff size={21} /> : <Eye size={21} />}
+                </button>
+              </div>
               <p className="customer-auth-password-hint">
                 Use 12–128 characters. A longer, unique passphrase is recommended.
               </p>
@@ -163,16 +176,27 @@ export default function RegisterPage() {
 
             <div className="customer-auth-field">
               <label htmlFor="reg-confirm-password">Confirm password *</label>
-              <input
-                id="reg-confirm-password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={12}
-                maxLength={128}
-                value={form.confirmPassword}
-                onChange={(event) => updateField("confirmPassword", event.target.value)}
-              />
+              <div className="customer-auth-password-control">
+                <input
+                  id="reg-confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  required
+                  minLength={12}
+                  maxLength={128}
+                  value={form.confirmPassword}
+                  onChange={(event) => updateField("confirmPassword", event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="customer-auth-password-toggle"
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                  aria-pressed={showConfirmPassword}
+                >
+                  {showConfirmPassword ? <EyeOff size={21} /> : <Eye size={21} />}
+                </button>
+              </div>
             </div>
           </div>
 
