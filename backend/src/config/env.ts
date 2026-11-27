@@ -11,6 +11,10 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 
+  GOOGLE_CLIENT_ID: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  FACEBOOK_APP_ID: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+  FACEBOOK_APP_SECRET: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
+
   CORS_ORIGIN: z.string().min(1, "CORS_ORIGIN is required"),
 
   JWT_ACCESS_SECRET: z
