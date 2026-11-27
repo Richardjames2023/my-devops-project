@@ -3107,14 +3107,14 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   .homepage-collection__grid .product-card__add-label {
     display: none;
   }
-  .homepage-collection__grid button[aria-label^="Add "] {
+  .homepage-collection__grid .product-card__add-button {
     width: 38px;
     height: 36px;
     justify-content: center;
     gap: 0;
     padding: 0;
   }
-  .homepage-collection__grid button[aria-label^="Add "] svg {
+  .homepage-collection__grid .product-card__add-button svg {
     width: 17px;
     height: 17px;
   }
