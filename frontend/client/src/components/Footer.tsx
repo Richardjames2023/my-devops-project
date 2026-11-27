@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight, Facebook, Headphones, Instagram, MapPin, Music2, ShieldCheck, Youtube } from "lucide-react";
+import { ArrowUpRight, Facebook, Instagram, MapPin, Music2, ShieldCheck, Youtube } from "lucide-react";
 
 const footerGroups = [
   { title: "Shop", links: [
@@ -61,7 +61,7 @@ const Footer = () => (
 
       <div className="storefront-footer__contact">
         <h2>Find your next everyday essential</h2>
-        <p>Explore useful finds for your home, work and everyday routines. Need a hand? We're here to help.</p>
+        <p>Explore useful finds for your home, work and everyday routines. Need a hand? We&apos;re here to help.</p>
         <Link href="/products" className="storefront-footer__help-link">
           Explore products <ArrowUpRight size={16} aria-hidden="true" />
         </Link>
