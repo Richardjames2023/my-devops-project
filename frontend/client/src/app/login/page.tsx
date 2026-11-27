@@ -30,7 +30,7 @@ export default function LoginPage() {
 
   function requestDemoCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const digits = phone.replace(/\\D/g, "");
+    const digits = phone.replace(/\D/g, "");
     if (digits.length < 10 || digits.length > 15) { setError("Enter a valid phone number, including your country code."); return; }
     setError("");
     setOtpRequested(true);
@@ -38,7 +38,7 @@ export default function LoginPage() {
 
   function verifyDemoCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!/^\\d{6}$/.test(otp)) { setError("Enter the 6-digit verification code."); return; }
+    if (!/^\d{6}$/.test(otp)) { setError("Enter the 6-digit verification code."); return; }
     loginDemoCustomerByPhone(phone);
     router.replace("/account");
   }
@@ -81,7 +81,7 @@ export default function LoginPage() {
           </> : <>
             <button type="button" className="customer-auth-back" onClick={() => {setOtpRequested(false);setOtp("");setError("");}}><ArrowLeft size={14}/> Change phone number</button>
             <p className="customer-auth-otp-copy">Enter the 6-digit code for <strong>{phone}</strong>.</p>
-            <label htmlFor="login-otp">Verification code</label><input id="login-otp" className="customer-auth-otp-input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={otp} onChange={e=>setOtp(e.target.value.replace(/\\D/g,"").slice(0,6))} placeholder="000000"/>
+            <label htmlFor="login-otp">Verification code</label><input id="login-otp" className="customer-auth-otp-input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} required value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="000000"/>
           </>}
           {error && <p className="customer-auth-error" role="alert">{error}</p>}
           <button className="customer-auth-submit" type="submit">{otpRequested ? "Verify and Sign In" : "Continue with Phone"}</button>
