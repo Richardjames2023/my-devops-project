@@ -70,7 +70,7 @@ export function saveDemoWishlistAlerts(value:{priceDrops:boolean;backInStock:boo
 export function getDemoRecentlyViewed(){try{const ids=JSON.parse(localStorage.getItem(VIEWED_KEY)||'["p3","p1","p4"]') as string[];return ids.map(id=>demoProducts.find(p=>p.id===id)).filter((p):p is (typeof demoProducts)[number]=>Boolean(p))}catch{return demoProducts.slice(0,3)}}
 
 export function loginDemoCustomerByPhone(phone:string):DemoCustomer {
- const normalizedPhone=phone.replace(/\\s+/g,"").trim();
+ const normalizedPhone=phone.replace(/\s+/g,"").trim();
  const saved=localStorage.getItem(CUSTOMER_KEY);let customer:DemoCustomer|null=null;
  if(saved){try{customer=JSON.parse(saved) as DemoCustomer}catch{localStorage.removeItem(CUSTOMER_KEY)}}
  if(!customer||customer.phone!==normalizedPhone){
@@ -82,7 +82,7 @@ export function loginDemoCustomerByPhone(phone:string):DemoCustomer {
 }
 
 export function registerDemoCustomerByPhone(input:{firstName:string;lastName:string;phone:string}):DemoCustomer {
- const customer:DemoCustomer={id:`demo-phone-${Date.now()}`,firstName:input.firstName.trim(),lastName:input.lastName.trim(),email:"",phone:input.phone.replace(/\\s+/g,"").trim(),createdAt:new Date().toISOString()};
+ const customer:DemoCustomer={id:`demo-phone-${Date.now()}`,firstName:input.firstName.trim(),lastName:input.lastName.trim(),email:"",phone:input.phone.replace(/\s+/g,"").trim(),createdAt:new Date().toISOString()};
  localStorage.setItem(CUSTOMER_KEY,JSON.stringify(customer));localStorage.setItem(SESSION_KEY,"active");
  localStorage.setItem(ADDRESS_KEY,JSON.stringify(defaultAddresses.map(a=>({...a,recipient:`${customer.firstName} ${customer.lastName}`,phone:customer.phone}))));
  return customer;
