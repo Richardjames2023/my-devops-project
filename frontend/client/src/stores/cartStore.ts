@@ -31,7 +31,7 @@ const useCartStore = create<CartStoreStateType & CartStoreActionsType>()(
             return {
               cart: state.cart.map((item, index) =>
                 index === existingIndex
-                  ? { ...item, quantity: Math.min(getStockLimit(item), item.quantity + quantityToAdd) }
+                  ? { ...item, quantity: Math.min(getStockLimit(item), stockLimit, item.quantity + quantityToAdd) }
                   : item
               ),
             };
