@@ -91,8 +91,8 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={submitRegistration} className="customer-auth-form">
-          <div className="customer-auth-two-col">
-            <div>
+          <div className="customer-auth-form-fields">
+            <div className="customer-auth-field">
               <label htmlFor="reg-first">First name *</label>
               <input
                 id="reg-first"
@@ -102,7 +102,8 @@ export default function RegisterPage() {
                 onChange={(event) => updateField("firstName", event.target.value)}
               />
             </div>
-            <div>
+
+            <div className="customer-auth-field">
               <label htmlFor="reg-last">Last name *</label>
               <input
                 id="reg-last"
@@ -112,60 +113,68 @@ export default function RegisterPage() {
                 onChange={(event) => updateField("lastName", event.target.value)}
               />
             </div>
+
+            <div className="customer-auth-field">
+              <label htmlFor="reg-email">Email address *</label>
+              <input
+                id="reg-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={form.email}
+                onChange={(event) => updateField("email", event.target.value)}
+              />
+            </div>
+
+            <div className="customer-auth-field">
+              <label htmlFor="reg-phone">
+                Phone number <span>(optional)</span>
+              </label>
+              <input
+                id="reg-phone"
+                type="tel"
+                autoComplete="tel"
+                minLength={7}
+                value={form.phone}
+                onChange={(event) => updateField("phone", event.target.value)}
+                placeholder="+234 801 234 5678"
+              />
+              <p className="customer-auth-password-hint">
+                Optional. Useful for account and delivery updates.
+              </p>
+            </div>
+
+            <div className="customer-auth-field">
+              <label htmlFor="reg-password">Password *</label>
+              <input
+                id="reg-password"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={12}
+                maxLength={128}
+                value={form.password}
+                onChange={(event) => updateField("password", event.target.value)}
+              />
+              <p className="customer-auth-password-hint">
+                Use 12–128 characters. A longer, unique passphrase is recommended.
+              </p>
+            </div>
+
+            <div className="customer-auth-field">
+              <label htmlFor="reg-confirm-password">Confirm password *</label>
+              <input
+                id="reg-confirm-password"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={12}
+                maxLength={128}
+                value={form.confirmPassword}
+                onChange={(event) => updateField("confirmPassword", event.target.value)}
+              />
+            </div>
           </div>
-
-          <label htmlFor="reg-email">Email address *</label>
-          <input
-            id="reg-email"
-            type="email"
-            autoComplete="email"
-            required
-            value={form.email}
-            onChange={(event) => updateField("email", event.target.value)}
-          />
-
-          <label htmlFor="reg-phone">
-            Phone number <span>(optional)</span>
-          </label>
-          <input
-            id="reg-phone"
-            type="tel"
-            autoComplete="tel"
-            minLength={7}
-            value={form.phone}
-            onChange={(event) => updateField("phone", event.target.value)}
-            placeholder="+234 801 234 5678"
-          />
-          <p className="customer-auth-password-hint">
-            Add a phone number to make it easier to manage your account and delivery details.
-          </p>
-
-          <label htmlFor="reg-password">Password *</label>
-          <input
-            id="reg-password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={12}
-            maxLength={128}
-            value={form.password}
-            onChange={(event) => updateField("password", event.target.value)}
-          />
-          <p className="customer-auth-password-hint">
-            Use 12–128 characters. A longer, unique passphrase is recommended.
-          </p>
-
-          <label htmlFor="reg-confirm-password">Confirm password *</label>
-          <input
-            id="reg-confirm-password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={12}
-            maxLength={128}
-            value={form.confirmPassword}
-            onChange={(event) => updateField("confirmPassword", event.target.value)}
-          />
 
           {error && <p className="customer-auth-error" role="alert">{error}</p>}
           <button className="customer-auth-submit" type="submit">
