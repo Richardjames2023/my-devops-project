@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ShoppingBag } from "lucide-react";
 import { registerDemoCustomer } from "@/lib/demo-account";
@@ -60,7 +61,28 @@ export default function RegisterPage() {
 
   return (
     <div className="customer-auth-page">
-      <section className="customer-auth-card">
+      <div className="customer-auth-layout">
+        <aside className="customer-auth-visual" aria-label="ClickClickBuy shopping experience">
+          <div className="customer-auth-visual-copy">
+            <span>GOOD FINDS. GREAT EVERYDAY.</span>
+            <h2>More of what you love, all in one place.</h2>
+            <p>Discover useful finds for your home, style and everyday routines with ClickClickBuy.</p>
+          </div>
+          <div className="customer-auth-visual-art">
+            <Image
+              src="/images/registration-shopping-illustration.png"
+              alt="A shopper enjoying ClickClickBuy finds, with fashion, home and lifestyle products"
+              fill
+              priority
+              sizes="(min-width: 1100px) 42vw, 100vw"
+            />
+          </div>
+          <div className="customer-auth-visual-trust">
+            <span>Delivery across Nigeria</span>
+            <span>Secure shopping experience</span>
+          </div>
+        </aside>
+        <section className="customer-auth-card">
         <Link href="/" className="customer-auth-brand">
           <ShoppingBag size={25} />
           <span>ClickClick<strong>Buy</strong></span>
@@ -208,19 +230,11 @@ export default function RegisterPage() {
 
         {notice && <p className="customer-auth-info" role="status">{notice}</p>}
 
-        <div className="customer-demo-notice">
-          <strong>Frontend prototype</strong>
-          <span>
-            This form currently creates a local demo account only. It does not
-            create a backend account or send an email verification message.
-            Secure registration and verification will be enabled during API integration.
-          </span>
-        </div>
-
         <p className="customer-auth-footnote">
           Already have a ClickClickBuy account? <Link href="/login">Sign in</Link>
         </p>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
