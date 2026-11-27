@@ -28,7 +28,7 @@ import ShoppingCartIcon from "./ShoppingCartIcon";
 import AnnouncementBar from "./AnnouncementBar";
 import { products as demoProducts } from "@/lib/catalogue";
 import { apiRequest } from "@/lib/api/client";
-import { getDemoOrders, getDemoWishlistCount, getDemoCustomer } from "@/lib/demo-account";
+import { getDemoOrders, getDemoWishlistCount, getDemoCustomer, type DemoCustomer } from "@/lib/demo-account";
 
 const navigation = [
   { label: "Shop", href: "/products" },
@@ -98,6 +98,7 @@ const Navbar = () => {
   const [catalogProducts, setCatalogProducts] = useState<CatalogPreviewProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [accountCounts, setAccountCounts] = useState({ orders: 0, wishlist: 0 });
+  const [demoCustomer, setDemoCustomer] = useState<DemoCustomer | null>(null);
 
   useEffect(() => {
     if (!activeMenu) return;
@@ -115,6 +116,7 @@ const Navbar = () => {
   useEffect(() => {
     if (activeMenu !== "account") return;
     const customer = getDemoCustomer();
+    setDemoCustomer(customer);
     setAccountCounts({
       orders: customer ? getDemoOrders().length : 0,
       wishlist: customer ? getDemoWishlistCount() : 0,
@@ -308,11 +310,17 @@ const Navbar = () => {
                 <div className="border-b border-[var(--shop-peach)] bg-[var(--shop-peach-tint)] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
-                    Welcome to ClickClickBuy
+                    {demoCustomer ? `Welcome back, ${demoCustomer.firstName}` : "Welcome to ClickClickBuy"}
                   </div>
-                  <Link href="/login" onClick={() => setActiveMenu(null)} className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
-                    Sign In
-                  </Link>
+                  {demoCustomer ? (
+                    <Link href="/account" onClick={() => setActiveMenu(null)} className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
+                      View Dashboard
+                    </Link>
+                  ) : (
+                    <Link href="/login" onClick={() => setActiveMenu(null)} className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
+                      Sign In
+                    </Link>
+                  )}
                 </div>
                 <div className="py-1">
                   <Link href="/account" onClick={() => setActiveMenu(null)} className={activeClass}>
