@@ -27,7 +27,8 @@ import SearchBar from "./SearchBar";
 import ShoppingCartIcon from "./ShoppingCartIcon";
 import AnnouncementBar from "./AnnouncementBar";
 import { products as demoProducts } from "@/lib/catalogue";
-import { apiRequest, getAccessToken } from "@/lib/api/client";
+import { apiRequest } from "@/lib/api/client";
+import { getDemoOrders, getDemoWishlistCount, getDemoCustomer } from "@/lib/demo-account";
 
 const navigation = [
   { label: "Shop", href: "/products" },
@@ -115,25 +116,11 @@ const Navbar = () => {
 
   useEffect(() => {
     if (activeMenu !== "account") return;
-    const token = getAccessToken();
-    if (!token) {
-      setAccountCounts({ orders: 0, wishlist: 0 });
-      return;
-    }
-
-    let cancelled = false;
-    Promise.allSettled([
-      apiRequest<CustomerOrderCountResponse>("/orders?page=1&limit=1", { authenticated: true }),
-      apiRequest<WishlistCountResponse>("/wishlist", { authenticated: true }),
-    ]).then(([ordersResult, wishlistResult]) => {
-      if (cancelled) return;
-      setAccountCounts({
-        orders: ordersResult.status === "fulfilled" ? ordersResult.value.pagination?.total ?? 0 : 0,
-        wishlist: wishlistResult.status === "fulfilled" ? wishlistResult.value.wishlist?.itemCount ?? 0 : 0,
-      });
+    const customer = getDemoCustomer();
+    setAccountCounts({
+      orders: customer ? getDemoOrders().length : 0,
+      wishlist: customer ? getDemoWishlistCount() : 0,
     });
-
-    return () => { cancelled = true; };
   }, [activeMenu]);
 
   useEffect(() => {
