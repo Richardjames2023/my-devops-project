@@ -5527,3 +5527,26 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
  .account-order-card--full .account-order-card__identity { flex:1; }
  .account-data-table { min-width:680px; }
 }
+
+
+/* Final brand consistency and expanded navigation */
+.account-sidebar nav { max-height:calc(100vh - 245px); overflow-y:auto; scrollbar-width:thin; scrollbar-color:#ead2c2 transparent; }
+.account-sidebar__link:hover { color:var(--shop-orange-dark); background:var(--shop-peach-tint); }
+.account-sidebar__link.is-active { color:var(--shop-orange-dark); background:var(--shop-peach); }
+.account-sidebar__link.is-active svg { color:var(--shop-orange-dark); }
+.account-order-tabs button[aria-selected="true"] { color:var(--shop-orange-dark); }
+.account-order-tabs button[aria-selected="true"]::after { background:var(--shop-orange); }
+.account-order-count { color:var(--shop-orange-dark); background:var(--shop-peach); }
+.account-status--processing { color:var(--shop-orange-dark); background:var(--shop-peach); }
+.account-status--shipped { color:#fff; background:var(--shop-navy); }
+.account-status--delivered { color:var(--shop-orange-dark); background:#f9e5d8; }
+.account-status--cancelled { color:#76503c; background:#f4e8df; }
+.account-nav-count { color:#fff; background:var(--shop-orange); }
+.account-feature-page .account-order-tabs { scrollbar-width:thin; }
+.account-inline-action { display:flex; align-items:center; gap:5px; margin-top:7px; border:0; padding:0; color:var(--shop-orange-dark); background:transparent; font-size:10px; font-weight:850; cursor:pointer; }
+@media(max-width:900px) { .account-sidebar nav { max-height:none; overflow:visible; } }
+@media(max-width:620px) {
+ .account-content { padding:18px 14px 22px; }
+ .account-sidebar { padding:12px; }
+ .account-sidebar__link { min-height:39px; }
+}
