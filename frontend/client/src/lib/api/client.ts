@@ -26,9 +26,24 @@ export class ApiError extends Error {
 // refresh tokens in localStorage/sessionStorage. A server-side session/BFF is
 // the next auth integration step for securely retaining refresh tokens.
 let accessToken: string | null = null;
+let refreshToken: string | null = null;
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+}
+
+export function setAuthTokens(tokens: { accessToken: string; refreshToken: string }): void {
+  accessToken = tokens.accessToken;
+  refreshToken = tokens.refreshToken;
+}
+
+export function clearAuthTokens(): void {
+  accessToken = null;
+  refreshToken = null;
+}
+
+export function hasAuthSession(): boolean {
+  return accessToken !== null;
 }
 
 export function getAccessToken(): string | null {
