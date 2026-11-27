@@ -5871,3 +5871,9 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     font-size: 12px;
   }
 }
+
+/* Let category chips share any available row width instead of leaving a blank tail */
+.shop-categories__category-chip,
+.shop-categories__all-categories {
+  flex-grow: 1;
+}
