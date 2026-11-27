@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  Bell, BriefcaseBusiness, ChevronRight, CircleUserRound, ClipboardList, CreditCard,
+  Bell, ChevronRight, CircleUserRound, ClipboardList, CreditCard,
   Headset, Heart, LogOut, MapPin, Package, RotateCcw, ShieldCheck, ShoppingBag,
   ShoppingBasket, Truck, UserRound, Wallet, Gift, Plus, Trash2,
   MessageSquare, CheckCircle2, FileText, Settings2, Star,
