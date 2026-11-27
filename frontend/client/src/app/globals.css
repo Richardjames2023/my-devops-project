@@ -5930,3 +5930,26 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   width: 0;
   height: 0;
 }
+
+/* ClickClickBuy authentication choices */
+.customer-auth-socials { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 17px; }
+.customer-auth-socials button { display:flex; min-height:45px; align-items:center; justify-content:center; gap:9px; border:1px solid #dce3ed; border-radius:9px; padding:0 10px; color:#243a58; background:#fff; font-family:var(--font-aftika),Arial,sans-serif; font-size:11px; font-weight:750; cursor:pointer; transition:border-color .15s,background .15s,transform .15s; }
+.customer-auth-socials button:hover { border-color:#aebed1; background:#f9fbfe; transform:translateY(-1px); }
+.customer-auth-google-mark { color:#4285f4; font-family:Arial,sans-serif; font-size:19px; font-weight:800; }
+.customer-auth-facebook-mark { display:grid; width:19px; height:19px; place-items:end center; border-radius:50%; color:#fff; background:#1877f2; font-family:Arial,sans-serif; font-size:17px; font-weight:800; line-height:18px; }
+.customer-auth-divider { display:flex; align-items:center; gap:12px; margin:0 0 14px; color:#8995a6; font-size:9px; font-weight:800; letter-spacing:.09em; }
+.customer-auth-divider::before,.customer-auth-divider::after { height:1px; flex:1; background:#e8edf3; content:""; }
+.customer-auth-methods { display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-bottom:15px; border-radius:9px; padding:4px; background:#f2f5f9; }
+.customer-auth-methods button { display:flex; min-height:37px; align-items:center; justify-content:center; gap:7px; border:0; border-radius:7px; color:#68788f; background:transparent; font-family:var(--font-aftika),Arial,sans-serif; font-size:11px; font-weight:750; cursor:pointer; }
+.customer-auth-methods button.is-active { color:#102b50; background:#fff; box-shadow:0 1px 4px rgba(16,43,80,.1); }
+.customer-auth-field-hint { margin:-3px 0 2px; color:#7b899b; font-size:10px; line-height:1.5; }
+.customer-auth-otp-copy { margin:0 0 3px; color:#68788f; font-size:12px; line-height:1.6; }
+.customer-auth-otp-copy strong { color:#102b50; }
+.customer-auth-otp-input { min-height:48px!important; text-align:center; font-size:21px!important; font-weight:800; letter-spacing:.35em; }
+.customer-auth-back { display:inline-flex; width:max-content; align-items:center; gap:6px; border:0; padding:0; color:#1769c2; background:transparent; font-family:var(--font-aftika),Arial,sans-serif; font-size:11px; font-weight:750; cursor:pointer; }
+.customer-auth-info { margin:12px 0 0; border:1px solid #d9e9fb; border-radius:8px; padding:10px 12px; color:#315f91; background:#f1f7ff; font-size:11px; line-height:1.55; }
+.customer-auth-card .customer-demo-notice { margin-top:16px; }
+@media(max-width:480px) {
+  .customer-auth-socials { grid-template-columns:1fr; }
+  .customer-auth-socials button { min-height:43px; }
+}
