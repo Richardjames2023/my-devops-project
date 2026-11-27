@@ -160,3 +160,26 @@ async function authenticateProvider(profile: Profile) {
   }
   return issueCustomerSession(userId);
 }
+
+export async function linkGoogleIdentity(userId: string, credential: string): Promise<void> {
+  await linkProviderIdentity(userId, await verifyGoogleCredential(credential));
+}
+
+export async function linkFacebookIdentity(userId: string, accessToken: string): Promise<void> {
+  await linkProviderIdentity(userId, await verifyFacebookCredential(accessToken));
+}
+
+async function linkProviderIdentity(userId: string, profile: Profile): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true, isActive: true } });
+  if (!user?.isActive) throw new AppError("Account is unavailable", 401);
+  if (user.email.toLowerCase() !== profile.email.toLowerCase()) {
+    throw new AppError("The provider email must match the email on your signed-in account before it can be linked", 409);
+  }
+  try {
+    await prisma.socialAccount.create({
+      data: { userId, provider: profile.provider, providerUserId: profile.providerUserId },
+    });
+  } catch {
+    throw new AppError("This provider identity is already linked to an account", 409);
+  }
+}
