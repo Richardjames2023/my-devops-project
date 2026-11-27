@@ -5842,3 +5842,32 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
  .ccb-chat-header { min-height:65px; }
 }
 @media(prefers-reduced-motion:reduce) { .ccb-chat-launcher { transition:none; } }
+
+/* Homepage category filters: keep the row scrollable without showing a scrollbar */
+.shop-categories__category-list {
+  gap: 7px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.shop-categories__category-list::-webkit-scrollbar {
+  display: none;
+}
+
+.shop-categories__category-chip {
+  padding-inline: 13px;
+  font-size: 12px;
+}
+
+.shop-categories__all-categories {
+  gap: 6px;
+  padding-inline: 11px;
+  font-size: 11px;
+}
+
+@media (min-width: 1200px) {
+  .shop-categories__category-chip {
+    padding-inline: 13px;
+    font-size: 12px;
+  }
+}
