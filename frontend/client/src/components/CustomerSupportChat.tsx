@@ -262,7 +262,7 @@ export default function CustomerSupportChat() {
                 <button type="submit" disabled={busy || !draft.trim() || conversation.status === "CLOSED"} aria-label="Send message"><Send size={17}/></button>
               </form>
               <div className="ccb-chat-footer">
-                {conversation.status === "BOT_ACTIVE" ? <button type="button" onClick={() => void requestAgent()} disabled={busy}><Headphones size={14}/> Talk to a human agent</button> : <span>{conversation.status === "WAITING_FOR_AGENT" ? "An agent will be with you shortly" : conversation.status === "HUMAN_ACTIVE" ? "You're speaking with customer care" : "Need more help? Start a new chat soon"}</span>}
+                {conversation.status === "BOT_ACTIVE" ? <button type="button" onClick={() => void requestAgent()} disabled={busy}><Headphones size={14}/> Talk to a human agent</button> : <span>{conversation.status === "WAITING_FOR_AGENT" ? "An agent will be with you shortly" : conversation.status === "HUMAN_ACTIVE" ? "You&apos;re speaking with customer care" : "Need more help? Start a new chat soon"}</span>}
                 <small>AI support may make mistakes. Please don't share passwords or payment details.</small>
               </div>
             </>
