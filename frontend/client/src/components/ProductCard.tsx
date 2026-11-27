@@ -50,7 +50,7 @@ const ProductCard = ({ product, variant = "default" }: { product: ProductType; v
           <p className={`catalogue-card__stock catalogue-card__stock--${product.stockStatus}`}>{product.stockStatus === "out-of-stock" ? "Currently unavailable" : product.stockStatus === "low-stock" ? "Only a few left" : "In stock"}</p>
           <div className="catalogue-card__purchase">
             <div className="catalogue-card__prices"><strong>₦{product.price.toLocaleString("en-NG")}</strong>{product.compareAtPrice && product.compareAtPrice > product.price && <del>₦{product.compareAtPrice.toLocaleString("en-NG")}</del>}</div>
-            <button type="button" onClick={handleAddToCart} disabled={product.stockStatus === "out-of-stock"} aria-label={`Add ${product.name} to basket`}><ShoppingCart size={17}/></button>
+            <button type="button" className="product-card__add-button" onClick={handleAddToCart} disabled={product.stockStatus === "out-of-stock"} aria-label={`Add ${product.name} to basket`}><ShoppingCart size={17}/></button>
           </div>
         </div>
       </article>
@@ -64,7 +64,7 @@ const ProductCard = ({ product, variant = "default" }: { product: ProductType; v
       </Link>
       <div className="flex flex-col gap-2 p-3">
         <div className="flex flex-col gap-1"><p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--shop-orange-dark)]">{product.categoryName}</p><h2 className="line-clamp-2 font-semibold leading-snug text-[var(--shop-navy)]">{product.name}</h2><p className="line-clamp-1 text-xs text-[var(--shop-muted)]">{product.shortDescription}</p></div>
-        <div className="flex items-center justify-between gap-3"><p className="font-bold text-[var(--shop-navy)]">₦{product.price.toLocaleString("en-NG")}</p><button type="button" aria-label={`Add ${product.name} to cart`} title="Add to cart" onClick={handleAddToCart} disabled={product.stockStatus === "out-of-stock"} className="flex items-center gap-1.5 rounded-lg bg-[var(--shop-orange)] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--shop-orange-dark)] disabled:cursor-not-allowed disabled:opacity-50"><ShoppingCart className="h-4 w-4" aria-hidden="true"/><span className="product-card__add-label">Add to Cart</span></button></div>
+        <div className="flex items-center justify-between gap-3"><p className="font-bold text-[var(--shop-navy)]">₦{product.price.toLocaleString("en-NG")}</p><button type="button" aria-label={`Add ${product.name} to cart`} title="Add to cart" onClick={handleAddToCart} disabled={product.stockStatus === "out-of-stock"} className="product-card__add-button flex items-center gap-1.5 rounded-lg bg-[var(--shop-orange)] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--shop-orange-dark)] disabled:cursor-not-allowed disabled:opacity-50"><ShoppingCart className="h-4 w-4" aria-hidden="true"/><span className="product-card__add-label">Add to Cart</span></button></div>
       </div>
     </article>
   );
