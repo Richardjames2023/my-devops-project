@@ -3,11 +3,11 @@
 import ShippingForm from "@/components/ShippingForm";
 import useCartStore from "@/stores/cartStore";
 import { ShippingFormInputs } from "@/types";
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, PackageCheck, ShieldCheck, Truck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, ChevronDown, ChevronUp, Clock3, CreditCard, Minus, PackageCheck, Plus, ShieldCheck, Trash2, Truck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 const formatNaira = (amount: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 0 }).format(amount);
@@ -21,7 +21,19 @@ const CartPageContent = () => {
   const activeStep = Number(searchParams.get("step") || "1");
   const mockStatus = searchParams.get("mockStatus");
   const isMockResult = activeStep === 4 && (mockStatus === "success" || mockStatus === "failed");
-  const { cart } = useCartStore();
+  const { cart, hasHydrated, updateQuantity, removeFromCart } = useCartStore();
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+    cart.forEach((item) => {
+      const stockLimit = typeof item.availableQuantity === "number"
+        ? Math.max(0, Math.floor(item.availableQuantity))
+        : item.stockStatus === "out-of-stock" ? 0 : Number.POSITIVE_INFINITY;
+      if (stockLimit === 0 || item.quantity > stockLimit) {
+        updateQuantity(item, stockLimit);
+      }
+    });
+  }, [cart, hasHydrated, updateQuantity]);
   const subtotal = useMemo(() => cart.reduce((total, item) => total + item.price * item.quantity, 0), [cart]);
   const itemCount = cart.reduce((total, item) => total + item.quantity, 0);
   const itemOffers = cart.reduce((total, item) => total + Math.max(0, (item.compareAtPrice ?? item.price) - item.price) * item.quantity, 0);
@@ -56,9 +68,39 @@ const CartPageContent = () => {
                   return (
                     <article className="cart-item" key={`${item.id}-${item.selectedSize}-${item.selectedColor}`}>
                       <Link className="cart-item-image" href={`/products/${item.id}`} aria-label={`View ${item.name}`}>{image ? <Image src={image} alt={item.name} fill sizes="92px"/> : null}</Link>
-                      <div className="cart-item-info"><Link href={`/products/${item.id}`} className="cart-item-name">{item.name}</Link>{(item.selectedColor !== "default" || item.selectedSize) && <p className="cart-item-variant">{[item.selectedColor !== "default" ? item.selectedColor : "", item.selectedSize].filter(Boolean).join(" · ")}</p>}<strong className="cart-item-unit-price">{formatNaira(item.price)}</strong></div>
-                      <div className="cart-quantity-control"><span>{item.quantity}</span></div>
+                      <div className="cart-item-info">
+                        <Link href={`/products/${item.id}`} className="cart-item-name">{item.name}</Link>
+                        {(item.selectedColor !== "default" || item.selectedSize) && <p className="cart-item-variant">{[item.selectedColor !== "default" ? item.selectedColor : "", item.selectedSize].filter(Boolean).join(" · ")}</p>}
+                        <strong className="cart-item-unit-price">{formatNaira(item.price)}</strong>
+                        {typeof item.availableQuantity === "number" && item.availableQuantity > 0 ? (
+                          <span className="cart-item-stock-note">{item.availableQuantity} available</span>
+                        ) : item.stockStatus === "out-of-stock" || item.availableQuantity === 0 ? (
+                          <span className="cart-item-stock-note is-unavailable">Currently out of stock</span>
+                        ) : null}
+                      </div>
+                      <div className="cart-quantity-control" aria-label={`Quantity for ${item.name}`}>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item, item.quantity - 1)}
+                          disabled={item.quantity <= 1}
+                          aria-label={`Decrease quantity of ${item.name}`}
+                        ><Minus size={14}/></button>
+                        <span aria-live="polite">{item.quantity}</span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item, item.quantity + 1)}
+                          disabled={item.stockStatus === "out-of-stock" || item.availableQuantity === 0 || (typeof item.availableQuantity === "number" && item.quantity >= item.availableQuantity)}
+                          aria-label={`Increase quantity of ${item.name}`}
+                        ><Plus size={14}/></button>
+                      </div>
                       <strong className="cart-item-line-total">{formatNaira(item.price * item.quantity)}</strong>
+                      <button
+                        type="button"
+                        className="cart-item-remove"
+                        onClick={() => removeFromCart(item)}
+                        aria-label={`Remove ${item.name} from cart`}
+                        title="Remove item"
+                      ><Trash2 size={17}/></button>
                     </article>
                   );
                 })}
