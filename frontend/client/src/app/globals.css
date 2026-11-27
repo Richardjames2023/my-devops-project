@@ -382,7 +382,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   max-width: 590px;
   margin: 0;
   color: var(--shop-navy);
-  font-size: clamp(40px, 4.25vw, 64px);
+  font-size: clamp(38px, 3.8vw, 56px);
   font-weight: 800;
   letter-spacing: -0.055em;
   line-height: 0.99;
@@ -529,7 +529,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 900px) {
   .hero-slider__stage { height: 390px; min-height: 370px; }
   .hero-slider__content { left: 48px; width: 54%; }
-  .hero-slider__title { font-size: clamp(36px, 5vw, 49px); }
+  .hero-slider__title { font-size: clamp(34px, 4.6vw, 46px); }
   .hero-slider__wash {
     background: linear-gradient(
       90deg,
@@ -562,7 +562,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     animation: hero-copy-enter-mobile 420ms ease both;
   }
   .hero-slider__eyebrow { margin-bottom: 14px; font-size: 10px; }
-  .hero-slider__title { max-width: 440px; font-size: clamp(35px, 9vw, 44px); line-height: 1.02; }
+  .hero-slider__title { max-width: 440px; font-size: clamp(32px, 8vw, 40px); line-height: 1.04; }
   .hero-slider__description { max-width: 390px; margin-top: 13px; font-size: 14px; line-height: 1.52; }
   .hero-slider__actions { margin-top: 19px; }
   .hero-slider__button { min-height: 46px; border-radius: 10px; padding: 0 17px; font-size: 13px; }
