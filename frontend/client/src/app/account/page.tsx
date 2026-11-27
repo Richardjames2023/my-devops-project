@@ -8,7 +8,7 @@ import {
   Bell, BriefcaseBusiness, ChevronRight, CircleUserRound, ClipboardList, CreditCard,
   Headset, Heart, LogOut, MapPin, Package, RotateCcw, ShieldCheck, ShoppingBag,
   ShoppingBasket, Truck, UserRound, Wallet, Gift, Plus, Trash2,
-  MessageSquare, CheckCircle2, FileText, Settings2,
+  MessageSquare, CheckCircle2, FileText, Settings2, Star,
 } from "lucide-react";
 import {
   DemoAddress, DemoCustomer, DemoOrder, DemoTicket, createDemoTicket, deleteDemoAddress,
