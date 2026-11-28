@@ -255,8 +255,14 @@ export default function RegisterPage() {
               checked={acceptPolicies} aria-invalid={Boolean(errors.acceptPolicies)}
               aria-describedby={errors.acceptPolicies ? "reg-acceptPolicies-error" : undefined}
               onChange={(event) => {
-                setAcceptPolicies(event.target.checked);
-                setErrors((current) => ({ ...current, acceptPolicies: undefined }));
+                const checked = event.target.checked;
+                setAcceptPolicies(checked);
+                setErrors((current) => ({
+                  ...current,
+                  acceptPolicies: checked || !submitted
+                    ? undefined
+                    : "You must accept the Terms & Conditions and Privacy Policy to create an account.",
+                }));
               }} />
             <div className="customer-auth-policy-copy">
               <label htmlFor="reg-accept-policies">
