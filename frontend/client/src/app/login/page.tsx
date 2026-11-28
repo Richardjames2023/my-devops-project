@@ -53,8 +53,13 @@ export default function LoginPage() {
 
   return (
     <div className="customer-auth-page"><section className="customer-auth-card">
-      <Link href="/" className="customer-auth-brand"><ShoppingBag size={25}/><span>ClickClick<strong>Buy</strong></span></Link>
-      <p className="customer-auth-eyebrow">YOUR ACCOUNT</p><h1>Welcome back</h1>
+      <div className="customer-auth-card-heading customer-auth-card-heading--center">
+        <div className="customer-auth-join">
+          <ShoppingBag size={23} strokeWidth={2.2} aria-hidden="true" />
+          <span>JOIN CLICKCLICKBUY</span>
+        </div>
+      </div>
+      <h1>Welcome back</h1>
       <p className="customer-auth-intro">Sign in your way. Your everyday finds are waiting.</p>
       <div className="customer-auth-socials">
         <button type="button" onClick={() => setNotice("Google sign-in will be enabled when secure authentication is connected.")} aria-label="Continue with Google"><svg className="customer-auth-provider-icon" viewBox="0 0 48 48" aria-hidden="true">
