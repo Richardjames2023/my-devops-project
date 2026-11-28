@@ -6757,3 +6757,64 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     font-size: 13px;
   }
 }
+
+
+/* Compact inline validation inspired by Facebook's space-saving field treatment */
+.customer-auth-form-fields > .customer-auth-field {
+  position: relative;
+}
+
+.customer-auth-form .customer-auth-field-error {
+  position: absolute;
+  z-index: 2;
+  right: 9px;
+  bottom: 5px;
+  left: 11px;
+  display: block;
+  overflow: hidden;
+  color: #c62828;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.customer-auth-form .customer-auth-field input[aria-invalid="true"] {
+  padding-bottom: 16px;
+}
+
+.customer-auth-form .customer-auth-field .customer-auth-password-control input[aria-invalid="true"] {
+  padding-bottom: 16px;
+}
+
+.customer-auth-form .customer-auth-field .customer-auth-phone-control input[aria-invalid="true"] {
+  padding-bottom: 16px;
+}
+
+.customer-auth-form .customer-auth-field-error--phone {
+  left: 103px;
+}
+
+.customer-auth-form .customer-auth-field-error--acceptPolicies {
+  position: static;
+  overflow: visible;
+  margin-top: 2px;
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.customer-auth-policy-copy {
+  position: relative;
+}
+
+@media (max-width: 480px) {
+  .customer-auth-form .customer-auth-field-error {
+    font-size: 9px;
+  }
+
+  .customer-auth-form .customer-auth-field-error--phone {
+    left: 94px;
+  }
+}
