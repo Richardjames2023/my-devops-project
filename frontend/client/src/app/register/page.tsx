@@ -76,14 +76,21 @@ export default function RegisterPage() {
             type="button"
             onClick={() => setNotice("Google sign-up will be available when secure Google authentication is connected.")}
           >
-            <span className="customer-auth-google-mark">G</span>
+            <svg className="customer-auth-provider-icon" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.91c-.58 2.96-2.25 5.48-4.73 7.18l7.65 5.94c4.47-4.13 7.15-10.21 7.15-17.59Z"/>
+              <path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19Z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.86l-7.65-5.94c-2.13 1.45-4.86 2.3-8.25 2.3-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"/>
+            </svg>
             Continue with Google
           </button>
           <button
             type="button"
             onClick={() => setNotice("Facebook sign-up will be available when secure Facebook authentication is connected.")}
           >
-            <span className="customer-auth-facebook-mark">f</span>
+            <svg className="customer-auth-provider-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path fill="#1877F2" d="M24 12a12 12 0 1 0-13.875 11.86v-8.39H7.08V12h3.045V9.35c0-3.005 1.79-4.665 4.53-4.665 1.312 0 2.685.234 2.685.234v2.95h-1.513c-1.49 0-1.955.925-1.955 1.874V12h3.328l-.532 3.47h-2.796v8.39A12.002 12.002 0 0 0 24 12Z"/>
+            </svg>
             Continue with Facebook
           </button>
         </div>
@@ -200,6 +207,12 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          <label className="customer-auth-policy">
+            <input type="checkbox" name="acceptPolicies" required />
+            <span>
+              I have read and agree to the <Link href="/terms-and-conditions" target="_blank">Terms &amp; Conditions</Link> and <Link href="/privacy-policy" target="_blank">Privacy Policy</Link>.
+            </span>
+          </label>
           {error && <p className="customer-auth-error" role="alert">{error}</p>}
           <button className="customer-auth-submit" type="submit">
             Create Account
