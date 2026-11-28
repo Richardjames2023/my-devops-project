@@ -6387,3 +6387,99 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     border-radius: 15px;
   }
 }
+
+
+/* Recognisable Google and Facebook identity marks */
+.customer-auth-provider-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+}
+
+/* Required registration agreement */
+.customer-auth-policy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 13px 0 2px;
+  color: #52647d;
+  font-size: 12px;
+  line-height: 1.55;
+  cursor: pointer;
+}
+
+.customer-auth-policy input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  margin: 1px 0 0;
+  accent-color: var(--shop-orange);
+  cursor: pointer;
+}
+
+.customer-auth-policy a {
+  color: #155eb5;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.customer-auth-policy a:hover {
+  color: var(--shop-orange-dark);
+}
+
+.customer-auth-policy input:focus-visible {
+  outline: 2px solid var(--shop-blue);
+  outline-offset: 2px;
+}
+
+.legal-page {
+  width: min(100% - 36px, 900px);
+  margin: 42px auto 72px;
+  border: 1px solid #e6ebf2;
+  border-radius: 16px;
+  padding: clamp(24px, 4vw, 48px);
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(16,43,80,.055);
+}
+
+.legal-page h1 {
+  margin: 0 0 10px;
+  color: var(--shop-navy);
+  font-size: clamp(28px, 4vw, 38px);
+}
+
+.legal-page .legal-intro {
+  margin: 0 0 28px;
+  color: var(--shop-muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.legal-page section + section {
+  margin-top: 24px;
+}
+
+.legal-page h2 {
+  margin: 0 0 8px;
+  color: var(--shop-navy);
+  font-size: 18px;
+}
+
+.legal-page p,
+.legal-page li {
+  color: #4d5b70;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.legal-page ul {
+  padding-left: 22px;
+}
+
+.legal-page a {
+  color: #155eb5;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
