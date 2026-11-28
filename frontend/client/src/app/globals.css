@@ -6911,3 +6911,70 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     display: none;
   }
 }
+
+
+/* Registration welcome marker: centered bag icon and brand blue */
+.customer-auth-card-heading--center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 0 17px;
+  text-align: center;
+}
+
+.customer-auth-join {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #0D62F1;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .14em;
+  line-height: 1.3;
+}
+
+.customer-auth-join svg {
+  color: #0D62F1;
+}
+
+.customer-auth-card-heading--center .customer-auth-brand,
+.customer-auth-card-heading--center .customer-auth-eyebrow {
+  display: none;
+}
+
+/* Use ClickClickBuy blue as a supporting accent alongside the orange CTA */
+.customer-auth-card .customer-auth-socials button:focus-visible,
+.customer-auth-card .customer-auth-password-toggle:focus-visible {
+  outline-color: #0D62F1;
+}
+
+.customer-auth-card .customer-auth-policy a,
+.customer-auth-card .customer-auth-footnote a {
+  color: #0D62F1;
+}
+
+.customer-auth-card .customer-auth-policy a:hover,
+.customer-auth-card .customer-auth-footnote a:hover {
+  color: #084dbf;
+}
+
+.customer-auth-card .customer-auth-form .customer-auth-field input:focus-visible {
+  border-color: #0D62F1;
+  box-shadow: 0 0 0 3px rgba(13, 98, 241, .11);
+}
+
+.customer-auth-card .customer-auth-policy > input[type="checkbox"]:checked {
+  border-color: #0D62F1;
+  background: #0D62F1;
+}
+
+.customer-auth-card .customer-auth-policy > input[type="checkbox"]:focus-visible {
+  outline-color: #0D62F1;
+}
+
+@media (max-width: 700px) {
+  .customer-auth-card-heading--center {
+    display: none;
+  }
+}
