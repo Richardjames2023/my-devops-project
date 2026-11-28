@@ -57,8 +57,15 @@ export default function LoginPage() {
       <p className="customer-auth-eyebrow">YOUR ACCOUNT</p><h1>Welcome back</h1>
       <p className="customer-auth-intro">Sign in your way. Your everyday finds are waiting.</p>
       <div className="customer-auth-socials">
-        <button type="button" onClick={() => setNotice("Google sign-in will be enabled when secure authentication is connected.")} aria-label="Continue with Google"><span className="customer-auth-google-mark">G</span>Continue with Google</button>
-        <button type="button" onClick={() => setNotice("Facebook sign-in will be enabled when secure authentication is connected.")} aria-label="Continue with Facebook"><span className="customer-auth-facebook-mark">f</span>Continue with Facebook</button>
+        <button type="button" onClick={() => setNotice("Google sign-in will be enabled when secure authentication is connected.")} aria-label="Continue with Google"><svg className="customer-auth-provider-icon" viewBox="0 0 48 48" aria-hidden="true">
+            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5Z"/>
+            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.91c-.58 2.96-2.25 5.48-4.73 7.18l7.65 5.94c4.47-4.13 7.15-10.21 7.15-17.59Z"/>
+            <path fill="#FBBC05" d="M10.53 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.97-6.19Z"/>
+            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.9-5.86l-7.65-5.94c-2.13 1.45-4.86 2.3-8.25 2.3-6.26 0-11.57-4.22-13.46-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48Z"/>
+          </svg>Continue with Google</button>
+        <button type="button" onClick={() => setNotice("Facebook sign-in will be enabled when secure authentication is connected.")} aria-label="Continue with Facebook"><svg className="customer-auth-provider-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#1877F2" d="M24 12a12 12 0 1 0-13.875 11.86v-8.39H7.08V12h3.045V9.35c0-3.005 1.79-4.665 4.53-4.665 1.312 0 2.685.234 2.685.234v2.95h-1.513c-1.49 0-1.955.925-1.955 1.874V12h3.328l-.532 3.47h-2.796v8.39A12.002 12.002 0 0 0 24 12Z"/>
+          </svg>Continue with Facebook</button>
       </div>
       <div className="customer-auth-divider"><span>OR CONTINUE WITH</span></div>
       <div className="customer-auth-methods" role="tablist" aria-label="Sign-in method">
@@ -88,7 +95,7 @@ export default function LoginPage() {
         </form>
       )}
       {notice && <p className="customer-auth-info" role="status">{notice}</p>}
-      <div className="customer-demo-notice"><strong>Frontend prototype</strong><span>No real authentication or SMS is sent yet. Phone verification is a UI preview; any 6-digit code completes the demo sign-in. Google and Facebook will be connected during the backend authentication phase.</span></div>
+      
       <p className="customer-auth-footnote">New to ClickClickBuy? <Link href="/register">Create an account</Link></p>
     </section></div>
   );
