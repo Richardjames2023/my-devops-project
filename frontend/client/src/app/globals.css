@@ -6678,3 +6678,82 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   appearance: none !important;
   -webkit-appearance: none !important;
 }
+
+
+/* Registration field placeholders and Nigerian phone prefix */
+.customer-auth-form .customer-auth-field input::placeholder {
+  color: #9aa7b8;
+  opacity: 1;
+}
+
+.customer-auth-phone-control {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  overflow: hidden;
+  border: 1px solid #dce4ef;
+  border-radius: 9px;
+  background: #fff;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.customer-auth-phone-control:focus-within {
+  border-color: #7894ba;
+  box-shadow: 0 0 0 3px rgba(21, 94, 181, .09);
+}
+
+.customer-auth-phone-control:has(input[aria-invalid="true"]) {
+  border-color: #d92d20;
+  background: #fffafa;
+}
+
+.customer-auth-phone-prefix {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 0 12px;
+  border-right: 1px solid #e7ecf2;
+  color: #263e5d;
+  font-size: 14px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.customer-auth-nigeria-flag {
+  display: inline-block;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.customer-auth-form .customer-auth-field .customer-auth-phone-control input {
+  min-width: 0;
+  min-height: 46px;
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.customer-auth-form .customer-auth-field .customer-auth-phone-control input:focus {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+.customer-auth-form .customer-auth-field .customer-auth-phone-control input[aria-invalid="true"] {
+  border: 0;
+  background: transparent;
+}
+
+@media (max-width: 480px) {
+  .customer-auth-phone-prefix {
+    gap: 6px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+}
