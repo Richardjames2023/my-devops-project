@@ -36,6 +36,26 @@ async function requestSiteverify(
   return (await response.json()) as SiteverifyResponse;
 }
 
+export function assertTurnstileResponse(
+  result: SiteverifyResponse,
+  expectedHostnames: string[] = [],
+): void {
+  if (result.success !== true) {
+    throw new AppError("The security check could not be verified. Please try again.", 403);
+  }
+
+  if (expectedHostnames.length && (
+    !result.hostname ||
+    !expectedHostnames.map((hostname) => hostname.toLowerCase()).includes(result.hostname.toLowerCase())
+  )) {
+    throw new AppError("The security check could not be verified. Please try again.", 403);
+  }
+
+  if (result.action !== EXPECTED_ACTION) {
+    throw new AppError("The security check could not be verified. Please try again.", 403);
+  }
+}
+
 let siteverify: Siteverify = requestSiteverify;
 
 /** Allows deterministic verifier injection in unit tests without calling Cloudflare. */
@@ -58,23 +78,10 @@ export async function verifyCustomerRegistrationTurnstile(
     throw new AppError("Registration security verification is temporarily unavailable", 503);
   }
 
-  if (result.success !== true) {
-    throw new AppError("The security check could not be verified. Please try again.", 403);
-  }
-
   const expectedHostnames = env.TURNSTILE_EXPECTED_HOSTNAMES
     ?.split(",")
-    .map((hostname) => hostname.trim().toLowerCase())
-    .filter(Boolean);
+    .map((hostname) => hostname.trim())
+    .filter(Boolean) ?? [];
 
-  if (expectedHostnames?.length && (
-    !result.hostname ||
-    !expectedHostnames.includes(result.hostname.toLowerCase())
-  )) {
-    throw new AppError("The security check could not be verified. Please try again.", 403);
-  }
-
-  if (result.action !== EXPECTED_ACTION) {
-    throw new AppError("The security check could not be verified. Please try again.", 403);
-  }
+  assertTurnstileResponse(result, expectedHostnames);
 }
