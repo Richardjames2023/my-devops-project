@@ -11,6 +11,15 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 
+  TURNSTILE_SECRET_KEY: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1, "TURNSTILE_SECRET_KEY cannot be empty").optional(),
+  ),
+  TURNSTILE_EXPECTED_HOSTNAMES: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1).optional(),
+  ),
+
   CORS_ORIGIN: z.string().min(1, "CORS_ORIGIN is required"),
 
   JWT_ACCESS_SECRET: z
