@@ -32,7 +32,7 @@ const SearchBar = () => {
 
     return products
       .filter((product) =>
-        [product.name, product.shortDescription, product.description]
+        [product.name, product.brand, product.categoryName, product.shortDescription, product.description, ...product.tags]
           .join(" ")
           .toLocaleLowerCase()
           .includes(normalizedQuery),

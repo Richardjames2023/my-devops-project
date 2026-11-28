@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import CustomerSupportChat from "@/components/CustomerSupportChat";
 import { ToastContainer } from "react-toastify";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "ClickClickBuy",
@@ -23,7 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.variable}>
+      <body>
         <div className="storefront-shell">
           <Navbar />
           <main className="storefront-main">{children}</main>
@@ -31,6 +26,7 @@ export default function RootLayout({
             <Footer />
           </div>
         </div>
+        <CustomerSupportChat />
         <ToastContainer position="bottom-right" />
       </body>
     </html>

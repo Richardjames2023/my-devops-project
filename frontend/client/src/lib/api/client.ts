@@ -1,6 +1,6 @@
 "use client";
 
-const API_BASE_URL = (
+export const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   (process.env.NODE_ENV === "production" ? "" : "http://localhost:5000/api/v1")
 ).replace(/\/+$/, "");
@@ -26,9 +26,28 @@ export class ApiError extends Error {
 // refresh tokens in localStorage/sessionStorage. A server-side session/BFF is
 // the next auth integration step for securely retaining refresh tokens.
 let accessToken: string | null = null;
+let refreshToken: string | null = null;
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+}
+
+export function setAuthTokens(tokens: { accessToken: string; refreshToken: string }): void {
+  accessToken = tokens.accessToken;
+  refreshToken = tokens.refreshToken;
+}
+
+export function getRefreshToken(): string | null {
+  return refreshToken;
+}
+
+export function clearAuthTokens(): void {
+  accessToken = null;
+  refreshToken = null;
+}
+
+export function hasAuthSession(): boolean {
+  return accessToken !== null;
 }
 
 export function getAccessToken(): string | null {
@@ -120,4 +139,9 @@ export async function apiRequest<T>(
   }
 
   return payload as T;
+}
+
+export function getApiOrigin(): string {
+  if (!API_BASE_URL) throw new ApiError("The API base URL is not configured for this environment.", 500);
+  return new URL(API_BASE_URL).origin;
 }

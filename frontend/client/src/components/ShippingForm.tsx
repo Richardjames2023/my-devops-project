@@ -1,116 +1,88 @@
+"use client";
+
 import { ShippingFormInputs, shippingFormSchema } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ArrowRight, Check, Clock3, Truck } from "lucide-react";
 import { SubmitHandler, useForm } from "react-hook-form";
 
-const ShippingForm = ({
-  setShippingForm,
-}: {
-  setShippingForm: (data: ShippingFormInputs) => void;
-}) => {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<ShippingFormInputs>({
+const states = [
+  "Abia","Adamawa","Akwa Ibom","Anambra","Bauchi","Bayelsa","Benue","Borno","Cross River","Delta","Ebonyi","Edo","Ekiti","Enugu","Federal Capital Territory","Gombe","Imo","Jigawa","Kaduna","Kano","Katsina","Kebbi","Kogi","Kwara","Lagos","Nasarawa","Niger","Ogun","Ondo","Osun","Oyo","Plateau","Rivers","Sokoto","Taraba","Yobe","Zamfara",
+];
+
+const ShippingForm = ({ setShippingForm, initialValues }: { setShippingForm: (data: ShippingFormInputs) => void; initialValues?: Partial<ShippingFormInputs> }) => {
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<ShippingFormInputs>({
     resolver: zodResolver(shippingFormSchema),
+    defaultValues: { saveAddress: true, deliverySpeed: "standard", state: "Federal Capital Territory", ...initialValues },
   });
+  const saveAddress = watch("saveAddress");
+  const selectedSpeed = watch("deliverySpeed");
+  const handleShippingForm: SubmitHandler<ShippingFormInputs> = (data) => setShippingForm(data);
 
-  const router = useRouter();
-
-  const handleShippingForm: SubmitHandler<ShippingFormInputs> = (data) => {
-    setShippingForm(data);
-    router.push("/cart?step=3", { scroll: false });
-  };
+  const field = (name: keyof ShippingFormInputs, label: string, placeholder: string, type = "text") => (
+    <div className="checkout-field">
+      <label htmlFor={name}>{label}</label>
+      <input id={name} type={type} placeholder={placeholder} {...register(name as never)} />
+      {errors[name] && <p className="checkout-field-error">{String(errors[name]?.message)}</p>}
+    </div>
+  );
 
   return (
-    <form
-      className="flex flex-col gap-4"
-      onSubmit={handleSubmit(handleShippingForm)}
-    >
-      <div className="flex flex-col gap-1">
-        <label htmlFor="name" className="text-xs text-gray-500 font-medium">
-          Name
-        </label>
-        <input
-          className="border-b border-gray-200 py-2 outline-none text-sm"
-          type="text"
-          id="name"
-          placeholder="John Doe"
-          {...register("name")}
-        />
-        {errors.name && (
-          <p className="text-xs text-red-500">{errors.name.message}</p>
-        )}
+    <form className="checkout-delivery-form" onSubmit={handleSubmit(handleShippingForm)}>
+      {field("name", "Recipient's full name", "Full name as shown on your ID")}
+      {field("email", "Email address", "you@example.com", "email")}
+      <div className="checkout-form-grid">
+        {field("phone", "Phone number", "0800 000 0000", "tel")}
+        {field("flatSuite", "Flat, suite or building", "e.g. Flat 2, Block C")}
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="email" className="text-xs text-gray-500 font-medium">
-          Email
-        </label>
-        <input
-          className="border-b border-gray-200 py-2 outline-none text-sm"
-          type="email"
-          id="email"
-          placeholder="johndoe@gmail.com"
-          {...register("email")}
-        />
-        {errors.email && (
-          <p className="text-xs text-red-500">{errors.email.message}</p>
-        )}
+      <p className="checkout-field-help">Add your apartment or building details separately from the street address.</p>
+      {field("address", "House number and street", "e.g. 12 Aminu Kano Crescent")}
+      {field("landmark", "Landmark (optional)", "e.g. Opposite Banex Plaza")}
+      <div className="checkout-form-grid">
+        {field("area", "Area", "e.g. Wuse 2")}
+        {field("city", "Town or city", "e.g. Abuja")}
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="phone" className="text-xs text-gray-500 font-medium">
-          Phone
-        </label>
-        <input
-          className="border-b border-gray-200 py-2 outline-none text-sm"
-          type="text"
-          id="phone"
-          placeholder="123456789"
-          {...register("phone")}
-        />
-        {errors.phone && (
-          <p className="text-xs text-red-500">{errors.phone.message}</p>
-        )}
+      <div className="checkout-field">
+        <label htmlFor="state">State</label>
+        <select id="state" {...register("state")}>
+          <option value="">Choose a state</option>
+          {states.map((state) => <option value={state} key={state}>{state}</option>)}
+        </select>
+        {errors.state && <p className="checkout-field-error">{errors.state.message}</p>}
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="address" className="text-xs text-gray-500 font-medium">
-          Address
-        </label>
-        <input
-          className="border-b border-gray-200 py-2 outline-none text-sm"
-          type="text"
-          id="address"
-          placeholder="123 Main St, Anytown"
-          {...register("address")}
-        />
-        {errors.address && (
-          <p className="text-xs text-red-500">{errors.address.message}</p>
-        )}
+
+      <div className="checkout-save-address">
+        <label className="checkout-checkbox"><input type="checkbox" {...register("saveAddress")}/><span>Save this address for next time</span></label>
+        {saveAddress && field("addressLabel", "Give it a name", "Home, Office, Mum's place…")}
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="city" className="text-xs text-gray-500 font-medium">
-          City
-        </label>
-        <input
-          className="border-b border-gray-200 py-2 outline-none text-sm"
-          type="text"
-          id="city"
-          placeholder="New York"
-          {...register("city")}
-        />
-        {errors.city && (
-          <p className="text-xs text-red-500">{errors.city.message}</p>
-        )}
+
+      <fieldset className="checkout-delivery-speed">
+        <legend>How fast do you need it?</legend>
+        <div className="checkout-delivery-speed-options">
+          <label className={selectedSpeed === "standard" ? "is-selected" : ""}>
+            <input type="radio" value="standard" {...register("deliverySpeed")}/>
+            <span className="checkout-speed-top"><Truck size={17}/><strong>Standard</strong><Check size={17}/></span>
+            <small>DELIVERY ESTIMATE</small>
+            <strong className="checkout-speed-arrival">Estimate confirmed for your area</strong>
+            <span className="checkout-speed-foot">Fee confirmed for your address</span>
+          </label>
+          <label className={selectedSpeed === "express" ? "is-selected" : ""}>
+            <input type="radio" value="express" {...register("deliverySpeed")}/>
+            <span className="checkout-speed-top"><Clock3 size={17}/><strong>Express</strong><span className="checkout-fastest">Faster option</span></span>
+            <small>DELIVERY ESTIMATE</small>
+            <strong className="checkout-speed-arrival">Express availability confirmed for your area</strong>
+            <span className="checkout-speed-foot">Express fee confirmed for your address</span>
+          </label>
+        </div>
+        <p className="checkout-field-help">Fees depend on your area and the size of your order. Sundays are not delivery days. Final delivery fee is confirmed for your address.</p>
+      </fieldset>
+
+      <div className="checkout-field">
+        <label htmlFor="deliveryNote">Delivery note</label>
+        <textarea id="deliveryNote" rows={3} placeholder="Gate codes, best times, or anything the courier should know." {...register("deliveryNote")}/>
+        <p className="checkout-field-help">Optional. Help the courier find you.</p>
       </div>
-      <button
-        type="submit"
-        className="w-full bg-gray-800 hover:bg-gray-900 transition-all duration-300 text-white p-2 rounded-lg cursor-pointer flex items-center justify-center gap-2"
-      >
-        Continue
-        <ArrowRight className="w-3 h-3" />
-      </button>
+
+      <button type="submit" className="checkout-primary-action">Continue to payment <ArrowRight size={17}/></button>
     </form>
   );
 };

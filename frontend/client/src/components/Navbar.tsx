@@ -26,7 +26,9 @@ import {
 import SearchBar from "./SearchBar";
 import ShoppingCartIcon from "./ShoppingCartIcon";
 import AnnouncementBar from "./AnnouncementBar";
-import { apiRequest, getAccessToken } from "@/lib/api/client";
+import { products as demoProducts } from "@/lib/catalogue";
+import { apiRequest } from "@/lib/api/client";
+import { getDemoOrders, getDemoWishlistCount, getDemoCustomer, type DemoCustomer } from "@/lib/demo-account";
 
 const navigation = [
   { label: "Shop", href: "/products" },
@@ -34,15 +36,16 @@ const navigation = [
 ];
 
 const shopCategories = [
-  { name: "All", slug: "all", icon: ShoppingBasket, image: "/products/1g.png", items: ["All products", "New arrivals", "Popular picks"], products: [{ name: "Adidas CoreFit T-Shirt", image: "/products/1g.png" }, { name: "Puma Ultra Warm Zip", image: "/products/2g.png" }, { name: "Nike Air Essentials Pullover", image: "/products/3gr.png" }, { name: "Nike Dri Flex T-Shirt", image: "/products/4w.png" }, { name: "Under Armour StormFleece", image: "/products/5bl.png" }, { name: "Nike Air Max 270", image: "/products/6g.png" }, { name: "Nike Ultraboost Pulse", image: "/products/7g.png" }, { name: "Levi's Classic Denim", image: "/products/8b.png" }] },
-  { name: "T-shirts", slug: "t-shirts", icon: Shirt, image: "/products/1g.png", items: ["Basic T-shirts", "Graphic T-shirts", "Polo shirts", "Long-sleeve T-shirts"], products: [{ name: "Adidas CoreFit T-Shirt", image: "/products/1g.png" }, { name: "Nike Dri Flex T-Shirt", image: "/products/4w.png" }, { name: "Adidas CoreFit T-Shirt · Purple", image: "/products/1p.png" }, { name: "Adidas CoreFit T-Shirt · Green", image: "/products/1gr.png" }] },
-  { name: "Shoes", slug: "shoes", icon: Footprints, image: "/products/6g.png", items: ["Casual shoes", "Sneakers", "Running shoes", "Everyday footwear"], products: [{ name: "Nike Air Max 270", image: "/products/6g.png" }, { name: "Nike Ultraboost Pulse", image: "/products/7g.png" }, { name: "Nike Air Max 270 · White", image: "/products/6w.png" }, { name: "Nike Ultraboost Pulse · Pink", image: "/products/7p.png" }] },
-  { name: "Accessories", slug: "accessories", icon: Glasses, image: "/products/8b.png", items: ["Everyday accessories", "Fashion accessories", "Style essentials"], products: [{ name: "Levi's Classic Denim", image: "/products/8b.png" }, { name: "Levi's Classic Denim · Green", image: "/products/8gr.png" }, { name: "Under Armour StormFleece", image: "/products/5bl.png" }] },
-  { name: "Bags", slug: "bags", icon: Briefcase, image: "/products/8b.png", items: ["Backpacks", "Everyday bags", "Travel bags"], products: [{ name: "Levi's Classic Denim", image: "/products/8b.png" }, { name: "Levi's Classic Denim · Green", image: "/products/8gr.png" }, { name: "Adidas CoreFit T-Shirt", image: "/products/1g.png" }] },
-  { name: "Dresses", slug: "dresses", icon: Venus, image: "/products/4w.png", items: ["Casual dresses", "Everyday dresses", "Occasion wear"], products: [{ name: "Nike Dri Flex T-Shirt", image: "/products/4w.png" }, { name: "Nike Dri Flex T-Shirt · Pink", image: "/products/4p.png" }, { name: "Adidas CoreFit T-Shirt", image: "/products/1g.png" }] },
-  { name: "Jackets", slug: "jackets", icon: Shirt, image: "/products/2g.png", items: ["Hoodies", "Zip-up jackets", "Light jackets"], products: [{ name: "Puma Ultra Warm Zip", image: "/products/2g.png" }, { name: "Nike Air Essentials Pullover", image: "/products/3gr.png" }, { name: "Under Armour StormFleece", image: "/products/5bl.png" }, { name: "Puma Ultra Warm Zip · Green", image: "/products/2gr.png" }] },
-  { name: "Gloves", slug: "gloves", icon: Hand, image: "/products/5bl.png", items: ["Everyday gloves", "Cold-weather gloves"], products: [{ name: "Under Armour StormFleece", image: "/products/5bl.png" }, { name: "Under Armour StormFleece · Red", image: "/products/5r.png" }, { name: "Under Armour StormFleece · Orange", image: "/products/5o.png" }] },
-  { name: "Sportswear", slug: "sportswear", icon: Footprints, image: "/products/7g.png", items: ["Activewear", "Training tops", "Performance footwear"], products: [{ name: "Nike Ultraboost Pulse", image: "/products/7g.png" }, { name: "Nike Air Max 270", image: "/products/6g.png" }, { name: "Nike Air Essentials Pullover", image: "/products/3gr.png" }] },
+  { name: "All", slug: "all", icon: ShoppingBasket, image: "https://images.unsplash.com/photo-1593085260707-5377ba37f868?w=160&auto=format&fit=crop&q=80", items: ["Browse the full catalogue", "Explore every department", "Find something useful for everyday life"], products: [{ name: "Woven Storage Basket Set", image: "https://images.unsplash.com/photo-1593085260707-5377ba37f868?w=320&auto=format&fit=crop&q=80" }, { name: "Compact Watering Can", image: "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=320&auto=format&fit=crop&q=80" }, { name: "Ceramic Dinnerware Set", image: "https://images.unsplash.com/photo-1603199506016-b9a594b593c0?w=320&auto=format&fit=crop&q=80" }] },
+  { name: "Home & Living", slug: "home-living", icon: Shirt, image: "https://images.unsplash.com/photo-1593085260707-5377ba37f868?w=160&auto=format&fit=crop&q=80", items: ["Storage & organisation", "Bedding & soft furnishings", "Everyday home essentials"], products: [{ name: "Woven Storage Basket Set", image: "https://images.unsplash.com/photo-1593085260707-5377ba37f868?w=320&auto=format&fit=crop&q=80" }, { name: "Soft Textured Throw Blanket", image: "https://images.unsplash.com/photo-1600369671236-e74521d4b6ad?w=320&auto=format&fit=crop&q=80" }] },
+  { name: "Garden & Outdoor", slug: "garden-outdoor", icon: Footprints, image: "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=160&auto=format&fit=crop&q=80", items: ["Plant care & gardening", "Outdoor seating", "Patio & balcony essentials"], products: [{ name: "Compact Watering Can", image: "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=320&auto=format&fit=crop&q=80" }, { name: "Foldable Outdoor Chair", image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=320&auto=format&fit=crop&q=80" }] },
+  { name: "Electrical & Lighting", slug: "electrical-lighting", icon: Glasses, image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=160&auto=format&fit=crop&q=80", items: ["Desk & task lighting", "Ambient home lighting", "Everyday electrical essentials"], products: [{ name: "Rechargeable LED Desk Lamp", image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=320&auto=format&fit=crop&q=80" }, { name: "Warm Glow Table Light", image: "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=320&auto=format&fit=crop&q=80" }] },
+  { name: "Kitchen & Dining", slug: "kitchen-dining", icon: Briefcase, image: "https://images.unsplash.com/photo-1603199506016-b9a594b593c0?w=160&auto=format&fit=crop&q=80", items: ["Cookware & tableware", "Food storage", "Everyday dining essentials"], products: [{ name: "Ceramic Dinnerware Set", image: "https://images.unsplash.com/photo-1603199506016-b9a594b593c0?w=320&auto=format&fit=crop&q=80" }, { name: "Glass Food Storage Containers", image: "https://images.unsplash.com/photo-1606787366850-de6330128bfc?w=320&auto=format&fit=crop&q=80" }] },
+  { name: "Tools & Hardware", slug: "tools-hardware", icon: Venus, image: "https://images.unsplash.com/photo-1581147036324-c1c89c2c8b5c?w=160&auto=format&fit=crop&q=80", items: ["Home repair tool kits", "Hand tools & accessories", "DIY and maintenance essentials"], products: [{ name: "Home Repair Tool Kit", image: "https://images.unsplash.com/photo-1581147036324-c1c89c2c8b5c?w=320&auto=format&fit=crop&q=80" }, { name: "Precision Screwdriver Set", image: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=320&auto=format&fit=crop&q=80" }] },
+  { name: "Bags & Luggage", slug: "bags-luggage", icon: Shirt, image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=160&auto=format&fit=crop&q=80", items: ["Backpacks & everyday bags", "Travel duffel bags", "Bags for work and study"], products: [{ name: "Everyday Canvas Backpack", image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=320&auto=format&fit=crop&q=80" }, { name: "Weekend Travel Duffel", image: "https://images.unsplash.com/photo-1622560480654-d96214fdc887?w=320&auto=format&fit=crop&q=80" }] },
+  { name: "Personal Care", slug: "personal-care", icon: Hand, image: "https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=160&auto=format&fit=crop&q=80", items: ["Grooming essentials", "Bathroom organisation", "Everyday personal-care items"], products: [{ name: "Daily Grooming Kit", image: "https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=320&auto=format&fit=crop&q=80" }, { name: "Bathroom Organiser Set", image: "https://images.unsplash.com/photo-1620626011761-996317b8d101?w=320&auto=format&fit=crop&q=80" }] },
+  { name: "Office & Stationery", slug: "office-stationery", icon: Footprints, image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=160&auto=format&fit=crop&q=80", items: ["Desk organisation", "Notebooks & planning", "Work and study essentials"], products: [{ name: "Minimal Desk Organiser", image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=320&auto=format&fit=crop&q=80" }, { name: "Hardcover Notebook Set", image: "https://images.unsplash.com/photo-1531346878377-a5be20888e57?w=320&auto=format&fit=crop&q=80" }] },
+  { name: "Home Décor", slug: "home-decor", icon: ShoppingBasket, image: "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=160&auto=format&fit=crop&q=80", items: ["Decorative accents", "Vases & ornaments", "Cushions and soft décor"], products: [{ name: "Modern Ceramic Vase", image: "https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=320&auto=format&fit=crop&q=80" }, { name: "Decorative Cushion Cover Set", image: "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=320&auto=format&fit=crop&q=80" }] },
 ];
 
 type CatalogPreviewProduct = {
@@ -54,8 +57,6 @@ type CatalogPreviewProduct = {
 };
 
 type CatalogPreviewResponse = { items: CatalogPreviewProduct[] };
-type CustomerOrderCountResponse = { pagination?: { total?: number } };
-type WishlistCountResponse = { wishlist?: { itemCount?: number } };
 
 function CountBadge({ count }: { count: number }) {
   if (count < 1) return null;
@@ -92,11 +93,12 @@ const Navbar = () => {
   const categoryPointerTypeRef = useRef<"mouse" | "touch" | "pen" | null>(null);
   const accountPointerTypeRef = useRef<"mouse" | "touch" | "pen" | null>(null);
   const helpPointerTypeRef = useRef<"mouse" | "touch" | "pen" | null>(null);
-    const [activeCategorySlug, setActiveCategorySlug] = useState("t-shirts");
+    const [activeCategorySlug, setActiveCategorySlug] = useState("home-living");
   const activeCategory = shopCategories.find((category) => category.slug === activeCategorySlug) ?? shopCategories[1];
   const [catalogProducts, setCatalogProducts] = useState<CatalogPreviewProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [accountCounts, setAccountCounts] = useState({ orders: 0, wishlist: 0 });
+  const [demoCustomer, setDemoCustomer] = useState<DemoCustomer | null>(null);
 
   useEffect(() => {
     if (!activeMenu) return;
@@ -113,25 +115,12 @@ const Navbar = () => {
 
   useEffect(() => {
     if (activeMenu !== "account") return;
-    const token = getAccessToken();
-    if (!token) {
-      setAccountCounts({ orders: 0, wishlist: 0 });
-      return;
-    }
-
-    let cancelled = false;
-    Promise.allSettled([
-      apiRequest<CustomerOrderCountResponse>("/orders?page=1&limit=1", { authenticated: true }),
-      apiRequest<WishlistCountResponse>("/wishlist", { authenticated: true }),
-    ]).then(([ordersResult, wishlistResult]) => {
-      if (cancelled) return;
-      setAccountCounts({
-        orders: ordersResult.status === "fulfilled" ? ordersResult.value.pagination?.total ?? 0 : 0,
-        wishlist: wishlistResult.status === "fulfilled" ? wishlistResult.value.wishlist?.itemCount ?? 0 : 0,
-      });
+    const customer = getDemoCustomer();
+    setDemoCustomer(customer);
+    setAccountCounts({
+      orders: customer ? getDemoOrders().length : 0,
+      wishlist: customer ? getDemoWishlistCount() : 0,
     });
-
-    return () => { cancelled = true; };
   }, [activeMenu]);
 
   useEffect(() => {
@@ -159,13 +148,20 @@ const Navbar = () => {
   const topRatedProduct = ratedProducts[0] ?? null;
   const previewProducts = catalogProducts.length > 0
     ? catalogProducts
-    : activeCategory.products.map((product, index) => ({
-        id: `fallback-${activeCategory.slug}-${index}`,
-        name: product.name,
-        slug: activeCategory.slug,
-        images: [{ url: product.image, isPrimary: true, sortOrder: index }],
-        reviewSummary: { averageRating: null, totalReviews: 0 },
-      }));
+    : activeCategory.products.flatMap((product, index) => {
+        const demoProduct = demoProducts.find((item) => item.name === product.name);
+        if (!demoProduct) return [];
+        return [{
+          id: String(demoProduct.id),
+          name: demoProduct.name,
+          slug: String(demoProduct.id),
+          images: [{ url: product.image, isPrimary: true, sortOrder: index }],
+          reviewSummary: {
+            averageRating: demoProduct.reviewSummary?.averageRating ?? null,
+            totalReviews: demoProduct.reviewSummary?.totalReviews ?? 0,
+          },
+        }];
+      });
 
   return (
     <>
@@ -200,15 +196,15 @@ const Navbar = () => {
                 Categories
                 <ChevronDown size={16} className={`transition-transform duration-200 ${activeMenu === "categories" ? "rotate-180" : ""}`} />
               </button>
-              <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-[calc(100%+24px)] z-50 mt-0 before:absolute before:-top-6 before:left-0 before:h-6 before:w-full before:content-[''] w-[min(780px,calc(100vw-48px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
-                <div className="grid h-[440px] max-h-[min(440px,calc(100vh-120px))] grid-cols-[190px_minmax(0,1fr)] overflow-hidden rounded-xl">
+              <div aria-hidden={activeMenu !== "categories"} className={`absolute left-1/2 top-[calc(100%+24px)] z-50 mt-0 before:absolute before:-top-6 before:left-0 before:h-6 before:w-full before:content-[''] w-[min(860px,calc(100vw-32px))] -translate-x-1/2 origin-top opacity-0 invisible pointer-events-none -translate-y-2 scale-[0.98] rounded-xl border border-[var(--shop-border)] bg-white shadow-2xl transition-all duration-200 ease-out ${activeMenu === "categories" ? "!visible !pointer-events-auto !translate-y-0 !scale-100 !opacity-100" : ""}`}>
+                <div className="grid h-[440px] max-h-[min(440px,calc(100vh-120px))] grid-cols-[230px_minmax(0,1fr)] overflow-hidden rounded-xl">
                   <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r border-[var(--shop-border)] bg-[var(--shop-peach-tint)] p-2">
                     <p className="shrink-0 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[var(--shop-orange-dark)]">Browse categories</p>
                     <div className="h-[360px] max-h-[360px] shrink-0 overflow-y-auto overscroll-y-contain [scrollbar-color:var(--shop-orange)_var(--shop-peach)] [scrollbar-width:thin]">
                     {shopCategories.map((category) => {
                       const Icon = category.icon;
                       return (
-                        <button key={category.slug} type="button" onMouseEnter={() => setActiveCategorySlug(category.slug)} onFocus={() => setActiveCategorySlug(category.slug)} onClick={() => setActiveCategorySlug(category.slug)} aria-pressed={activeCategorySlug === category.slug} className={`group flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left text-sm font-semibold transition-colors ${activeCategorySlug === category.slug ? "bg-white text-[var(--shop-orange-dark)] shadow-sm ring-1 ring-[var(--shop-peach)]" : "text-[var(--shop-navy)] hover:bg-white hover:text-[var(--shop-orange)]"}`}>
+                        <button key={category.slug} type="button" onMouseEnter={() => setActiveCategorySlug(category.slug)} onFocus={() => setActiveCategorySlug(category.slug)} onClick={() => setActiveCategorySlug(category.slug)} aria-pressed={activeCategorySlug === category.slug} className={`group flex w-full items-center justify-between gap-2 rounded-lg px-3 py-3 text-left text-sm font-semibold leading-snug transition-colors ${activeCategorySlug === category.slug ? "bg-white text-[var(--shop-orange-dark)] shadow-sm ring-1 ring-[var(--shop-peach)]" : "text-[var(--shop-navy)] hover:bg-white hover:text-[var(--shop-orange)]"}`}>
                           <span className="flex items-center gap-2"><Icon size={17} />{category.name}</span>
                           <ChevronDown size={14} className="-rotate-90 text-[var(--shop-muted)]" />
                         </button>
@@ -314,22 +310,28 @@ const Navbar = () => {
                 <div className="border-b border-[var(--shop-peach)] bg-[var(--shop-peach-tint)] p-4">
                   <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--shop-navy)]">
                     <UserRound size={18} className="text-[var(--shop-orange)]" />
-                    Welcome to ClickClickBuy
+                    {demoCustomer ? `Welcome back, ${demoCustomer.firstName}` : "Welcome to ClickClickBuy"}
                   </div>
-                  <div className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
-                    Sign In <ComingSoon>Coming soon</ComingSoon>
-                  </div>
+                  {demoCustomer ? (
+                    <Link href="/account" onClick={() => setActiveMenu(null)} className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
+                      View Dashboard
+                    </Link>
+                  ) : (
+                    <Link href="/login" onClick={() => setActiveMenu(null)} className="flex items-center justify-center rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--shop-orange-dark)]">
+                      Sign In
+                    </Link>
+                  )}
                 </div>
                 <div className="py-1">
-                  <div className={placeholderClass}>
-                    <UserRound size={19} /> My Account <ComingSoon>Coming soon</ComingSoon>
-                  </div>
-                  <div className={placeholderClass}>
-                    <Package size={19} /> Orders <CountBadge count={accountCounts.orders} /> <ComingSoon>Coming soon</ComingSoon>
-                  </div>
-                  <div className={placeholderClass}>
-                    <Heart size={19} /> Wishlist <CountBadge count={accountCounts.wishlist} /> <ComingSoon>Coming soon</ComingSoon>
-                  </div>
+                  <Link href="/account" onClick={() => setActiveMenu(null)} className={activeClass}>
+                    <UserRound size={19} /> My Account
+                  </Link>
+                  <Link href="/account?section=orders" onClick={() => setActiveMenu(null)} className={activeClass}>
+                    <Package size={19} /> Orders <CountBadge count={accountCounts.orders} />
+                  </Link>
+                  <Link href="/account?section=saved" onClick={() => setActiveMenu(null)} className={activeClass}>
+                    <Heart size={19} /> Wishlist <CountBadge count={accountCounts.wishlist} />
+                  </Link>
                 </div>
               </div>
             </div>

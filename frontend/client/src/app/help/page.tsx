@@ -1,31 +1,17 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, LifeBuoy } from "lucide-react";
+import { ArrowLeft, ChevronDown, Headset, PackageSearch, CreditCard, RotateCcw, Truck, ShieldCheck } from "lucide-react";
 
-const HelpCentrePage = () => {
-  return (
-    <section className="mx-auto flex min-h-[55vh] max-w-3xl flex-col items-center justify-center px-4 py-16 text-center">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-[var(--shop-blue-light)] text-[var(--shop-blue)]">
-        <LifeBuoy size={30} strokeWidth={1.7} aria-hidden="true" />
-      </div>
-      <p className="mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-[var(--shop-orange)]">
-        Customer support
-      </p>
-      <h1 className="text-3xl font-bold tracking-tight text-[var(--shop-navy)] sm:text-4xl">
-        Help Centre
-      </h1>
-      <p className="mt-4 max-w-xl text-base leading-7 text-[var(--shop-muted)]">
-        We’re putting our help resources together. Helpful answers and support
-        information will be available here soon.
-      </p>
-      <Link
-        href="/"
-        className="mt-8 inline-flex items-center gap-2 rounded-full bg-[var(--shop-navy)] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--shop-blue)]"
-      >
-        <ArrowLeft size={16} aria-hidden="true" />
-        Back to shopping
-      </Link>
-    </section>
-  );
-};
-
-export default HelpCentrePage;
+const topics=[
+ {title:"Orders and tracking",icon:PackageSearch,questions:[["How do I track my order?","Open My Account → My Orders and select Track Order beside your purchase. Delivery updates appear as the order progresses."],["What does Processing mean?","Your order has been received and is being prepared. Dispatch information becomes available when a delivery handoff is arranged."],["Can I change my delivery address?","Contact customer support as soon as possible. Address changes may not be possible after an order has been dispatched."]]},
+ {title:"Payments",icon:CreditCard,questions:[["How do I know my payment was successful?","Check the payment status in your order details and transaction history. A successful payment should have a matching transaction reference."],["What if I was debited but my order is not confirmed?","Keep your transaction reference and contact support. Avoid making another payment until the first transaction has been checked."],["How are refunds handled?","Refund eligibility and timing depend on the order and payment provider. Support will provide updates once a request has been reviewed."]]},
+ {title:"Delivery",icon:Truck,questions:[["How much does delivery cost?","Delivery fees depend on the delivery destination and available service. The applicable fee should be shown before you confirm checkout."],["Can someone receive my order for me?","You may arrange for a trusted recipient at the delivery address. Keep your phone available for delivery coordination."]]},
+ {title:"Returns and warranty",icon:RotateCcw,questions:[["How do I request a return?","Review the Returns Policy, then contact support with your order number, item and reason for the request."],["Are all products covered by warranty?","Warranty coverage depends on the product and its stated terms. Check the product listing and documentation before purchase."]]},
+ {title:"Account security",icon:ShieldCheck,questions:[["How do I update my account details?","Use Account Settings in your customer dashboard to review and update your profile in this prototype."],["Will ClickClickBuy ask for my password or payment PIN over chat?","Never share your password, one-time passcodes, card PIN or banking credentials with anyone claiming to provide support."]]}
+];
+export default function HelpCentrePage(){
+ const [open,setOpen]=useState("How do I track my order?");
+ return <main className="mx-auto min-h-[55vh] max-w-5xl px-4 py-12"><Link href="/account?section=support" className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--shop-orange-dark)]"><ArrowLeft size={16}/>Back to account support</Link><header className="my-7 rounded-2xl border border-[#f0d8c8] bg-gradient-to-r from-[#fff2e9] to-white p-7"><div className="flex items-center gap-2 text-[var(--shop-orange-dark)]"><Headset size={22}/><span className="text-xs font-extrabold uppercase tracking-widest">CLICKCLICKBUY CUSTOMER CARE</span></div><h1 className="mt-3 text-3xl font-extrabold text-[var(--shop-navy)]">How can we help?</h1><p className="mt-2 max-w-xl text-sm leading-6 text-[var(--shop-muted)]">Find answers about orders, payments, delivery, returns and your account.</p><Link href="/account?section=support" className="mt-5 inline-flex rounded-lg bg-[var(--shop-orange)] px-4 py-3 text-xs font-bold text-white">Contact customer support</Link></header><div className="grid gap-6 md:grid-cols-[230px_1fr]"><aside className="grid h-fit gap-2 rounded-xl border border-[var(--shop-border)] bg-white p-3">{topics.map(t=><a key={t.title} href={`#${t.title.replaceAll(" ","-")}`} className="flex items-center gap-2 rounded-lg px-3 py-3 text-xs font-semibold text-[var(--shop-navy)] hover:bg-[var(--shop-peach-tint)]"><t.icon size={16} className="text-[var(--shop-orange)]"/>{t.title}</a>)}</aside><div className="grid gap-5">{topics.map(topic=><section id={topic.title.replaceAll(" ","-")} key={topic.title} className="rounded-xl border border-[var(--shop-border)] bg-white p-5"><h2 className="mb-3 flex items-center gap-2 text-base font-extrabold text-[var(--shop-navy)]"><topic.icon size={18} className="text-[var(--shop-orange)]"/>{topic.title}</h2>{topic.questions.map(([q,a])=><div className="border-t border-[var(--shop-border)]" key={q}><button className="flex w-full items-center justify-between gap-3 py-4 text-left text-sm font-semibold text-[var(--shop-navy)]" onClick={()=>setOpen(open===q?"":q)} aria-expanded={open===q}>{q}<ChevronDown size={16} className={open===q?"rotate-180 transition-transform":"transition-transform"}/></button>{open===q&&<p className="pb-4 pr-8 text-xs leading-6 text-[var(--shop-muted)]">{a}</p>}</div>)}</section>)}</div></div><p className="mt-6 rounded-lg bg-[var(--shop-peach-tint)] p-4 text-xs leading-5 text-[var(--shop-orange-dark)]">This Help Centre is frontend prototype content. Support response times, delivery commitments and policy outcomes must be confirmed by ClickClickBuy before launch.</p></main>
+}
