@@ -129,9 +129,9 @@ export default function RegisterPage() {
 
   function fieldError(field: RegistrationField) {
     return errors[field] ? (
-      <p className="customer-auth-field-error" id={`reg-${field}-error`} role="alert">
+      <span className={`customer-auth-field-error customer-auth-field-error--${field}`} id={`reg-${field}-error`} role="alert">
         {errors[field]}
-      </p>
+      </span>
     ) : null;
   }
 
