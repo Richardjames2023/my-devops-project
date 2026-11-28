@@ -6927,7 +6927,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #E6B29D;
+  color: #FD6800;
   font-size: 13px;
   font-weight: 850;
   letter-spacing: .14em;
@@ -6937,7 +6937,7 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
 .customer-auth-join svg {
   width: 23px;
   height: 23px;
-  color: #E6B29D;
+  color: #FD6800;
 }
 
 .customer-auth-card-heading--center .customer-auth-brand,
