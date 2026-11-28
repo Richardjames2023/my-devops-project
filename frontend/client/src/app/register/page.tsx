@@ -280,7 +280,7 @@ export default function RegisterPage() {
           </button>
         </form>
 
-        {notice && <p className="customer-auth-info" role="status">{notice}</p>}
+        {notice && <p className="customer-auth-info customer-auth-panel-enter" role="status">{notice}</p>}
 
         <p className="customer-auth-footnote">
           Already have a ClickClickBuy account? <Link href="/login">Sign in</Link>
