@@ -78,7 +78,7 @@ export default function LoginPage() {
         <button type="button" role="tab" aria-selected={method === "phone"} className={method === "phone" ? "is-active" : ""} onClick={() => selectMethod("phone")}><Phone size={15}/>Phone number</button>
       </div>
       {method === "email" ? (
-        <form onSubmit={handleEmailSubmit} className="customer-auth-form">
+        <form key="email-login" onSubmit={handleEmailSubmit} className="customer-auth-form customer-auth-panel-enter">
           <label htmlFor="login-email">Email address</label><div className="customer-auth-input"><Mail size={18}/><input id="login-email" type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></div>
           <label htmlFor="login-password">Password</label>
           <div className="customer-auth-input"><LockKeyhole size={18}/><input id="login-password" type={showPassword?"text":"password"} autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter your password"/><button type="button" aria-label={showPassword?"Hide password":"Show password"} onClick={()=>setShowPassword(v=>!v)}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></div>
@@ -86,7 +86,7 @@ export default function LoginPage() {
           <button className="customer-auth-submit" type="submit">Sign In</button>
         </form>
       ) : (
-        <form onSubmit={otpRequested ? verifyDemoCode : requestDemoCode} className="customer-auth-form">
+        <form key={otpRequested ? "phone-verify" : "phone-entry"} onSubmit={otpRequested ? verifyDemoCode : requestDemoCode} className="customer-auth-form customer-auth-panel-enter">
           {!otpRequested ? <>
             <label htmlFor="login-phone">Mobile phone number</label><div className="customer-auth-input"><Phone size={18}/><input id="login-phone" type="tel" inputMode="tel" autoComplete="tel" required value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+234 801 234 5678"/></div>
             <p className="customer-auth-field-hint">Use your country code so we can identify the right number.</p>
@@ -99,7 +99,7 @@ export default function LoginPage() {
           <button className="customer-auth-submit" type="submit">{otpRequested ? "Verify and Sign In" : "Continue with Phone"}</button>
         </form>
       )}
-      {notice && <p className="customer-auth-info" role="status">{notice}</p>}
+      {notice && <p className="customer-auth-info customer-auth-panel-enter" role="status">{notice}</p>}
       
       <p className="customer-auth-footnote">New to ClickClickBuy? <Link href="/register">Create an account</Link></p>
     </section></div>
