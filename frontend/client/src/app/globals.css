@@ -6483,3 +6483,83 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+
+/* Registration consent: align the checkbox with the first line of copy */
+.customer-auth-policy {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin: 14px 0 4px;
+  color: #52647d;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.customer-auth-policy > input[type="checkbox"] {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--shop-orange);
+  cursor: pointer;
+}
+
+.customer-auth-policy-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.customer-auth-policy-copy > label {
+  display: block;
+  margin: 0;
+  color: #52647d;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.customer-auth-policy-copy a {
+  color: #155eb5;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.customer-auth-policy input:focus-visible {
+  outline: 2px solid var(--shop-blue);
+  outline-offset: 2px;
+}
+
+.customer-auth-field-error {
+  margin: 1px 0 0;
+  color: #b42318;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.customer-auth-form .customer-auth-field input[aria-invalid="true"] {
+  border-color: #d92d20;
+  background-color: #fffafa;
+}
+
+.customer-auth-form .customer-auth-field input[aria-invalid="true"]:focus {
+  border-color: #d92d20;
+  box-shadow: 0 0 0 3px rgba(217,45,32,.1);
+}
+
+.customer-auth-policy input[aria-invalid="true"] {
+  outline: 1px solid #d92d20;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .customer-auth-policy {
+    gap: 9px;
+    font-size: 11px;
+  }
+}
