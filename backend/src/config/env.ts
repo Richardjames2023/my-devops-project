@@ -156,6 +156,22 @@ const envSchema = z.object({
     });
   }
 
+  if (value.NODE_ENV === "production" && !value.TURNSTILE_SECRET_KEY) {
+    context.addIssue({
+      code: "custom",
+      path: ["TURNSTILE_SECRET_KEY"],
+      message: "TURNSTILE_SECRET_KEY is required in production to protect customer registration",
+    });
+  }
+
+  if (value.NODE_ENV === "production" && !value.TURNSTILE_EXPECTED_HOSTNAMES) {
+    context.addIssue({
+      code: "custom",
+      path: ["TURNSTILE_EXPECTED_HOSTNAMES"],
+      message: "TURNSTILE_EXPECTED_HOSTNAMES is required in production",
+    });
+  }
+
   if (value.NODE_ENV === "production" && !value.PAYSTACK_SECRET_KEY) {
     context.addIssue({
       code: "custom",
