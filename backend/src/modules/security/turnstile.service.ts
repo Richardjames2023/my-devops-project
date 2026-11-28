@@ -56,13 +56,6 @@ export function assertTurnstileResponse(
   }
 }
 
-let siteverify: Siteverify = requestSiteverify;
-
-/** Allows deterministic verifier injection in unit tests without calling Cloudflare. */
-export function setTurnstileSiteverifyForTests(verifier: Siteverify | null): void {
-  siteverify = verifier ?? requestSiteverify;
-}
-
 export async function verifyCustomerRegistrationTurnstile(
   token: string,
   remoteIp?: string,
@@ -73,7 +66,7 @@ export async function verifyCustomerRegistrationTurnstile(
 
   let result: SiteverifyResponse;
   try {
-    result = await siteverify(env.TURNSTILE_SECRET_KEY, token, remoteIp);
+    result = await requestSiteverify(env.TURNSTILE_SECRET_KEY, token, remoteIp);
   } catch {
     throw new AppError("Registration security verification is temporarily unavailable", 503);
   }
