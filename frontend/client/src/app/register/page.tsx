@@ -12,7 +12,7 @@ const registrationSchema = z.object({
   firstName: z.string().trim().min(2, "Enter your first name (at least 2 characters).").max(50, "First name must be 50 characters or fewer.").regex(/^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u, "Use letters, spaces, apostrophes or hyphens only."),
   lastName: z.string().trim().min(2, "Enter your last name (at least 2 characters).").max(50, "Last name must be 50 characters or fewer.").regex(/^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u, "Use letters, spaces, apostrophes or hyphens only."),
   email: z.string().trim().email("Enter a valid email address.").max(254, "Email address is too long."),
-  phone: z.string().trim().refine((value) => value === "" || /^[+\d][\d\s().-]{6,19}$/.test(value), "Enter a valid phone number, including your country code."),
+  phone: z.string().trim().min(1, "Enter your Nigerian mobile number.").refine((value) => /^(?:0[789]\d{9}|[789]\d{9})$/.test(value.replace(/[\s().-]/g, "")), "Enter a valid Nigerian mobile number, e.g. 08012345678."),
   password: z.string().min(12, "Use at least 12 characters for your password.").max(128, "Password must be 128 characters or fewer."),
   confirmPassword: z.string().min(1, "Please confirm your password."),
   acceptPolicies: z.literal(true, { error: "You must accept the Terms & Conditions and Privacy Policy to create an account." }),
@@ -112,7 +112,7 @@ export default function RegisterPage() {
       firstName: result.data.firstName,
       lastName: result.data.lastName,
       email: result.data.email.toLowerCase(),
-      phone: result.data.phone,
+      phone: `+234${result.data.phone.replace(/[\\s().-]/g, "").replace(/^0/, "")}`,
     });
     router.replace("/account");
   }
@@ -182,7 +182,7 @@ export default function RegisterPage() {
           <div className="customer-auth-form-fields">
             <div className="customer-auth-field">
               <label htmlFor="reg-first">First name *</label>
-              <input id="reg-first" autoComplete="given-name" required maxLength={50}
+              <input id="reg-first" autoComplete="given-name" required maxLength={50} placeholder="Enter your first name"
                 value={form.firstName} {...fieldProps("firstName")}
                 onChange={(event) => updateField("firstName", event.target.value)} />
               {fieldError("firstName")}
@@ -190,7 +190,7 @@ export default function RegisterPage() {
 
             <div className="customer-auth-field">
               <label htmlFor="reg-last">Last name *</label>
-              <input id="reg-last" autoComplete="family-name" required maxLength={50}
+              <input id="reg-last" autoComplete="family-name" required maxLength={50} placeholder="Enter your last name"
                 value={form.lastName} {...fieldProps("lastName")}
                 onChange={(event) => updateField("lastName", event.target.value)} />
               {fieldError("lastName")}
@@ -198,19 +198,21 @@ export default function RegisterPage() {
 
             <div className="customer-auth-field">
               <label htmlFor="reg-email">Email address *</label>
-              <input id="reg-email" type="email" autoComplete="email" required maxLength={254}
+              <input id="reg-email" type="email" autoComplete="email" required maxLength={254} placeholder="you@example.com"
                 value={form.email} {...fieldProps("email")}
                 onChange={(event) => updateField("email", event.target.value)} />
               {fieldError("email")}
             </div>
 
             <div className="customer-auth-field">
-              <label htmlFor="reg-phone">Phone number <span>(optional)</span></label>
-              <input id="reg-phone" type="tel" inputMode="tel" autoComplete="tel"
-                value={form.phone} {...fieldProps("phone")} placeholder="+234 801 234 5678" />
-              <p className="customer-auth-password-hint">
-                Optional. Useful for account and delivery updates.
-              </p>
+              <label htmlFor="reg-phone">Phone number *</label>
+              <div className="customer-auth-phone-control">
+                <span className="customer-auth-phone-prefix" aria-hidden="true"><span className="customer-auth-nigeria-flag">🇳🇬</span><span>+234</span></span>
+                <input id="reg-phone" type="tel" inputMode="numeric" autoComplete="tel-national"
+                  required maxLength={14} value={form.phone} {...fieldProps("phone")}
+                  onChange={(event) => updateField("phone", event.target.value.replace(/[^0-9\\s().-]/g, ""))}
+                  placeholder="801 234 5678" />
+              </div>
               {fieldError("phone")}
             </div>
 
@@ -218,7 +220,7 @@ export default function RegisterPage() {
               <label htmlFor="reg-password">Password *</label>
               <div className="customer-auth-password-control">
                 <input id="reg-password" type={showPassword ? "text" : "password"}
-                  autoComplete="new-password" required minLength={12} maxLength={128}
+                  autoComplete="new-password" required minLength={12} maxLength={128} placeholder="Create a password"
                   value={form.password} {...fieldProps("password")}
                   onChange={(event) => updateField("password", event.target.value)} />
                 <button type="button" className="customer-auth-password-toggle"
@@ -235,7 +237,7 @@ export default function RegisterPage() {
               <label htmlFor="reg-confirm-password">Confirm password *</label>
               <div className="customer-auth-password-control">
                 <input id="reg-confirm-password" type={showConfirmPassword ? "text" : "password"}
-                  autoComplete="new-password" required maxLength={128}
+                  autoComplete="new-password" required maxLength={128} placeholder="Re-enter your password"
                   value={form.confirmPassword} {...fieldProps("confirmPassword")}
                   onChange={(event) => updateField("confirmPassword", event.target.value)} />
                 <button type="button" className="customer-auth-password-toggle"
