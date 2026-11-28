@@ -112,7 +112,7 @@ export default function RegisterPage() {
       firstName: result.data.firstName,
       lastName: result.data.lastName,
       email: result.data.email.toLowerCase(),
-      phone: `+234${result.data.phone.replace(/[\\s().-]/g, "").replace(/^0/, "")}`,
+      phone: `+234${result.data.phone.replace(/[\s().-]/g, "").replace(/^0/, "")}`,
     });
     router.replace("/account");
   }
@@ -210,7 +210,7 @@ export default function RegisterPage() {
                 <span className="customer-auth-phone-prefix" aria-hidden="true"><span className="customer-auth-nigeria-flag">🇳🇬</span><span>+234</span></span>
                 <input id="reg-phone" type="tel" inputMode="numeric" autoComplete="tel-national"
                   required maxLength={14} value={form.phone} {...fieldProps("phone")}
-                  onChange={(event) => updateField("phone", event.target.value.replace(/[^0-9\\s().-]/g, ""))}
+                  onChange={(event) => updateField("phone", event.target.value.replace(/[^0-9\s().-]/g, ""))}
                   placeholder="801 234 5678" />
               </div>
               {fieldError("phone")}
