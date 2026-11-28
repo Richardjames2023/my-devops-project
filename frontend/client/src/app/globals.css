@@ -6656,3 +6656,25 @@ button, a, input { -webkit-tap-highlight-color: transparent; }
     column-gap: 9px;
   }
 }
+
+
+/* Hard-size the consent control so global form-input rules cannot stretch it */
+.customer-auth-policy > input[type="checkbox"] {
+  box-sizing: border-box !important;
+  display: block !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  max-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  max-height: 18px !important;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 18px !important;
+  align-self: flex-start;
+  margin: 2px 0 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: top;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
