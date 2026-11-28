@@ -228,9 +228,6 @@ export default function RegisterPage() {
                   {showPassword ? <EyeOff size={21} /> : <Eye size={21} />}
                 </button>
               </div>
-              <p className="customer-auth-password-hint">
-                Use 12–128 characters. A longer, unique passphrase is recommended.
-              </p>
               {fieldError("password")}
             </div>
 
