@@ -25,6 +25,7 @@ import {
 } from "../guest-session/guest-session.service";
 import prisma from "../../infrastructure/prisma/client";
 import type { AuthenticatedRequest } from "../../common/middleware/authenticate";
+import { verifyCustomerRegistrationTurnstile } from "../security/turnstile.service";
 
 async function mergeGuestCartIfPresent(
   req: Request,
@@ -58,6 +59,24 @@ export async function register(req: Request, res: Response): Promise<void> {
     return;
   }
 
+  // A filled honeypot is treated as automated abuse. Never create an account.
+  const honeypot = req.body && typeof req.body === "object"
+    ? (req.body as Record<string, unknown>).website
+    : undefined;
+  if (typeof honeypot === "string" && honeypot.trim().length > 0) {
+    res.status(400).json({ message: "Unable to complete registration. Please try again." });
+    return;
+  }
+
+  const token = req.body && typeof req.body === "object"
+    ? (req.body as Record<string, unknown>).turnstileToken
+    : undefined;
+  if (typeof token !== "string" || token.length === 0 || token.length > 2048) {
+    res.status(400).json({ message: "Please complete the security check." });
+    return;
+  }
+
+  await verifyCustomerRegistrationTurnstile(token, req.ip);
   const user = await registerUser(result.data);
 
   res.status(201).json({
