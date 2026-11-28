@@ -11,6 +11,15 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
 
+  TURNSTILE_SECRET_KEY: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1, "TURNSTILE_SECRET_KEY cannot be empty").optional(),
+  ),
+  TURNSTILE_EXPECTED_HOSTNAMES: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1).optional(),
+  ),
+
   CORS_ORIGIN: z.string().min(1, "CORS_ORIGIN is required"),
 
   JWT_ACCESS_SECRET: z
@@ -144,6 +153,22 @@ const envSchema = z.object({
       code: "custom",
       path: ["COUPON_CUSTOMER_HASH_SECRET"],
       message: "COUPON_CUSTOMER_HASH_SECRET is required in production",
+    });
+  }
+
+  if (value.NODE_ENV === "production" && !value.TURNSTILE_SECRET_KEY) {
+    context.addIssue({
+      code: "custom",
+      path: ["TURNSTILE_SECRET_KEY"],
+      message: "TURNSTILE_SECRET_KEY is required in production to protect customer registration",
+    });
+  }
+
+  if (value.NODE_ENV === "production" && !value.TURNSTILE_EXPECTED_HOSTNAMES) {
+    context.addIssue({
+      code: "custom",
+      path: ["TURNSTILE_EXPECTED_HOSTNAMES"],
+      message: "TURNSTILE_EXPECTED_HOSTNAMES is required in production",
     });
   }
 

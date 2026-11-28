@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Eye, EyeOff, ShoppingBag } from "lucide-react";
 import { z } from "zod";
-import { registerDemoCustomer } from "@/lib/demo-account";
+import { ApiError, apiRequest } from "@/lib/api/client";
+import TurnstileWidget from "@/components/security/TurnstileWidget";
 
 const registrationSchema = z.object({
   firstName: z.string().trim().min(2, "Enter your first name (at least 2 characters).").max(50, "First name must be 50 characters or fewer.").regex(/^[\p{L}\p{M}][\p{L}\p{M}\s.'’-]*$/u, "Use letters, spaces, apostrophes or hyphens only."),
@@ -48,7 +48,6 @@ const initialForm: RegistrationValues = {
 };
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [form, setForm] = useState(initialForm);
   const [acceptPolicies, setAcceptPolicies] = useState(false);
   const [errors, setErrors] = useState<RegistrationErrors>({});
@@ -56,6 +55,21 @@ export default function RegisterPage() {
   const [notice, setNotice] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [website, setWebsite] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+    setNotice("");
+  }, []);
+  const handleTurnstileExpire = useCallback(() => setTurnstileToken(null), []);
+  const handleTurnstileError = useCallback(() => {
+    setTurnstileToken(null);
+    setNotice("The security check could not load. Please refresh the page and try again.");
+  }, []);
 
   function validateField(field: RegistrationField) {
     const result = registrationSchema.safeParse({ ...form, acceptPolicies });
@@ -88,7 +102,7 @@ export default function RegisterPage() {
     }
   }
 
-  function submitRegistration(event: FormEvent<HTMLFormElement>) {
+  async function submitRegistration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitted(true);
     setNotice("");
@@ -104,17 +118,37 @@ export default function RegisterPage() {
       return;
     }
 
-    setErrors({});
+    if (!turnstileToken) {
+      setNotice("Please complete the security check before creating your account.");
+      return;
+    }
 
-    // This branch still uses the local storefront demo account. The live
-    // backend registration endpoint will be connected in the auth integration.
-    registerDemoCustomer({
-      firstName: result.data.firstName,
-      lastName: result.data.lastName,
-      email: result.data.email.toLowerCase(),
-      phone: `+234${result.data.phone.replace(/[\s().-]/g, "").replace(/^0/, "")}`,
-    });
-    router.replace("/account");
+    setErrors({});
+    setIsSubmitting(true);
+    try {
+      const response = await apiRequest<{ message: string }>("/auth/register", {
+        method: "POST",
+        body: {
+          firstName: result.data.firstName,
+          lastName: result.data.lastName,
+          email: result.data.email.toLowerCase(),
+          phone: `+234${result.data.phone.replace(/[\\s().-]/g, "").replace(/^0/, "")}`,
+          password: result.data.password,
+          turnstileToken,
+          website,
+        },
+      });
+      setNotice(response.message || "Account created. Please check your email for a verification link.");
+      setForm(initialForm);
+      setAcceptPolicies(false);
+      setSubmitted(false);
+    } catch (cause) {
+      setNotice(cause instanceof ApiError ? cause.message : "We couldn't complete registration. Please try again.");
+    } finally {
+      setTurnstileToken(null);
+      setTurnstileResetKey((current) => current + 1);
+      setIsSubmitting(false);
+    }
   }
 
   function fieldProps(field: RegistrationField) {
@@ -275,8 +309,24 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <button className="customer-auth-submit" type="submit">
-            Create Account
+          <div className="customer-auth-honeypot" aria-hidden="true">
+            <label htmlFor="reg-website">Leave this field empty</label>
+            <input id="reg-website" name="website" type="text" tabIndex={-1}
+              autoComplete="off" value={website}
+              onChange={(event) => setWebsite(event.target.value)} />
+          </div>
+
+          <TurnstileWidget
+            siteKey={turnstileSiteKey}
+            resetKey={turnstileResetKey}
+            onVerify={handleTurnstileVerify}
+            onExpire={handleTurnstileExpire}
+            onError={handleTurnstileError}
+          />
+
+          <button className="customer-auth-submit" type="submit"
+            disabled={isSubmitting || !turnstileToken}>
+            {isSubmitting ? "Creating account..." : "Create Account"}
           </button>
         </form>
 
