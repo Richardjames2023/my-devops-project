@@ -15,6 +15,15 @@ const envSchema = z.object({
   FACEBOOK_APP_ID: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
   FACEBOOK_APP_SECRET: z.preprocess((value) => value === "" ? undefined : value, z.string().min(1).optional()),
 
+  TURNSTILE_SECRET_KEY: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1, "TURNSTILE_SECRET_KEY cannot be empty").optional(),
+  ),
+  TURNSTILE_EXPECTED_HOSTNAMES: z.preprocess(
+    (value) => value === "" ? undefined : value,
+    z.string().min(1).optional(),
+  ),
+
   CORS_ORIGIN: z.string().min(1, "CORS_ORIGIN is required"),
 
   JWT_ACCESS_SECRET: z
