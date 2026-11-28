@@ -138,11 +138,13 @@ export default function RegisterPage() {
   return (
     <div className="customer-auth-page">
       <section className="customer-auth-card">
-        <Link href="/" className="customer-auth-brand">
-          <ShoppingBag size={25} />
-          <span>ClickClick<strong>Buy</strong></span>
-        </Link>
-        <p className="customer-auth-eyebrow">JOIN CLICKCLICKBUY</p>
+        <div className="customer-auth-card-heading">
+          <Link href="/" className="customer-auth-brand">
+            <ShoppingBag size={25} />
+            <span>ClickClick<strong>Buy</strong></span>
+          </Link>
+          <p className="customer-auth-eyebrow">JOIN CLICKCLICKBUY</p>
+        </div>
         <h1>Create your account</h1>
         <p className="customer-auth-intro">
           A better everyday shopping experience starts here.
