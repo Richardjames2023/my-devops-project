@@ -138,12 +138,11 @@ export default function RegisterPage() {
   return (
     <div className="customer-auth-page">
       <section className="customer-auth-card">
-        <div className="customer-auth-card-heading">
-          <Link href="/" className="customer-auth-brand">
-            <ShoppingBag size={25} />
-            <span>ClickClick<strong>Buy</strong></span>
-          </Link>
-          <p className="customer-auth-eyebrow">JOIN CLICKCLICKBUY</p>
+        <div className="customer-auth-card-heading customer-auth-card-heading--center">
+          <div className="customer-auth-join">
+            <ShoppingBag size={21} strokeWidth={2.2} aria-hidden="true" />
+            <span>JOIN CLICKCLICKBUY</span>
+          </div>
         </div>
         <h1>Create your account</h1>
         <p className="customer-auth-intro">
