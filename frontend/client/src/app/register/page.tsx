@@ -64,9 +64,28 @@ export default function RegisterPage() {
   }
 
   function updateField(field: keyof RegistrationValues, value: string) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
+    const nextForm = { ...form, [field]: value };
+    setForm(nextForm);
     setNotice("");
+
+    if (submitted) {
+      const result = registrationSchema.safeParse({ ...nextForm, acceptPolicies });
+      const relevantIssues = result.success
+        ? []
+        : result.error.issues.filter((issue) =>
+            issue.path[0] === field ||
+            (field === "password" && issue.path[0] === "confirmPassword"),
+          );
+      setErrors((current) => ({
+        ...current,
+        [field]: relevantIssues.find((issue) => issue.path[0] === field)?.message,
+        ...(field === "password"
+          ? { confirmPassword: relevantIssues.find((issue) => issue.path[0] === "confirmPassword")?.message }
+          : {}),
+      }));
+    } else {
+      setErrors((current) => ({ ...current, [field]: undefined }));
+    }
   }
 
   function submitRegistration(event: FormEvent<HTMLFormElement>) {
